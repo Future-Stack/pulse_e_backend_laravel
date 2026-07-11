@@ -17,16 +17,17 @@ class User extends Authenticatable
      *
      * @var list<string>
      */
-    protected $fillable = [
+        protected $fillable = [
         'full_name',
         'email',
         'password',
         'otp',
         'otp_expire_at',
         'status',
+        'suspend_reason',
         'user_type',
         'fcm_token',
-        'email_verified_at'
+        'email_verified_at',
     ];
 
     /**
@@ -50,6 +51,8 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'otp_expire_at' => 'datetime',
             'password' => 'hashed',
+            'is_privacy_accepted' => 'boolean',
+            'onboardingCompleted' => 'boolean',
         ];
     }
 

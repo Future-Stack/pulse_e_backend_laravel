@@ -22,6 +22,7 @@ return new class extends Migration
             $table->rememberToken();
             $table->string('fcm_token')->nullable();
             $table->string('status')->default('pending')->comment('pending,active,suspended');
+            $table->text('suspend_reason')->nullable();
             $table->string('user_type')->nullable()->comment('user,admin');
             $table->boolean('is_privacy_accepted')->default(false);
             $table->boolean('onboardingCompleted')->default(false);
