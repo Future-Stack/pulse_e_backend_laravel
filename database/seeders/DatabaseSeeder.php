@@ -13,13 +13,13 @@ class DatabaseSeeder extends Seeder
     {
         $this->call([
             SettingsSeeder::class,
-            InspectionTypeSeeder::class,
-            UserSeeder::class,
             PagesSeeder::class,
-            InspectionsSeeder::class,
-            ReviewsSeeder::class,
-            FaqSeeder::class,
-            InspectorPayoutSeeder::class,
+            UserSeeder::class,
+            ActivitySeeder::class,
+            ConnectDeviceSeeder::class,
+            HealthGoalSeeder::class,
+            LifeJourneySeeder::class,
+            LifeStageSeeder::class,
         ]);
     }
 }

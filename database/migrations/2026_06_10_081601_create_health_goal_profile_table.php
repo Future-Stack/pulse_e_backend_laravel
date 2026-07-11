@@ -11,11 +11,16 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('settings', function (Blueprint $table) {
+        Schema::create('health_goal_profile', function (Blueprint $table) {
             $table->id();
-            $table->string('platform_name');
-            $table->string('email')->nullable();
-            $table->text('logo')->nullable();
+
+            $table->foreignId('health_goal_id')
+                ->constrained('health_goals')
+                ->onDelete('cascade');
+
+            $table->foreignId('profile_id')
+                ->constrained('profiles')
+                ->onDelete('cascade');
             $table->timestamps();
         });
     }
@@ -25,6 +30,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('settings');
+        Schema::dropIfExists('health_goal_profile');
     }
 };

@@ -21,10 +21,12 @@ return new class extends Migration
             $table->integer('otp')->nullable();
             $table->timestamp('otp_expire_at')->nullable();
             $table->rememberToken();
-            $table->string('device_token')->nullable();
+            $table->string('fcm_token')->nullable();
             $table->string('status')->default('pending')->comment('pending,active,suspended');
-            $table->string('user_type')->nullable()->comment('customer,inspector,admin');
-            $table->decimal('earnings',10,2)->default(0.00);
+            $table->string('user_type')->nullable()->comment('user,admin');
+            $table->boolean('is_privacy_accepted')->default(false);
+            $table->boolean('onboardingCompleted')->default(false);
+
             $table->timestamps();
         });
 

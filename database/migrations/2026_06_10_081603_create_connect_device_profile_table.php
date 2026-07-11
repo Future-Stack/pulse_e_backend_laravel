@@ -11,11 +11,12 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('settings', function (Blueprint $table) {
+        Schema::create('connect_device_profile', function (Blueprint $table) {
             $table->id();
-            $table->string('platform_name');
-            $table->string('email')->nullable();
-            $table->text('logo')->nullable();
+            $table->foreignId('connect_device_id')->constrained('connect_devices')->onDelete('cascade');
+            $table->foreignId('profile_id')
+                ->constrained('profiles')
+                ->onDelete('cascade');
             $table->timestamps();
         });
     }
@@ -25,6 +26,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('settings');
+        Schema::dropIfExists('connect_device_profile');
     }
 };
