@@ -17,6 +17,7 @@ class UserSeeder extends Seeder
             ['email' => 'admin@gmail.com'],
             [
                 'full_name' => 'Super Admin',
+               
                 'password'   => Hash::make('Password@123'),
                 'status'     => 'active',
                 'user_type'  => 'admin',
@@ -27,7 +28,8 @@ class UserSeeder extends Seeder
         $user = User::updateOrCreate(
             ['email' => 'user@gmail.com'],
             [
-                'full_name' => 'John Doe',
+                'full_name' => 'User',
+               
                 'password'   => Hash::make('Password@123'),
                 'status'     => 'active',
                 'user_type'  => 'user',
