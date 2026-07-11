@@ -3,29 +3,57 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class Profile extends Model
 {
-    protected $table = 'profiles';
-
     protected $fillable = [
-        'user_id', 'address', 'profile_img', 'phone',
-        'license_number', 'license_expiry', 'insurance_expiry',
-        'stripe_account_id', 'stripe_customer_id', 'stripe_onboarding_completed'
+        'user_id',
+        'life_stage_id',
+        'activity_id',
+        'bio',
+        'profile_img',
+        'age',
+        'height',
+        'weight',
+        'stripe_account_id',
     ];
 
+    protected $casts = [
+        'height' => 'float',
+        'weight' => 'float',
+        'age' => 'integer',
+    ];
 
-    public function healthGoals()
+    public function user(): BelongsTo
     {
-        return $this->belongsToMany(HealthGoal::class, 'health_goal_profile');
+        return $this->belongsTo(User::class);
     }
 
-    public function lifeJourneys()
+    public function lifeStage(): BelongsTo
     {
-        return $this->belongsToMany(LifeJourney::class, 'life_journey_profile');
+        return $this->belongsTo(LifeStage::class);
     }
 
+    public function activity(): BelongsTo
+    {
+        return $this->belongsTo(Activity::class);
+    }
 
+    public function healthGoals(): BelongsToMany
+    {
+        return $this->belongsToMany(
+            HealthGoal::class,
+            'health_goal_profile'
+        );
+    }
 
-
+    public function lifeJourneys(): BelongsToMany
+    {
+        return $this->belongsToMany(
+            LifeJourney::class,
+            'life_journey_profile'
+        );
+    }
 }

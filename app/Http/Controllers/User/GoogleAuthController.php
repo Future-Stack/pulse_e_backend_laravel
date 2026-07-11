@@ -1,5 +1,6 @@
 <?php
-namespace App\Http\Controllers\User;
+
+namespace App\Http\Controllers\Api\Auth;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
@@ -11,72 +12,40 @@ class GoogleAuthController extends Controller
 {
     public function tokenLogin(Request $request)
     {
+        // 1. Validate request
         $request->validate([
-            'id_token'  => 'required|string',
-            'user_type' => 'required|string|in:homeowner,inspector',
+            'id_token' => 'required|string',
         ]);
 
-        // 1. Verify Google token
-        $response = Http::get(
-            "https://oauth2.googleapis.com/tokeninfo?id_token={$request->id_token}"
-        );
+        $idToken = $request->id_token;
+
+        // 2. Verify token with Google
+        $response = Http::get("https://oauth2.googleapis.com/tokeninfo?id_token={$idToken}");
 
         if ($response->failed()) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Invalid Google token'
-            ], 401);
+            return response()->json(['error' => 'Invalid Google token'], 401);
         }
 
         $googleUser = $response->json();
 
-        // 2. Get email
-        $email = $googleUser['email'] ?? null;
-
-        if (!$email) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Email not found from Google'
-            ], 422);
-        }
-
-        // 3. Name split
-        $nameParts = explode(' ', $googleUser['name'] ?? 'User', 2);
-
-        $firstName = $nameParts[0];
-        $lastName  = $nameParts[1] ?? '';
-
-        // 4. SAFE USER TYPE (IMPORTANT)
-        // admin block for security
-        $allowedTypes = ['homeowner', 'inspector'];
-
-        $userType = in_array($request->user_type, $allowedTypes)
-            ? $request->user_type
-            : 'homeowner';
-
-        // 5. Create or update user
+        // 3. Create or update user
         $user = User::updateOrCreate(
-            ['email' => $email],
+            ['email' => $googleUser['email']],
             [
-                'first_name' => $firstName,
-                'last_name'  => $lastName,
+                'full_name' => $googleUser['full_name'] ?? 'No Name',
                 'email_verified_at' => now(),
-                'password'   => Hash::make(Str::random(24)),
-                'status'     => 'active',
-                'user_type'  => $userType,
+                'password' => bcrypt(Str::random(16)),
+                'profile_photo_path' => $googleUser['picture'] ?? null,
             ]
         );
 
-        // 6. Create token
-        $token = $user->createToken('google_token')->plainTextToken;
+        // 4. Create Sanctum token
+        $token = $user->createToken('api-token')->plainTextToken;
 
-        // 7. Response
+        // 5. Return response
         return response()->json([
-            'success' => true,
-            'message' => 'Google login successful',
-            'access_token' => $token,
-            'token_type' => 'Bearer',
-            'user' => $user
-        ], 200);
+            'user' => $user,
+            'token' => $token,
+        ]);
     }
 }
