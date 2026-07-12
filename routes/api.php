@@ -1,4 +1,6 @@
 <?php
+
+use App\Http\Controllers\Onboarding\OnboardingController;
 use App\Http\Controllers\User\AppleAuthController;
 use App\Http\Controllers\User\GoogleAuthController;
 use App\Http\Controllers\Faq\FaqController;
@@ -33,7 +35,7 @@ Route::prefix('v1')->group(function () {
     Route::post('forgot-password', [AuthController::class, 'forgotPassword']);
     Route::post('/verify-otp', [AuthController::class, 'verifyOtp']);
     Route::post('reset-password', [AuthController::class, 'resetPassword']);
-   
+
    // Google OAuth (public, no auth required)
     Route::post('/auth/google/token', [GoogleAuthController::class, 'tokenLogin']);
     //Apple
@@ -49,6 +51,15 @@ Route::post('/apple', [AppleAuthController::class, 'login'])->name('api.auth.app
 
         Route::post('/profile/update', [AuthController::class, 'updateProfile']);
 
+        //Profile Onboarding
+        Route::get('/life-stages', [OnboardingController::class, 'getLifeStages']);
+        Route::get('/health-goals', [OnboardingController::class, 'getHealthGoals']);
+        Route::get('/activities', [OnboardingController::class, 'getActivities']);
+        Route::get('/life-journeys', [OnboardingController::class, 'getLifeJourneys']);
+        Route::get('/connect-devices', [OnboardingController::class, 'getConnectDevices']);
+        Route::get('/privacy-policy', [OnboardingController::class, 'getPrivacyPolicy']);
+
+        Route::post('/profile-onboarding', [OnboardingController::class, 'profileOnboarding']);
 
         //Pages
         Route::apiResource('pages', PageController::class)->names('pages.');
