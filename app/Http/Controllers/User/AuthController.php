@@ -17,318 +17,181 @@ use Illuminate\Validation\Rules\Password;
 
 class AuthController extends Controller
 {
-    public function getProfile(Request $request)
-    {
-        try {
-            $user = $request->user();
+    
+public function register(Request $request)
+{
+    try {
 
-            if (!$user) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'User context not found or unauthenticated.'
-                ], 401);
-            }
-
-            $user->load(['profile.inspectionTypes']);
-
-            $responseData = [
-                'id'         => $user->id,
-                'first_name' => $user->first_name,
-                'last_name'  => $user->last_name,
-                'email'      => $user->email,
-                'status'     => $user->status,
-                'user_type'  => $user->user_type, 
-                'profile'    => $user->profile ? [
-                    'id'                          => $user->profile->id,
-                    'address'                     => $user->profile->address,
-                    'phone'                       => $user->profile->phone,
-                    'profile_img'                 => $user->profile->profile_img
-                                                        ? asset('storage/' . $user->profile->profile_img)
-                                                        : asset('defaults/placeholder.png'),
-                    'license_number'              => $user->profile->license_number,
-                    'license_expiry'              => $user->profile->license_expiry,
-                    'insurance_expiry'            => $user->profile->insurance_expiry,
-                    'stripe_account_id'           => $user->profile->stripe_account_id,
-                    'stripe_customer_id'          => $user->profile->stripe_customer_id,
-                    'stripe_onboarding_completed' => (bool) $user->profile->stripe_onboarding_completed,
-                    'inspection_types'            => $user->profile->inspectionTypes->map(function ($type) {
-                        return [
-                            'id'         => $type->id,
-                            'title'      => $type->title,
-                            'short_desc' => $type->short_desc,
-                            'price'      => floatval($type->price),
-                            'img'        => $type->img ? asset('storage/' . $type->img) : null,
-                        ];
-                    }),
-                ] : null,
-            ];
-
-            return response()->json([
-                'success' => true,
-                'message' => 'User profile retrieved successfully.',
-                'data'    => $responseData,
-            ], 200);
-
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to retrieve profile data: ' . $e->getMessage(),
-            ], 500);
-        }
-    }
-
-
-    public function register(Request $request)
-    {
         $request->validate([
-            'first_name'            => 'required|string|max:255',
-            'last_name'             => 'required|string|max:255',
-            'email'                 => 'required|string|email|max:255|unique:users',
-            'password'              => ['required', 'string', 'confirmed', Password::min(8)],
-            'user_type'             => 'required|string|in:inspector,homeowner',
-            'address'               => 'nullable|string',
-            'phone'                 => 'nullable|string|max:50',
-            'profile_img'           => 'nullable|image|mimes:jpeg,png,jpg,gif|max:10240',
-            'license_number'        => 'nullable|string|max:255',
-            'license_expiry'        => 'nullable|date_format:Y-m-d',
-            'insurance_expiry'      => 'nullable|date_format:Y-m-d',
-            'inspection_type_ids'   => 'nullable|array',
-            'inspection_type_ids.*' => 'integer|exists:inspection_types,id',
+            'full_name' => 'required|string|max:255',
+            'email' => 'required|email|max:255|unique:users,email',
+            'password' => [
+                'required',
+                'confirmed',
+                Password::min(8)
+                    ->letters()
+                    ->mixedCase()
+                    ->numbers()
+                    ->symbols(),
+            ],
+            'is_privacy_accepted' => 'required|accepted',
+        ], [
+            'full_name.required' => 'Full name field is required.',
+
+            'email.required' => 'Email field is required.',
+            'email.email' => 'Please enter a valid email address.',
+            'email.unique' => 'Email is already registered.',
+
+            'password.required' => 'Password is required.',
+            'password.confirmed' => 'Password confirmation does not match.',
+
+            'is_privacy_accepted.required' => 'You must accept the terms and conditions.',
+            'is_privacy_accepted.accepted' => 'You must accept the terms and conditions.',
         ]);
 
-        DB::beginTransaction();
+        // Generate OTP
+        $otp = random_int(1000, 9999);
 
-        try {
-            $status = $request->user_type === 'inspector' ? 'pending' : 'active';
-            $otp    = random_int(1000, 9999);
+        // Create User
+        $user = User::create([
+            'full_name' => $request->full_name,
+            'email' => $request->email,
+            'password' => Hash::make($request->password),
 
-            $user = User::create([
-                'first_name'    => $request->first_name,
-                'last_name'     => $request->last_name,
-                'email'         => $request->email,
-                'password'      => Hash::make($request->password),
-                'status'        => $status,
-                'user_type'     => $request->user_type,
-                'otp'           => $otp,
-                'otp_expire_at' => now()->addMinutes(5),
-            ]);
+            'user_type' => 'user',
+            'status' => 'active',
 
-            $profileImgPath = null;
-            if ($request->hasFile('profile_img')) {
-                $profileImgPath = $request->file('profile_img')->store('profiles', 'public');
-            }
+            'otp' => $otp,
+            'otp_expire_at' => Carbon::now()->addMinutes(5),
 
-            $profile = Profile::create([
-                'user_id'                     => $user->id,
-                'address'                     => $request->address ?? null,
-                'profile_img'                 => $profileImgPath,
-                'phone'                       => $request->phone ?? null,
-                'license_number'              => $request->license_number ?? null,
-                'license_expiry'              => $request->license_expiry ?? null,
-                'insurance_expiry'            => $request->insurance_expiry ?? null,
-                'stripe_account_id'           => null, 
-                'stripe_customer_id'          => null,
-                'stripe_onboarding_completed' => false,
-            ]);
+            'is_privacy_accepted' => true,
+            'onboardingCompleted' => false,
+        ]);
 
-            if ($request->user_type === 'inspector' && $request->has('inspection_type_ids')) {
-                $profile->inspectionTypes()->attach($request->inspection_type_ids);
-            }
+        // Create empty profile
+        Profile::create([
+            'user_id' => $user->id,
+        ]);
 
-            DB::commit();
+        // Send OTP Email
+        SendOtpEmail::dispatch($user->id, 'verify', $otp);
 
-            SendOtpEmail::dispatch($user->id, 'register', $otp);
+        return response()->json([
+            'success' => true,
+            'message' => 'Registration successful. OTP sent to your email.',
+            'data' => [
+                'id' => $user->id,
+                'full_name' => $user->full_name,
+                'email' => $user->email,
+                'user_type' => $user->user_type,
+                'status' => $user->status,
+                'is_privacy_accepted' => $user->is_privacy_accepted,
+                'onboardingCompleted' => $user->onboardingCompleted,
+                'email_verified_at' => $user->email_verified_at,
+                'created_at' => $user->created_at,
+            ]
+        ], 201);
 
-            return response()->json([
-                'success' => true,
-                'message' => 'Registration successful. Please check your email for OTP verification.',
-            ], 201);
+    } catch (\Illuminate\Validation\ValidationException $e) {
 
-        } catch (\Illuminate\Validation\ValidationException $e) {
-            DB::rollBack();
-            return response()->json([
-                'success' => false,
-                'message' => collect($e->errors())->flatten()->first(),
-            ], 422);
-        } catch (\Exception $e) {
-            DB::rollBack();
-            Log::error('Registration Failure: ' . $e->getMessage());
-            return response()->json([
-                'success' => false,
-                'message' => 'Registration failed. Please try again.',
-            ], 500);
-        }
+        return response()->json([
+            'success' => false,
+            'message' => collect($e->errors())->flatten()->first(),
+        ], 422);
+
+    } catch (\Exception $e) {
+
+        Log::error('Registration Error: ' . $e->getMessage());
+
+        return response()->json([
+            'success' => false,
+            'message' => 'Something went wrong. Please try again.',
+        ], 500);
     }
+}
+    
 
+   public function login(Request $request)
+{
+    try {
 
-    public function updateProfile(Request $request)
-    {
-        try {
-            $user = $request->user();
+        $request->validate([
+            'email' => 'required|email',
+            'password' => 'required|string|min:8',
+        ], [
+            'email.required' => 'Email field is required.',
+            'email.email' => 'Please enter a valid email address.',
+            'password.required' => 'Password field is required.',
+            'password.min' => 'Password must be at least 8 characters.',
+        ]);
 
-            if (!$user) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Unauthenticated user context.',
-                ], 401);
-            }
+        $user = User::where('email', $request->email)->first();
 
-            $request->validate([
-                'first_name'            => 'required|string|max:255',
-                'last_name'             => 'required|string|max:255',
-                'address'               => 'nullable|string',
-                'phone'                 => 'nullable|string|max:50',
-                'profile_img'           => 'nullable|image|mimes:jpeg,png,jpg,gif|max:10240',
-                'license_number'        => 'nullable|string|max:255',
-                'license_expiry'        => 'nullable|date_format:Y-m-d',
-                'insurance_expiry'      => 'nullable|date_format:Y-m-d',
-                'inspection_type_ids'   => 'nullable|array',
-                'inspection_type_ids.*' => 'integer|exists:inspection_types,id',
-            ]);
-
-            DB::beginTransaction();
-
-            $user->update([
-                'first_name' => $request->first_name,
-                'last_name'  => $request->last_name,
-            ]);
-
-            $profile = Profile::firstOrCreate(['user_id' => $user->id]);
-
-            if ($request->hasFile('profile_img')) {
-                if ($profile->profile_img && Storage::disk('public')->exists($profile->profile_img)) {
-                    Storage::disk('public')->delete($profile->profile_img);
-                }
-                $profile->profile_img = $request->file('profile_img')->store('profiles', 'public');
-            }
-
-            $profile->address = $request->address;
-            $profile->phone   = $request->phone;
-
-            if ($user->user_type === 'inspector') {
-                $profile->license_number   = $request->license_number;
-                $profile->license_expiry   = $request->license_expiry;
-                $profile->insurance_expiry = $request->insurance_expiry;
-
-                $selectedTypes = $request->input('inspection_type_ids') ?? [];
-                $profile->inspectionTypes()->sync($selectedTypes);
-            }
-
-            $profile->save();
-
-            DB::commit();
-
-            $user->load(['profile.inspectionTypes']);
-
+        if (!$user || !Hash::check($request->password, $user->password)) {
             return response()->json([
-                'success' => true,
-                'message' => 'Profile updated successfully.',
-                'data'    => [
-                    'id'        => $user->id,
-                    'first_name'=> $user->first_name,
-                    'last_name' => $user->last_name,
-                    'email'     => $user->email,
-                    'user_type' => $user->user_type, // ✅ fixed
-                    'profile'   => [
-                        'id'                          => $profile->id,
-                        'address'                     => $profile->address,
-                        'phone'                       => $profile->phone,
-                        'profile_img'                 => $profile->profile_img
-                                                            ? asset('storage/' . $profile->profile_img)
-                                                            : asset('defaults/placeholder.png'),
-                        'license_number'              => $profile->license_number,
-                        'license_expiry'              => $profile->license_expiry,
-                        'insurance_expiry'            => $profile->insurance_expiry,
-                        'stripe_account_id'           => $profile->stripe_account_id,
-                        'stripe_customer_id'          => $profile->stripe_customer_id,
-                        'stripe_onboarding_completed' => (bool) $profile->stripe_onboarding_completed,
-                        'inspection_types'            => $profile->inspectionTypes->map(function ($type) {
-                            return [
-                                'id'    => $type->id,
-                                'title' => $type->title,
-                                'price' => floatval($type->price),
-                            ];
-                        }),
-                    ],
+                'success' => false,
+                'message' => 'Invalid email or password.',
+            ], 401);
+        }
+
+        // Email verification
+        if (is_null($user->email_verified_at)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Please verify your email before logging in.',
+            ], 403);
+        }
+
+        // Suspended account
+        if ($user->status === 'suspended') {
+            return response()->json([
+                'success' => false,
+                'message' => $user->suspend_reason
+                    ? 'Your account has been suspended. Reason: '.$user->suspend_reason
+                    : 'Your account has been suspended.',
+            ], 403);
+        }
+
+        // Remove old tokens
+        $user->tokens()->delete();
+
+        // Create new token
+        $token = $user->createToken('auth_token')->plainTextToken;
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Login successful.',
+            'data' => [
+                'user' => [
+                    'id' => $user->id,
+                    'full_name' => $user->full_name,
+                    'email' => $user->email,
+                    'user_type' => $user->user_type,
+                    'status' => $user->status,
+                    'onboardingCompleted' => $user->onboardingCompleted,
                 ],
-            ], 200);
+                'token' => $token,
+                'token_type' => 'Bearer',
+            ],
+        ], 200);
 
-        } catch (\Illuminate\Validation\ValidationException $e) {
-            DB::rollBack();
-            return response()->json([
-                'success' => false,
-                'message' => collect($e->errors())->flatten()->first(),
-            ], 422);
-        } catch (\Exception $e) {
-            DB::rollBack();
-            Log::error('Profile Update Error: ' . $e->getMessage());
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to update profile. Please try again.',
-            ], 500);
-        }
+    } catch (\Illuminate\Validation\ValidationException $e) {
+
+        return response()->json([
+            'success' => false,
+            'message' => collect($e->errors())->flatten()->first(),
+        ], 422);
+
+    } catch (\Exception $e) {
+
+        Log::error('Login Error: '.$e->getMessage());
+
+        return response()->json([
+            'success' => false,
+            'message' => 'Something went wrong. Please try again.',
+        ], 500);
     }
-
-
-    public function login(Request $request)
-    {
-        try {
-            $request->validate([
-                'email'    => 'required|string|email',
-                'password' => 'required|string',
-            ]);
-
-            $user = User::where('email', $request->email)->first();
-
-            if (!$user || !Hash::check($request->password, $user->password)) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Invalid login credentials.',
-                ], 401);
-            }
-
-            if (is_null($user->email_verified_at)) {
-                return response()->json([
-                    'success'     => false,
-                    'is_verified' => false,
-                    'message'     => 'Your email is not verified. Please verify your email first.',
-                ], 403);
-            }
-
-            if ($user->status !== 'active') {
-                $message = $user->status === 'pending'
-                    ? 'Your account is under admin review. Please wait for approval.'
-                    : 'Your account is inactive. Please contact support.';
-
-                return response()->json([
-                    'success' => false,
-                    'message' => $message,
-                ], 403);
-            }
-
-            $token = $user->createToken(config('auth.token_name', 'auth_token'))->plainTextToken;
-
-            return response()->json([
-                'success'      => true,
-                'message'      => 'Logged in successfully.',
-                'access_token' => $token,
-                'token_type'   => 'Bearer',
-                'user'         => $user,
-            ], 200);
-
-        } catch (\Illuminate\Validation\ValidationException $e) {
-            return response()->json([
-                'success' => false,
-                'message' => collect($e->errors())->flatten()->first(),
-            ], 422);
-        } catch (\Exception $e) {
-            Log::error('Login Error: ' . $e->getMessage());
-            return response()->json([
-                'success' => false,
-                'message' => 'Login failed. Please try again.',
-            ], 500);
-        }
-    }
+}
 
 
     public function me(Request $request)
@@ -460,7 +323,7 @@ class AuthController extends Controller
                     ], 200);
                 }
 
-                $token = $user->createToken(config('auth.token_name', 'auth_token'))->plainTextToken;
+                $token = $user->createToken(config('auth.token_full_name', 'auth_token'))->plainTextToken;
 
                 return response()->json([
                     'success'      => true,
@@ -516,7 +379,9 @@ class AuthController extends Controller
 
             $user->update([
                 'otp'           => $otp,
-                'otp_expire_at' => Carbon::now()->addMinutes(5),
+                'otp_expire_at' => Carbon::now()->addMinutes(5),0
+
+
             ]);
 
             $mailType = is_null($user->email_verified_at) ? 'register' : 'forgot';

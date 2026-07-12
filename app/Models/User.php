@@ -17,7 +17,7 @@ class User extends Authenticatable
      *
      * @var list<string>
      */
-        protected $fillable = [
+       protected $fillable = [
         'full_name',
         'email',
         'password',
@@ -28,6 +28,8 @@ class User extends Authenticatable
         'user_type',
         'fcm_token',
         'email_verified_at',
+        'is_privacy_accepted',
+        'onboardingCompleted',
     ];
 
     /**
@@ -54,33 +56,7 @@ class User extends Authenticatable
             'is_privacy_accepted' => 'boolean',
             'onboardingCompleted' => 'boolean',
         ];
-    }
+    } 
 
-    public function profile()
-    {
-        return $this->hasOne(Profile::class, 'user_id');
-    }
-
-    public function inspectionAssigns()
-    {
-        return $this->hasMany(InspectionAssign::class, 'inspector_id');
-    }
-
-
-    public function inspectionBookings()
-    {
-        return $this->hasMany(InspectionBooking::class, 'homeowner_id');
-    }
-
-    //no need at now
-    public function inspectorPayouts()
-{
-    return $this->hasMany(\App\Models\InspectorPayout::class, 'inspector_id');
-}
-
-
-public function inspectionPayments()
-{
-    return $this->hasMany(\App\Models\InspectionPayment::class, 'inspector_id');
-}
+   
 }
