@@ -69,11 +69,6 @@ public function register(Request $request)
             'onboardingCompleted' => false,
         ]);
 
-        // Create empty profile
-        Profile::create([
-            'user_id' => $user->id,
-        ]);
-
         // Send OTP Email
         SendOtpEmail::dispatch($user->id, 'verify', $otp);
 
@@ -87,7 +82,7 @@ public function register(Request $request)
                 'user_type' => $user->user_type,
                 'status' => $user->status,
                 'is_privacy_accepted' => $user->is_privacy_accepted,
-                'onboardingCompleted' => $user->onboardingCompleted,
+                'onboardingCompleted' => $user->onboardingCompleted, // false
                 'email_verified_at' => $user->email_verified_at,
                 'created_at' => $user->created_at,
             ]
@@ -102,7 +97,7 @@ public function register(Request $request)
 
     } catch (\Exception $e) {
 
-        Log::error('Registration Error: ' . $e->getMessage());
+        Log::error('Registration Error: '.$e->getMessage());
 
         return response()->json([
             'success' => false,
