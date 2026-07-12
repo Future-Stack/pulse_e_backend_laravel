@@ -19,12 +19,12 @@ jobs:
       # Build the Docker image from the current directory
       - name: Build Docker image
         run: |
-          docker build -t ${{ secrets.DOCKER_USERNAME }}/kujuba_backend:latest .
+          docker build -t ${{ secrets.DOCKER_USERNAME }}/pulse_backend_laravel:latest .
 
       # Push the built image to the Docker Hub registry
       - name: Push Docker image
         run: |
-          docker push ${{ secrets.DOCKER_USERNAME }}/kujuba_backend:latest
+          docker push ${{ secrets.DOCKER_USERNAME }}/pulse_backend_laravel:latest
 
   deploy:
     name: Deploy to VPS
@@ -40,10 +40,10 @@ jobs:
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.VPS_HOST }}
-          username: root
+          username: admin
           password: ${{ secrets.VPS_PASSWORD }}
           script: |
-            cd /root/backend/app
+            cd /home/admin/backend/app
             # Stop currently running containers and remove orphans (containers not defined in the compose file)
             # This ensures we start with a clean state and avoid conflicts with old containers.
             docker compose down --remove-orphans
