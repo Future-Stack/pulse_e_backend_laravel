@@ -14,6 +14,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rules\Password;
+use Illuminate\Support\Facades\Auth;
 
 class AuthController extends Controller
 {
@@ -68,11 +69,6 @@ public function register(Request $request)
             'onboardingCompleted' => false,
         ]);
 
-        // Create empty profile
-        Profile::create([
-            'user_id' => $user->id,
-        ]);
-
         // Send OTP Email
         SendOtpEmail::dispatch($user->id, 'verify', $otp);
 
@@ -86,7 +82,7 @@ public function register(Request $request)
                 'user_type' => $user->user_type,
                 'status' => $user->status,
                 'is_privacy_accepted' => $user->is_privacy_accepted,
-                'onboardingCompleted' => $user->onboardingCompleted,
+                'onboardingCompleted' => $user->onboardingCompleted, // false
                 'email_verified_at' => $user->email_verified_at,
                 'created_at' => $user->created_at,
             ]
@@ -101,7 +97,7 @@ public function register(Request $request)
 
     } catch (\Exception $e) {
 
-        Log::error('Registration Error: ' . $e->getMessage());
+        Log::error('Registration Error: '.$e->getMessage());
 
         return response()->json([
             'success' => false,
@@ -500,4 +496,62 @@ public function register(Request $request)
             ], 500);
         }
     }
+
+
+
+
+//save device token
+    public function saveFcmToken(Request $request)
+{
+    try {
+
+        $request->validate([
+            'fcm_token' => [
+                'required',
+                'string',
+               
+            ],
+        ], [
+            'fcm_token.required' => 'FCM token is required.',
+            'fcm_token.string'   => 'Invalid FCM token.',
+           
+        ]);
+
+        $user = Auth::user();
+
+        if (!$user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized.',
+            ], 401);
+        }
+
+        $user->update([
+            'fcm_token' => $request->fcm_token,
+        ]);
+
+        Log::info("Device token updated for user {$user->id}");
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Device token saved successfully.',
+        ], 200);
+
+    } catch (\Illuminate\Validation\ValidationException $e) {
+
+        return response()->json([
+            'success' => false,
+            'message' => collect($e->errors())->flatten()->first(),
+        ], 422);
+
+    } catch (\Exception $e) {
+
+        Log::error('Save Fcm Token Error: ' . $e->getMessage());
+
+        return response()->json([
+            'success' => false,
+            'message' => 'Failed to save fcm token.',
+        ], 500);
+    }
+}
 }
