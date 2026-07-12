@@ -24,7 +24,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: softvence/kujuba_backend:latest
+    image: softvence/pulse_backend_laravel:latest
     platform: linux/amd64
     container_name: laravel_app
     restart: unless-stopped
@@ -43,7 +43,7 @@ services:
 
   # Laravel Queue Worker Service: Processes background jobs
   queue:
-    image: softvence/kujuba_backend:latest
+    image: softvence/pulse_backend_laravel:latest
     platform: linux/amd64
     container_name: laravel_queue
     restart: unless-stopped
