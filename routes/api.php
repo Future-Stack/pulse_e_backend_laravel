@@ -1,34 +1,16 @@
 <?php
-
-use App\Http\Controllers\Booking\InspectionBookingRequestCotroller;
-use App\Http\Controllers\Booking\RescheduleBookingRequestController;
+use App\Http\Controllers\User\AppleAuthController;
+use App\Http\Controllers\User\GoogleAuthController;
 use App\Http\Controllers\Faq\FaqController;
-use App\Http\Controllers\Inspection\AdminInspectionController;
-use App\Http\Controllers\Inspection\InspectionController;
-use App\Http\Controllers\Inspection_Assign\InspectionAssignsController;
-use App\Http\Controllers\InspectionBookingController;
-use App\Http\Controllers\Inspecttion_Decline\InspectionDeclinesController;
 use App\Http\Controllers\Notification\NotificationController;
 use App\Http\Controllers\Notification\NotificationPreferenceController;
 use App\Http\Controllers\Page\PageController;
-use App\Http\Controllers\Payment\AdminPaymentController;
-use App\Http\Controllers\Reviews\HomeownerReviewsController;
-use App\Http\Controllers\Reviews\InspectorReviewsController;
-use App\Http\Controllers\Reviews\ReviewsController;
 use App\Http\Controllers\Settings\SettingsController;
-use App\Http\Controllers\Support\SupportRequestController;
 use App\Http\Controllers\User\AuthController;
 use App\Http\Controllers\User\DeleteUsersController;
 use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\InspectionTypeController;
-use App\Http\Controllers\User\GoogleAuthController;
-use App\Http\Controllers\InspectionReportController;
-use App\Http\Controllers\Admin\AdminInspectionReportController;
 use App\Http\Controllers\Admin\UserManagementController;
-use App\Http\Controllers\Admin\InspectorManagementController;
-use App\Http\Controllers\Admin\AdminDashboardController;
-use App\Http\Controllers\StripeController;
-use App\Http\Controllers\InspectorPaymentHistoryController;
+
 
 
 Route::prefix('v1')->group(function () {
@@ -51,8 +33,11 @@ Route::prefix('v1')->group(function () {
     Route::post('forgot-password', [AuthController::class, 'forgotPassword']);
     Route::post('/verify-otp', [AuthController::class, 'verifyOtp']);
     Route::post('reset-password', [AuthController::class, 'resetPassword']);
-    // Google OAuth (public, no auth required)
-    Route::post('google/token', [GoogleAuthController::class, 'tokenLogin']);
+   
+   // Google OAuth (public, no auth required)
+    Route::post('/auth/google/token', [GoogleAuthController::class, 'tokenLogin']);
+    //Apple
+Route::post('/apple', [AppleAuthController::class, 'login'])->name('api.auth.apple');
 
 
     Route::middleware('auth:sanctum')->group(function () {
