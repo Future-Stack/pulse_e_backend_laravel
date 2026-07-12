@@ -27,6 +27,7 @@ class User extends Authenticatable
         'suspend_reason',
         'user_type',
         'fcm_token',
+        'apple_id',
         'email_verified_at',
         'is_privacy_accepted',
         'onboardingCompleted',
