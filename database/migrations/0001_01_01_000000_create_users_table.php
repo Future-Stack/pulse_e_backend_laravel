@@ -21,6 +21,7 @@ return new class extends Migration
             $table->timestamp('otp_expire_at')->nullable();
             $table->rememberToken();
             $table->string('fcm_token')->nullable();
+            $table->string('apple_id')->nullable();
             $table->string('status')->default('active')->comment('active,suspended');
             $table->text('suspend_reason')->nullable();
             $table->string('user_type')->nullable()->comment('user,admin');

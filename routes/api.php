@@ -35,15 +35,20 @@ Route::prefix('v1')->group(function () {
     Route::post('reset-password', [AuthController::class, 'resetPassword']);
    
    // Google OAuth (public, no auth required)
-    Route::post('/auth/google/token', [GoogleAuthController::class, 'tokenLogin']);
+    Route::post('/google/token', [GoogleAuthController::class, 'tokenLogin']);
     //Apple
 Route::post('/apple', [AppleAuthController::class, 'login'])->name('api.auth.apple');
 
 
     Route::middleware('auth:sanctum')->group(function () {
+       
         Route::post('/change-password', [AuthController::class, 'changePassword']);
+          // Save Firebase device token
+        Route::post('/save-fcm-token', [AuthController::class, 'saveFcmToken']);
 
         Route::post('logout', [AuthController::class, 'logout']);
+         //Delete User(self)
+        Route::post('/delete-user',[DeleteUsersController::class, 'destroy']);
 
         Route::get('/user-profile', [AuthController::class, 'getProfile']);
 
