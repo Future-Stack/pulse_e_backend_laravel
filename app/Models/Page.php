@@ -3,9 +3,21 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Page extends Model
 {
-    protected $fillable = ['title','slug','content','status'];
+    use SoftDeletes;
 
+    protected $fillable = [
+        'title',
+        'slug',
+        'content',
+        'status',
+    ];
+
+    protected $casts = [
+    'content' => 'array',
+    'status' => 'boolean',
+];
 }
