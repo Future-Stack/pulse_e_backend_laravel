@@ -4,9 +4,11 @@ namespace App\Http\Controllers\Page;
 
 use App\Http\Controllers\Controller;
 use App\Models\Page;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 class PageController extends Controller
 {
@@ -16,150 +18,209 @@ class PageController extends Controller
     public function index()
     {
         try {
-            $pages = Page::all();
+
+            $pages = Page::latest()->get();
 
             return response()->json([
                 'success' => true,
-                'data' => $pages
+                'data' => $pages,
             ], 200);
 
         } catch (\Exception $e) {
-            Log::error('Page index failed: ' . $e->getMessage());
+
+            Log::error('Page Index Error: ' . $e->getMessage());
 
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to fetch pages'
+                'message' => 'Failed to fetch pages.',
             ], 500);
         }
     }
 
     /**
-     * Store a new page with system-generated slug.
+     * Store page.
      */
     public function store(Request $request)
     {
         try {
+
             $validated = $request->validate([
-                'title' => 'required|string|max:255',
-                'content' => 'required|string',
-                'status' => 'boolean'
+                'title'   => 'required|string|max:255',
+                'content' => 'required|array',
+                'status'  => 'nullable|boolean',
+            ], [
+                'title.required'   => 'Title is required.',
+                'content.required' => 'Content is required.',
+                'content.array'    => 'Content must be a valid JSON object.',
             ]);
 
-            // Generate slug from title
-            $validated['slug'] = Str::slug($validated['title']);
-
-            // Ensure uniqueness
-            $count = Page::where('slug', 'LIKE', $validated['slug'].'%')->count();
-            if ($count > 0) {
-                $validated['slug'] .= '-' . ($count + 1);
-            }
+            $validated['slug'] = $this->generateSlug($validated['title']);
+            $validated['status'] = $validated['status'] ?? true;
 
             $page = Page::create($validated);
 
             return response()->json([
                 'success' => true,
+                'message' => 'Page created successfully.',
                 'data' => $page,
-                'message' => 'Page created successfully'
             ], 201);
 
-        } catch (\Exception $e) {
-            Log::error('Page store failed: ' . $e->getMessage());
+        } catch (ValidationException $e) {
 
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to create page'
+                'message' => collect($e->errors())->flatten()->first(),
+            ], 422);
+
+        } catch (\Exception $e) {
+
+            Log::error('Page Store Error: ' . $e->getMessage());
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to create page.',
             ], 500);
         }
     }
 
     /**
-     * Show a single page.
+     * Show single page.
      */
-    public function show($id)
+    public function show($page_id)
     {
         try {
-            $page = Page::findOrFail($id);
+
+            $page = Page::findOrFail($page_id);
 
             return response()->json([
                 'success' => true,
-                'data' => $page
+                'data' => $page,
             ], 200);
 
-        } catch (\Exception $e) {
-            Log::error('Page show failed: ' . $e->getMessage());
+        } catch (ModelNotFoundException $e) {
 
             return response()->json([
                 'success' => false,
-                'message' => 'Page not found'
+                'message' => 'Page not found.',
             ], 404);
+
+        } catch (\Exception $e) {
+
+            Log::error('Page Show Error: ' . $e->getMessage());
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to fetch page.',
+            ], 500);
         }
     }
 
     /**
-     * Update an existing page (slug auto-regenerated if title changes).
+     * Update page.
      */
-    public function update(Request $request, $id)
+    public function update(Request $request, $page_id)
     {
         try {
+
             $validated = $request->validate([
-                'title' => 'sometimes|string|max:255',
-                'content' => 'sometimes|string',
-                'status' => 'boolean'
+                'title'   => 'sometimes|string|max:255',
+                'content' => 'sometimes|array',
+                'status'  => 'nullable|boolean',
+            ], [
+                'content.array' => 'Content must be a valid JSON object.',
             ]);
 
-//            return $validated;
+            $page = Page::findOrFail($page_id);
 
-            $page = Page::findOrFail($id);
-
-            // If title is updated, regenerate slug
             if (isset($validated['title'])) {
-                $slug = Str::slug($validated['title']);
-                $count = Page::where('slug', 'LIKE', $slug.'%')->where('id', '!=', $id)->count();
-                if ($count > 0) {
-                    $slug .= '-' . ($count + 1);
-                }
-                $validated['slug'] = $slug;
+                $validated['slug'] = $this->generateSlug(
+                    $validated['title'],
+                    $page->id
+                );
             }
 
             $page->update($validated);
 
             return response()->json([
                 'success' => true,
-                'data' => $page,
-                'message' => 'Page updated successfully'
+                'message' => 'Page updated successfully.',
+                'data' => $page->fresh(),
             ], 200);
 
-        } catch (\Exception $e) {
-            Log::error('Page update failed: ' . $e->getMessage());
+        } catch (ValidationException $e) {
 
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to update page'
+                'message' => collect($e->errors())->flatten()->first(),
+            ], 422);
+
+        } catch (ModelNotFoundException $e) {
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Page not found.',
+            ], 404);
+
+        } catch (\Exception $e) {
+
+            Log::error('Page Update Error: ' . $e->getMessage());
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to update page.',
             ], 500);
         }
     }
 
     /**
-     * Delete a page.
+     * Delete page.
      */
-    public function destroy($id)
+    public function destroy($page_id)
     {
         try {
-            $page = Page::findOrFail($id);
+
+            $page = Page::findOrFail($page_id);
+
             $page->delete();
 
             return response()->json([
                 'success' => true,
-                'message' => 'Page deleted successfully'
+                'message' => 'Page deleted successfully.',
             ], 200);
 
-        } catch (\Exception $e) {
-            Log::error('Page delete failed: ' . $e->getMessage());
+        } catch (ModelNotFoundException $e) {
 
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to delete page'
+                'message' => 'Page not found.',
+            ], 404);
+
+        } catch (\Exception $e) {
+
+            Log::error('Page Delete Error: ' . $e->getMessage());
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to delete page.',
             ], 500);
         }
+    }
+
+    /**
+     * Generate unique slug.
+     */
+    private function generateSlug(string $title, ?int $ignoreId = null): string
+    {
+        $slug = Str::slug($title);
+
+        $query = Page::where('slug', 'LIKE', $slug . '%');
+
+        if ($ignoreId) {
+            $query->where('id', '!=', $ignoreId);
+        }
+
+        $count = $query->count();
+
+        return $count > 0 ? $slug . '-' . ($count + 1) : $slug;
     }
 }

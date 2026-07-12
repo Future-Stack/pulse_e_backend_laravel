@@ -41,6 +41,14 @@ Route::prefix('v1')->group(function () {
     //Apple
 Route::post('/apple', [AppleAuthController::class, 'login'])->name('api.auth.apple');
 
+// Public routes (no auth required)
+// Public Pages
+Route::get('pages', [PageController::class, 'index']);
+Route::get('pages/{page_id}', [PageController::class, 'show']);
+
+
+
+
 
     Route::middleware('auth:sanctum')->group(function () {
        
@@ -66,8 +74,12 @@ Route::post('/apple', [AppleAuthController::class, 'login'])->name('api.auth.app
 
         Route::post('/profile-onboarding', [OnboardingController::class, 'profileOnboarding']);
 
-        //Pages
-        Route::apiResource('pages', PageController::class)->names('pages.');
+        
+      // Pages (Admin/Auth)
+        Route::post('pages', [PageController::class, 'store']);
+        Route::put('pages/{page_id}', [PageController::class, 'update']);
+        Route::delete('pages/{page_id}', [PageController::class, 'destroy']);
+
 
         //Settings
         Route::get('settings', [SettingsController::class, 'show']);
