@@ -56,4 +56,13 @@ class Profile extends Model
             'life_journey_profile'
         );
     }
+
+    public function connectDevices(): BelongsToMany
+    {
+        return $this->belongsToMany(
+            ConnectDevice::class,
+            'connect_device_profile'
+        );
+
+    }
 }
