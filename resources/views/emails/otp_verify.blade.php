@@ -16,7 +16,7 @@
         </div>
         
         <p>If you did not request this change, you can safely ignore this email.</p>
-        <p>Regards,<br>Pulse</p>
+        <p>Regards,<br>NUEMERA</p>
     </div>
 </body>
 </html>
