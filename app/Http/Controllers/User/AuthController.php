@@ -589,4 +589,26 @@ public function suspendUser(Request $request)
         'message' => 'User suspended successfully and email sent.',
     ]);
 }
+
+
+
+public function updateStatus(Request $request)
+{
+    $request->validate([
+        'user_id' => 'required|exists:users,id',
+        'status' => 'required|in:active,suspended',
+    ]);
+
+    $user = User::findOrFail($request->user_id);
+
+    $user->update([
+        'status' => $request->status,
+    ]);
+
+    return response()->json([
+        'success' => true,
+        'message' => 'User status updated successfully.',
+        'data' => $user,
+    ]);
+}
 }
