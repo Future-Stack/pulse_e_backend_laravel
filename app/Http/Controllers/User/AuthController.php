@@ -15,6 +15,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rules\Password;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Mail;
 
 class AuthController extends Controller
 {
@@ -553,5 +554,61 @@ public function register(Request $request)
             'message' => 'Failed to save fcm token.',
         ], 500);
     }
+}
+
+
+
+//suspend reason
+public function suspendUser(Request $request)
+{
+    $request->validate([
+        'user_id' => 'required|exists:users,id',
+        'suspend_reason' => 'required|string|max:1000',
+    ]);
+
+    $user = User::findOrFail($request->user_id);
+
+    $user->update([
+        'status' => 'suspended',
+        'suspend_reason' => $request->suspend_reason,
+    ]);
+
+    Mail::raw(
+        "Dear {$user->full_name},\n\n" .
+        "Your account has been suspended.\n\n" .
+        "Reason:\n{$request->suspend_reason}\n\n" .
+        "If you believe this is a mistake, please contact our support team.",
+        function ($message) use ($user) {
+            $message->to($user->email)
+                    ->subject('Account Suspended');
+        }
+    );
+
+    return response()->json([
+        'success' => true,
+        'message' => 'User suspended successfully and email sent.',
+    ]);
+}
+
+
+
+public function updateStatus(Request $request)
+{
+    $request->validate([
+        'user_id' => 'required|exists:users,id',
+        'status' => 'required|in:active,suspended',
+    ]);
+
+    $user = User::findOrFail($request->user_id);
+
+    $user->update([
+        'status' => $request->status,
+    ]);
+
+    return response()->json([
+        'success' => true,
+        'message' => 'User status updated successfully.',
+        'data' => $user,
+    ]);
 }
 }

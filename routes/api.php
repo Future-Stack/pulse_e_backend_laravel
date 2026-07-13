@@ -59,6 +59,10 @@ Route::get('pages/{page_id}', [PageController::class, 'show']);
         Route::post('logout', [AuthController::class, 'logout']);
          //Delete User(self)
         Route::post('/delete-user',[DeleteUsersController::class, 'destroy']);
+        //suspend user reason
+        Route::post('/users/suspend', [AuthController::class, 'suspendUser']);
+        //user status
+        Route::post('/users/update-status', [AuthController::class, 'updateStatus']);
 
         Route::get('/user-profile', [AuthController::class, 'getProfile']);
 
