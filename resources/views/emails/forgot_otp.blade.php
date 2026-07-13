@@ -15,7 +15,7 @@
             Hello <strong>{{ $user->first_name ?? 'User' }}</strong>,
         </p>
         <p style="color: #4b5563; font-size: 16px; line-height: 1.6;">
-            We received a request to reset the password for your Pulse account. Please use the verification code below to complete the process. 
+            We received a request to reset the password for your NUEMERA account. Please use the verification code below to complete the process. 
         </p>
         
         <div style="text-align: center; margin: 35px 0;">
@@ -37,7 +37,7 @@
         
         <p style="color: #6b7280; font-size: 14px; line-height: 1.5; margin-bottom: 0;">
             Regards,<br>
-            <strong style="color: #4F46E5; font-size: 16px;">Pulse Team</strong>
+            <strong style="color: #4F46E5; font-size: 16px;">NUEMERA Team</strong>
         </p>
     </div>
 </body>
