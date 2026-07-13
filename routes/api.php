@@ -12,8 +12,10 @@ use App\Http\Controllers\User\AuthController;
 use App\Http\Controllers\User\DeleteUsersController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Admin\UserManagementController;
-
-
+use App\Http\Controllers\CommunityCommentController;
+use App\Http\Controllers\CommunityLikeController;
+use App\Http\Controllers\CommunityPostController;
+use App\Http\Controllers\CommunityPostReportController;
 
 Route::prefix('v1')->group(function () {
     Route::get('/', function () {
@@ -93,6 +95,27 @@ Route::get('pages/{page_id}', [PageController::class, 'show']);
         //Fetch All Notifications Record (Admin)
         Route::get('/all-notifications', [NotificationController::class, 'fetchAllNotification']);
         Route::get('/admins-notifications', [NotificationController::class, 'fetchAdminNotification']);
+
+        // Community Post
+
+        Route::get('/posts', [CommunityPostController::class, 'index']);
+        Route::post('/posts', [CommunityPostController::class, 'store']);
+        Route::get('/posts/{post}', [CommunityPostController::class, 'show']);
+        Route::put('/posts/{post}', [CommunityPostController::class, 'update']);
+        Route::delete('/posts/{post}', [CommunityPostController::class, 'destroy']);
+    
+        // Comments (nested under a post)
+        Route::get('/posts/{post}/comments', [CommunityCommentController::class, 'index']);
+        Route::post('/posts/{post}/comments', [CommunityCommentController::class, 'store']);
+        Route::delete('/comments/{comment}', [CommunityCommentController::class, 'destroy']);
+    
+        // Likes (toggle)
+        Route::post('/posts/{post}/like', [CommunityLikeController::class, 'toggle']);
+    
+        // Reports
+        Route::post('/posts/{post}/report', [CommunityPostReportController::class, 'store']);
+
+        Route::get('/reports', [CommunityPostReportController::class, 'index']);
 
     });
 
