@@ -7,7 +7,7 @@
     <div style="max-width: 600px; margin: 0 auto; background: #fff; padding: 30px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
         <h2 style="color: #2563EB; margin-top: 0;">Password Changed Successfully</h2>
         <p style="color: #555; font-size: 16px; line-height: 1.5;">Hello {{ $user->first_name }},</p>
-        <p style="color: #555; font-size: 16px; line-height: 1.5;">This is a confirmation email that the password for your Pulse account has been successfully updated.</p>
+        <p style="color: #555; font-size: 16px; line-height: 1.5;">This is a confirmation email that the password for your NUEMERA account has been successfully updated.</p>
         
         <div style="background: #EFF6FF; border-left: 4px solid #2563EB; padding: 15px; margin: 25px 0; border-radius: 4px;">
             <p style="color: #1E40AF; margin: 0; font-size: 15px; font-weight: 500;">
@@ -19,7 +19,7 @@
         <p style="color: #555; font-size: 15px; line-height: 1.5; margin-top: 0;">If you did NOT request this change, please contact our support team immediately to secure your account.</p>
         
         <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;">
-        <p style="color: #777; font-size: 14px; line-height: 1.5;">Regards,<br><strong style="color: #2563EB;">Pulse</strong></p>
+        <p style="color: #777; font-size: 14px; line-height: 1.5;">Regards,<br><strong style="color: #2563EB;">NUEMERA</strong></p>
     </div>
 </body>
 </html>
