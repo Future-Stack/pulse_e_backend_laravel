@@ -50,7 +50,6 @@ return new class extends Migration
             $table->timestamp('paid_at')->nullable();
             $table->json('meta')->nullable();
 
-            $table->timestamps();
 
             $table->index(['user_id', 'type', 'status']);
 

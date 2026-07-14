@@ -36,7 +36,6 @@ return new class extends Migration
             // (topups always expire end of the billing month purchased in).
             $table->timestamp('topup_expires_at')->nullable();
 
-            $table->timestamps();
 
             $table->index('subscription_expires_at');
             $table->index('topup_expires_at');
