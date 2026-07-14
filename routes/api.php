@@ -121,6 +121,12 @@ Route::get('pages/{page_id}', [PageController::class, 'show']);
 
         Route::get('/reports', [CommunityPostReportController::class, 'index']);
 
+        // Approve Post
+        Route::post('/posts/{post}/approve', [CommunityPostController::class, 'approve']);
+
+        // Decline Post
+        Route::post('/posts/{post}/decline', [CommunityPostController::class, 'decline']);
+
     });
 
 });
