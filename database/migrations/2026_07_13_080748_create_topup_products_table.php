@@ -21,7 +21,6 @@ return new class extends Migration
 
             $table->string('name');
             $table->enum('topup_kind', ['coaching_sessions', 'skin_scans'])->nullable();// e.g. "+20 Coaching Sessions"
-            $table->unsignedInteger('quantity');
             $table->unsignedInteger('quantity')->nullable();
             $table->decimal('price', 8, 2);
             $table->char('currency', 3)->default('USD');
