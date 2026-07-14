@@ -14,39 +14,39 @@ class SettingsController extends Controller
         try {
             $validated = $request->validate([
                 'platform_name' => 'required|string|max:255',
-                'support_mail' => 'required|email',
-                'max_inspector_area' => 'required|integer',
-                'inspector_response_time' => 'integer|min:1',
-                'urgent_booking_lead' => 'integer|min:1',
-                'report_deadline' => 'integer|min:1',
-                'platform_commission' => 'numeric|min:0|max:100',
-                'auto_approve' => 'boolean',
-                'urgent_inspection_fee' => 'numeric|min:0',
-                'late_cancellation_penalty' => 'numeric|min:0',
-                'last_minute_cancel_penalty' => 'numeric|min:0',
+                'email'         => 'required|email',
+                'logo'          => 'nullable|image|mimes:jpeg,png,jpg,gif,svg,webp|max:2048',
             ]);
+
+            // Handle logo upload
+            if ($request->hasFile('logo')) {
+                $storedPath = $request->file('logo')->store('settings', 'public');
+                $validated['logo'] = asset('storage/' . $storedPath);
+            }
 
             // updateOrCreate ensures either update existing row or create new one
             $settings = Setting::updateOrCreate(
-                ['id' => 1], // assuming singleton row
+                ['id' => 1], // singleton row
                 $validated
             );
 
             return response()->json([
                 'success' => true,
-                'data' => $settings,
-                'message' => 'Setting saved successfully'
+                'data'    => $settings,
+                'message' => 'Settings saved successfully.',
             ], 200);
 
-        } catch (\Exception $e) {
-            Log::error('Setting create/update failed: ' . $e->getMessage());
+        } catch (\Throwable $e) {
+            Log::error('Settings create/update failed: '.$e->getMessage());
 
             return response()->json([
                 'success' => false,
-                'message' => $e->getMessage()
+                'message' => 'Failed to save settings.',
+                'error'   => $e->getMessage(),
             ], 500);
         }
     }
+
 
     /**
      * Get current settings.

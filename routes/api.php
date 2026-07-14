@@ -1,6 +1,8 @@
 <?php
 
+use App\Http\Controllers\Notification\NotificationSettingsController;
 use App\Http\Controllers\Onboarding\OnboardingController;
+use App\Http\Controllers\Profile\ProfileController;
 use App\Http\Controllers\User\AppleAuthController;
 use App\Http\Controllers\User\GoogleAuthController;
 use App\Http\Controllers\Faq\FaqController;
@@ -38,37 +40,34 @@ Route::prefix('v1')->group(function () {
     Route::post('/verify-otp', [AuthController::class, 'verifyOtp']);
     Route::post('reset-password', [AuthController::class, 'resetPassword']);
 
-   // Google OAuth (public, no auth required)
+    // Google OAuth (public, no auth required)
     Route::post('/google/token', [GoogleAuthController::class, 'tokenLogin']);
     //Apple
-Route::post('/apple', [AppleAuthController::class, 'login'])->name('api.auth.apple');
+    Route::post('/apple', [AppleAuthController::class, 'login'])->name('api.auth.apple');
 
 // Public routes (no auth required)
 // Public Pages
-Route::get('pages', [PageController::class, 'index']);
-Route::get('pages/{page_id}', [PageController::class, 'show']);
-
-
-
+    Route::get('pages', [PageController::class, 'index']);
+    Route::get('pages/{page_id}', [PageController::class, 'show']);
 
 
     Route::middleware('auth:sanctum')->group(function () {
-       
+
         Route::post('/change-password', [AuthController::class, 'changePassword']);
-          // Save Firebase device token
+        // Save Firebase device token
         Route::post('/save-fcm-token', [AuthController::class, 'saveFcmToken']);
 
         Route::post('logout', [AuthController::class, 'logout']);
-         //Delete User(self)
-        Route::post('/delete-user',[DeleteUsersController::class, 'destroy']);
+        //Delete User(self)
+        Route::post('/delete-user', [DeleteUsersController::class, 'destroy']);
         //suspend user reason
         Route::post('/users/suspend', [AuthController::class, 'suspendUser']);
         //user status
         Route::post('/users/update-status', [AuthController::class, 'updateStatus']);
 
-        Route::get('/user-profile', [AuthController::class, 'getProfile']);
+        Route::get('/user-profile', [ProfileController::class, 'getProfile']);
 
-        Route::post('/profile/update', [AuthController::class, 'updateProfile']);
+        Route::post('/profile/update', [ProfileController::class, 'saveProfile']);
 
         //Profile Onboarding
         Route::get('/life-stages', [OnboardingController::class, 'getLifeStages']);
@@ -80,8 +79,8 @@ Route::get('pages/{page_id}', [PageController::class, 'show']);
 
         Route::post('/profile-onboarding', [OnboardingController::class, 'profileOnboarding']);
 
-        
-      // Pages (Admin/Auth)
+
+        // Pages (Admin/Auth)
         Route::post('pages', [PageController::class, 'store']);
         Route::put('pages/{page_id}', [PageController::class, 'update']);
         Route::delete('pages/{page_id}', [PageController::class, 'destroy']);
@@ -92,9 +91,9 @@ Route::get('pages/{page_id}', [PageController::class, 'show']);
         Route::post('settings', [SettingsController::class, 'createOrUpdate']);
 
 
-        //Notification Preference
-        Route::post('/notification-preference-save', [NotificationPreferenceController::class, 'notificationPreference']);
-        Route::get('/notification-preference-get', [NotificationPreferenceController::class, 'notificationPreferenceGet']);
+        //Notification Settings
+        Route::post('/notification-settings', [NotificationSettingsController::class, 'createOrUpdate']);
+        Route::get('/notification-settings', [NotificationSettingsController::class, 'getNotificationSettings']);
 
         //Fetch All Notifications Record (Admin)
         Route::get('/all-notifications', [NotificationController::class, 'fetchAllNotification']);
@@ -107,15 +106,15 @@ Route::get('pages/{page_id}', [PageController::class, 'show']);
         Route::get('/posts/{post}', [CommunityPostController::class, 'show']);
         Route::put('/posts/{post}', [CommunityPostController::class, 'update']);
         Route::delete('/posts/{post}', [CommunityPostController::class, 'destroy']);
-    
+
         // Comments (nested under a post)
         Route::get('/posts/{post}/comments', [CommunityCommentController::class, 'index']);
         Route::post('/posts/{post}/comments', [CommunityCommentController::class, 'store']);
         Route::delete('/comments/{comment}', [CommunityCommentController::class, 'destroy']);
-    
+
         // Likes (toggle)
         Route::post('/posts/{post}/like', [CommunityLikeController::class, 'toggle']);
-    
+
         // Reports
         Route::post('/posts/{post}/report', [CommunityPostReportController::class, 'store']);
 

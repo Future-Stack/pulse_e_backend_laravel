@@ -4,6 +4,7 @@ namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
@@ -57,10 +58,15 @@ class User extends Authenticatable
             'is_privacy_accepted' => 'boolean',
             'onboardingCompleted' => 'boolean',
         ];
-    } 
+    }
 
     public function hasRole(string $role): bool
     {
         return $this->user_type === $role;
+    }
+
+    public function profile(): HasOne
+    {
+        return $this->hasOne(Profile::class);
     }
 }
