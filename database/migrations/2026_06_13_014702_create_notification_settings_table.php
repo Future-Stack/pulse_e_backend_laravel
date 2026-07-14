@@ -4,8 +4,7 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-return new class extends Migration
-{
+return new class extends Migration {
     /**
      * Run the migrations.
      */
@@ -13,13 +12,9 @@ return new class extends Migration
     {
         Schema::create('notification_settings', function (Blueprint $table) {
             $table->id();
-            $table->string('type');
-            $table->string('title');
-            $table->text('message');
-            $table->foreignId('sender_id')->constrained('users')->onDelete('cascade');
-            $table->foreignId('sent_to')->constrained('users')->onDelete('cascade');
-            $table->string('status')->default('sent');
-            $table->timestamp('sent_at')->nullable();
+            $table->boolean('email')->default(true);
+            $table->boolean('push')->default(true);
+            $table->boolean('security_alert')->default(true);
             $table->timestamps();
         });
     }
