@@ -63,4 +63,11 @@ class User extends Authenticatable
     {
         return $this->user_type === $role;
     }
+
+
+//health log
+    public function healthLogs()
+    {
+        return $this->hasMany(HealthLog::class);
+    }
 }
