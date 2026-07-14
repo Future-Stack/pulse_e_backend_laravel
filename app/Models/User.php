@@ -59,5 +59,8 @@ class User extends Authenticatable
         ];
     } 
 
-   
+    public function hasRole(string $role): bool
+    {
+        return $this->user_type === $role;
+    }
 }
