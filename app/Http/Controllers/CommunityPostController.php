@@ -159,4 +159,46 @@ class CommunityPostController extends Controller
 
         return response()->json(['message' => 'Post deleted successfully.']);
     }
+
+
+    public function approve(CommunityPost $post)
+    {
+        $user = Auth::user();
+
+        if (!($user->hasRole('admin') ?? false)) {
+            return response()->json([
+                'message' => 'Unauthorized. Only admins can approve posts.'
+            ], 403);
+        }
+
+        $post->update([
+            'is_approved' => true,
+            'posted_at'   => now()
+        ]);
+
+        return response()->json([
+            'message' => 'Post approved successfully.',
+            'post'    => $post
+        ], 200);
+    }
+
+   
+    public function decline(CommunityPost $post)
+    {
+        $user = Auth::user();
+
+        if ($user->user_type !== 'admin') {
+            return response()->json([
+                'message' => 'Unauthorized. Only admins can decline posts.'
+            ], 403);
+        }
+
+        $post->update([
+            'is_approved' => false
+        ]);
+
+        return response()->json([
+            'message' => 'Post declined successfully.'
+        ]);
+    }
 }

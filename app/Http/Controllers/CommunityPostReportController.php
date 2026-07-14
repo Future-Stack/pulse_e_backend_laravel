@@ -51,7 +51,7 @@ class CommunityPostReportController extends Controller
     public function index()
     {
         $reports = CommunityPostReport::query()
-            ->with(['post:id,title,slug', 'user:id,name'])
+            ->with(['post:id,title,slug', 'user:id,full_name'])
             ->latest()
             ->paginate(20);
 
