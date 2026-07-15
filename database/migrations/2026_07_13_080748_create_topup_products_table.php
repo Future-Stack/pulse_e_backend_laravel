@@ -15,10 +15,6 @@ return new class extends Migration
             $table->id();
             $table->string('slug')->unique(); // e.g. coaching_sessions_20, skin_scans_5
 
-            // Which subscription_usage column this product tops up.
-            // e.g. "ai_coaching" -> increments ai_coaching allowance.
-            $table->string('metric');
-
             $table->string('name');
             $table->text('description');
             $table->enum('topup_kind', ['coaching_sessions', 'skin_scans'])->nullable();// e.g. "+20 Coaching Sessions"

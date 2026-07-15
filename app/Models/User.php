@@ -32,6 +32,7 @@ class User extends Authenticatable
         'email_verified_at',
         'is_privacy_accepted',
         'onboardingCompleted',
+        'stripe_customer_id'
     ];
 
     /**
