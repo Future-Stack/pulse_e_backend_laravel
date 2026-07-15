@@ -27,6 +27,8 @@ return new class extends Migration
             $table->string('user_type')->nullable()->comment('user,admin');
             $table->boolean('is_privacy_accepted')->default(false);
             $table->boolean('onboardingCompleted')->default(false);
+            $table->string('stripe_customer_id')->nullable();
+
             $table->softDeletes(); // Soft Delete
            $table->timestamps();
         });
