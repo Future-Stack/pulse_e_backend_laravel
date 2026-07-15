@@ -22,6 +22,7 @@ use App\Http\Controllers\CommunityLikeController;
 use App\Http\Controllers\CommunityPostController;
 use App\Http\Controllers\CommunityPostReportController;
 use App\Http\Controllers\User\HealthLogController;
+use App\Http\Controllers\LabReportController;
 
 Route::prefix('v1')->group(function () {
     Route::get('/', function () {
@@ -65,6 +66,8 @@ Route::prefix('v1')->group(function () {
     Route::apiResource('health-logs', HealthLogController::class);
     Route::get('/health-log/today', [HealthLogController::class, 'today']);
 
+
+        Route::apiResource('lab-reports', LabReportController::class);
 
         Route::post('/change-password', [AuthController::class, 'changePassword']);
         // Save Firebase device token
