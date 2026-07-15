@@ -18,6 +18,7 @@ use App\Http\Controllers\CommunityCommentController;
 use App\Http\Controllers\CommunityLikeController;
 use App\Http\Controllers\CommunityPostController;
 use App\Http\Controllers\CommunityPostReportController;
+use App\Http\Controllers\User\HealthLogController;
 
 Route::prefix('v1')->group(function () {
     Route::get('/', function () {
@@ -51,7 +52,16 @@ Route::prefix('v1')->group(function () {
     Route::get('pages/{page_id}', [PageController::class, 'show']);
 
 
+
+
+
+
     Route::middleware('auth:sanctum')->group(function () {
+
+         //user health log
+    Route::apiResource('health-logs', HealthLogController::class);
+    Route::get('/health-log/today', [HealthLogController::class, 'today']);
+
 
         Route::post('/change-password', [AuthController::class, 'changePassword']);
         // Save Firebase device token
@@ -127,5 +137,9 @@ Route::prefix('v1')->group(function () {
         Route::post('/posts/{post}/decline', [CommunityPostController::class, 'decline']);
 
     });
+
+
+
+
 
 });
