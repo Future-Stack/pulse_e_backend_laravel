@@ -14,12 +14,15 @@ class DatabaseSeeder extends Seeder
         $this->call([
             SettingsSeeder::class,
             PagesSeeder::class,
+            SubscriptionPlanSeeder::class,
+            TopupProductSeeder::class,
             UserSeeder::class,
             ActivitySeeder::class,
             ConnectDeviceSeeder::class,
             HealthGoalSeeder::class,
             LifeJourneySeeder::class,
             LifeStageSeeder::class,
+
         ]);
     }
 }

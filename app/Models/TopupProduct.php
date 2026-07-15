@@ -6,5 +6,5 @@ use Illuminate\Database\Eloquent\Model;
 
 class TopupProduct extends Model
 {
-    //
+    protected $guarded = [];
 }

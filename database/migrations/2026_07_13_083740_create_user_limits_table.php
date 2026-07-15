@@ -29,9 +29,7 @@ return new class extends Migration
             $table->unsignedInteger('ai_coaching_topup_limit')->default(0);
 
             $table->timestamp('subscription_expires_at')->nullable();
-
             $table->timestamp('topup_expires_at')->nullable();
-
             $table->timestamps();
         });
     }
