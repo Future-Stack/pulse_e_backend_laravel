@@ -19,7 +19,7 @@ use Illuminate\Support\Facades\Mail;
 
 class AuthController extends Controller
 {
-    
+
 public function register(Request $request)
 {
     try {
@@ -106,7 +106,7 @@ public function register(Request $request)
         ], 500);
     }
 }
-    
+
 
    public function login(Request $request)
 {
@@ -185,7 +185,7 @@ public function register(Request $request)
 
         return response()->json([
             'success' => false,
-            'message' => 'Something went wrong. Please try again.',
+            'message' => $e->getMessage(),
         ], 500);
     }
 }
@@ -510,12 +510,12 @@ public function register(Request $request)
             'fcm_token' => [
                 'required',
                 'string',
-               
+
             ],
         ], [
             'fcm_token.required' => 'FCM token is required.',
             'fcm_token.string'   => 'Invalid FCM token.',
-           
+
         ]);
 
         $user = Auth::user();

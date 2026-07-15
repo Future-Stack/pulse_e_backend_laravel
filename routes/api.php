@@ -3,6 +3,9 @@
 use App\Http\Controllers\Notification\NotificationSettingsController;
 use App\Http\Controllers\Onboarding\OnboardingController;
 use App\Http\Controllers\Profile\ProfileController;
+use App\Http\Controllers\Subscription\SubscriptionController;
+use App\Http\Controllers\Subscription\SubscriptionPlanController;
+use App\Http\Controllers\Topup\TopupController;
 use App\Http\Controllers\User\AppleAuthController;
 use App\Http\Controllers\User\GoogleAuthController;
 use App\Http\Controllers\Faq\FaqController;
@@ -144,10 +147,23 @@ Route::prefix('v1')->group(function () {
         Route::get('/terra/activity-data', [TerraWebhookController::class, 'getActivityData']);
         Route::get('/terra/connections', [TerraWebhookController::class, 'getConnections']);
 
+        //Subscription Plans
+        Route::get('/subscription-plans',[SubscriptionPlanController::class, 'getAllPlans']);
+        Route::get('/subscription-plan/{slug}',[SubscriptionPlanController::class, 'getPlanBySlug']);
+        Route::post('/update-subscription-plan/{slug}',[SubscriptionPlanController::class, 'createOrUpdate']);
+
+        //TopUp
+        Route::get('/topups',[TopupController::class, 'getAll']);
+        Route::get('/topup/{slug}',[TopupController::class, 'getBySlug']);
+        Route::post('/update-topup/{slug}',[TopupController::class, 'createOrUpdate']);
+
+        //Subscription Payment
+        Route::post('/subscriptions', [SubscriptionController::class, 'createSubscription']);
+        Route::post('/subscriptions/cancel', [SubscriptionController::class, 'cancelSubscription']);
     });
 
-
-
+    // Stripe webhook endpoint
+    Route::post('/subscription-stripe/webhook', [SubscriptionController::class, 'handleStripeWebhook']);
     Route::post('/terra/webhook', [TerraWebhookController::class, 'handle']);
 
 });
