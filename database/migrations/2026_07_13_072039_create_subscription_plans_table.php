@@ -15,12 +15,10 @@ return new class extends Migration
             $table->id();
             $table->string('slug')->unique(); // free, premium, elite
             $table->string('name');
-            $table->string('badge')->nullable(); // most_popular, best_value
             $table->text('description')->nullable();
 
             $table->decimal('price_monthly', 8, 2)->default(0);
             $table->decimal('price_annual', 8, 2)->nullable();
-            $table->char('currency', 3)->default('USD');
 
             // Sentinel convention: -1 = unlimited, 0 = not included.
             $table->integer('skin_scans_limit')->default(0);
@@ -31,8 +29,7 @@ return new class extends Migration
             $table->string('tracking_label'); // e.g. "Cycle + BBT, manual + limited sync"
             $table->json('tracking_integrations')->nullable();
 
-            $table->boolean('is_active')->default(true);
-            $table->unsignedSmallInteger('sort_order')->default(0);
+            $table->boolean('status')->default(true);
             $table->timestamps();
         });
     }

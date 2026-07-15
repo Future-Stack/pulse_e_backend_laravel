@@ -68,5 +68,12 @@ class User extends Authenticatable
     public function profile(): HasOne
     {
         return $this->hasOne(Profile::class);
+
+    }
+//health log
+    public function healthLogs()
+    {
+        return $this->hasMany(HealthLog::class);
+
     }
 }
