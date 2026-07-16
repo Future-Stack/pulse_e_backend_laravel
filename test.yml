@@ -1,23 +1,5 @@
 
 services:
-  # MySQL Database Service: Provides the database for the application
-  mysql:
-    image: mysql:8.0
-    container_name: laravel_mysql
-    restart: unless-stopped
-    env_file:
-      - .env.docker
-    ports:
-      - "3307:3306" # Maps host port 3307 to container port 3306
-    volumes:
-      - mysql_data:/var/lib/mysql # Persists database data
-    networks:
-      - laravel
-    healthcheck:
-      test: [ "CMD", "mysqladmin", "ping", "-h", "localhost" ]
-      timeout: 20s
-      retries: 10
-
   # Laravel Application Service: The main PHP application
   app:
     build:
@@ -34,9 +16,6 @@ services:
       - .env
     volumes:
       - app_public_storage:/var/www/html/storage/app/public # Persists storage
-    depends_on:
-      mysql:
-        condition: service_healthy # Waits for MySQL to be ready
     networks:
       - laravel
 
@@ -53,8 +32,6 @@ services:
     volumes:
       - app_public_storage:/var/www/html/storage/app/public
     depends_on:
-      mysql:
-        condition: service_healthy
       app:
         condition: service_started
     networks:
@@ -65,7 +42,6 @@ networks:
     driver: bridge # Creates a custom bridge network
 
 volumes:
-  mysql_data:
-    driver: local
   app_public_storage:
     driver: local
+

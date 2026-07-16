@@ -44,7 +44,7 @@ jobs:
           key: ${{ secrets.VPS_PASSWORD }}
           port: 22
           script: |
-            cd /home/admin/backend/app
+            cd /home/ubuntu/be/app
             # Stop currently running containers and remove orphans (containers not defined in the compose file)
             # This ensures we start with a clean state and avoid conflicts with old containers.
             docker compose down --remove-orphans
