@@ -15,6 +15,7 @@ return new class extends Migration
             $table->id();
             $table->foreignId('user_id')->constrained('users')->onDelete('cascade')->nullable();
             $table->string('terra_user_id')->unique(); 
+            $table->string('reference_id'); 
             $table->string('provider'); 
             $table->boolean('active')->default(true);
             $table->timestamps();
