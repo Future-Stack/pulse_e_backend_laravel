@@ -161,6 +161,8 @@ Route::prefix('v1')->group(function () {
         //Subscription Payment
         Route::post('/subscriptions', [SubscriptionController::class, 'createSubscription']);
         Route::post('/subscriptions/cancel', [SubscriptionController::class, 'cancelSubscription']);
+        Route::get('/terra/scores', [TerraWebhookController::class, 'getScores']);
+        Route::get('/terra/today-scores', [TerraWebhookController::class, 'getTodayScores']);
     });
 
     // Stripe webhook endpoint
