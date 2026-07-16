@@ -21,6 +21,7 @@ use App\Http\Controllers\CommunityCommentController;
 use App\Http\Controllers\CommunityLikeController;
 use App\Http\Controllers\CommunityPostController;
 use App\Http\Controllers\CommunityPostReportController;
+use App\Http\Controllers\TerraWebhookController;
 use App\Http\Controllers\User\HealthLogController;
 use App\Http\Controllers\LabReportController;
 
@@ -142,44 +143,9 @@ Route::prefix('v1')->group(function () {
         // Decline Post
         Route::post('/posts/{post}/decline', [CommunityPostController::class, 'decline']);
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+        Route::post('/terra/widget-session', [TerraWebhookController::class, 'generateWidgetSession']);
+        Route::get('/terra/activity-data', [TerraWebhookController::class, 'getActivityData']);
+        Route::get('/terra/connections', [TerraWebhookController::class, 'getConnections']);
 
         //Subscription Plans
         Route::get('/subscription-plans',[SubscriptionPlanController::class, 'getAllPlans']);
@@ -198,10 +164,6 @@ Route::prefix('v1')->group(function () {
 
     // Stripe webhook endpoint
     Route::post('/subscription-stripe/webhook', [SubscriptionController::class, 'handleStripeWebhook']);
-
-
-
-
-
+    Route::post('/terra/webhook', [TerraWebhookController::class, 'handle']);
 
 });
