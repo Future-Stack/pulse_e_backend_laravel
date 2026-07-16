@@ -18,11 +18,13 @@ class SubscriptionController extends Controller
 
             $request->validate([
                 'plan_slug' => 'required|exists:subscription_plans,slug',
-                'billing_cycle' => 'required|in:monthly,annual',
+                'billing_cycle' => 'required|in:month,year',
                 'payment_method_id' => 'required|string', // Stripe PaymentMethod ID
             ]);
 
             $plan = SubscriptionPlan::where('slug', $request->plan_slug)->first();
+
+            \Stripe\Stripe::setApiKey(config('services.stripe.secret'));
 
             // Create or retrieve Stripe customer
             $stripeCustomer = $user->stripe_customer_id ?? \Stripe\Customer::create([
@@ -32,15 +34,30 @@ class SubscriptionController extends Controller
 
             $user->update(['stripe_customer_id' => $stripeCustomer]);
 
-            // Create subscription in Stripe
             $stripe = new \Stripe\StripeClient(config('services.stripe.secret'));
+
+
+            //Attach Payment Methods to customer
+            $stripe->paymentMethods->attach(
+                $request->payment_method_id,
+                ['customer' => $stripeCustomer]
+            );
+
+            $stripe->customers->update($stripeCustomer, [
+                'invoice_settings' => [
+                    'default_payment_method' => $request->payment_method_id,
+                ],
+            ]);
+
+            // Create subscription in Stripe
+
             $subscription = $stripe->subscriptions->create([
                 'customer' => $stripeCustomer,
                 'items' => [[
                     'price_data' => [
                         'currency' => 'usd',
-                        'product'  => $plan->slug, // ⚠️ Ensure this matches a valid Stripe product ID
-                        'unit_amount' => $request->billing_cycle === 'monthly'
+                        'product'  => $plan->stripe_product_id, // ⚠️ Ensure this matches a valid Stripe product ID
+                        'unit_amount' => $request->billing_cycle === 'month'
                             ? $plan->price_monthly * 100
                             : $plan->price_annual * 100,
                         'recurring' => ['interval' => $request->billing_cycle],
@@ -58,11 +75,11 @@ class SubscriptionController extends Controller
                 'type' => 'subscription',
                 'billing_cycle' => $request->billing_cycle,
                 'current_period_start' => now(),
-                'current_period_end' => $request->billing_cycle === 'monthly'
+                'current_period_end' => $request->billing_cycle === 'month'
                     ? now()->addMonth()
                     : now()->addYear(),
                 'stripe_subscription_id' => $subscription->id,
-                'amount' => $request->billing_cycle === 'monthly'
+                'amount' => $request->billing_cycle === 'month'
                     ? $plan->price_monthly
                     : $plan->price_annual,
                 'status' => 'pending',
@@ -89,6 +106,7 @@ class SubscriptionController extends Controller
             ], 200);
 
         } catch (\Throwable $e) {
+            DB::rollBack();
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to create subscription.',
@@ -96,8 +114,6 @@ class SubscriptionController extends Controller
             ], 500);
         }
     }
-
-
 
     public function cancelSubscription(Request $request)
     {
@@ -118,7 +134,6 @@ class SubscriptionController extends Controller
             'message' => 'Subscription cancelled successfully.',
         ]);
     }
-
 
     public function handleStripeWebhook(Request $request)
     {
@@ -154,6 +169,15 @@ class SubscriptionController extends Controller
 
         return response()->json(['success' => true]);
     }
-
+    // Create a PaymentMethod (test card for dev)
+//            $paymentMethod = $stripe->paymentMethods->create([
+//                'type' => 'card',
+//                'card' => [
+//                    'number' => '4242424242424242', // Stripe test Visa
+//                    'exp_month' => 12,
+//                    'exp_year' => 2026,
+//                    'cvc' => '123',
+//                ],
+//            ]);
 
 }
