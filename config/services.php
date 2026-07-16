@@ -42,4 +42,11 @@ return [
 
     ],
 
+    'terra' => [
+        'dev_id' => env('TERRA_DEV_ID'),
+        'api_key' => env('TERRA_API_KEY'),
+        'signing_secret' => env('TERRA_SIGNING_SECRET'),
+        'base_url' => env('TERRA_BASE_URL'),
+    ],
+
 ];
