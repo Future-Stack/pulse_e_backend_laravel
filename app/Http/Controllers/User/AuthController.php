@@ -107,8 +107,7 @@ public function register(Request $request)
     }
 }
 
-
-   public function login(Request $request)
+public function login(Request $request)
 {
     try {
 
@@ -124,7 +123,7 @@ public function register(Request $request)
 
         $user = User::where('email', $request->email)->first();
 
-        if (!$user || !Hash::check($request->password, $user->password)) {
+        if (! $user || ! Hash::check($request->password, $user->password)) {
             return response()->json([
                 'success' => false,
                 'message' => 'Invalid email or password.',
@@ -144,10 +143,15 @@ public function register(Request $request)
             return response()->json([
                 'success' => false,
                 'message' => $user->suspend_reason
-                    ? 'Your account has been suspended. Reason: '.$user->suspend_reason
+                    ? 'Your account has been suspended. Reason: ' . $user->suspend_reason
                     : 'Your account has been suspended.',
             ], 403);
         }
+
+        // Update last login time
+        $user->update([
+            'last_login_at' => now(),
+        ]);
 
         // Remove old tokens
         $user->tokens()->delete();
@@ -181,16 +185,14 @@ public function register(Request $request)
 
     } catch (\Exception $e) {
 
-        Log::error('Login Error: '.$e->getMessage());
+        Log::error('Login Error: ' . $e->getMessage());
 
         return response()->json([
             'success' => false,
-            'message' => $e->getMessage(),
+            'message' => 'Something went wrong. Please try again later.',
         ], 500);
     }
 }
-
-
     public function me(Request $request)
     {
         return response()->json([
