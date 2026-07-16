@@ -136,3 +136,6 @@ php artisan tinker
 >>> InspectionBooking::latest()->get(['id','status']);
 That's the complete local flow identical to live.
 ```
+## Subscription Payments
+
+![img.png](img.png)
