@@ -29,6 +29,11 @@ return new class extends Migration
             $table->string('tracking_label'); // e.g. "Cycle + BBT, manual + limited sync"
             $table->json('tracking_integrations')->nullable();
 
+            //Stripe
+            $table->string('stripe_product_id')->nullable();
+            $table->string('stripe_price_monthly_id')->nullable();
+            $table->string('stripe_price_annual_id')->nullable();
+
             $table->boolean('status')->default(true);
             $table->timestamps();
         });
