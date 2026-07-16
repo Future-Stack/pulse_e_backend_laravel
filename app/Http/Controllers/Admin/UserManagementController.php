@@ -51,4 +51,44 @@ class UserManagementController extends Controller
             ],
         ], 200);
     }
+
+
+
+    public function show($id): JsonResponse
+{
+    $user = User::with([
+        'profile.lifeStage',
+        'profile.activity',
+        'profile.healthGoals',
+        'profile.lifeJourneys',
+        'latestSubscription.subscriptionPlan',
+    ])
+    ->where('id', '!=', 1)
+    ->findOrFail($id);
+
+    return response()->json([
+        'success' => true,
+        'message' => 'User details retrieved successfully.',
+        'data' => [
+            'account_information' => [
+                'id' => $user->id,
+                'full_name' => $user->full_name,
+                'email' => $user->email,
+                'age' => $user->profile?->age,
+                'joined' => optional($user->created_at)->format('F d, Y'),
+                'status' => ucfirst($user->status),
+                'last_login' => $user->last_login_at?->diffForHumans(),
+                'subscription_plan' => $user->latestSubscription?->subscriptionPlan?->name,
+            ],
+
+            'health_profile' => [
+                'life_stage' => $user->profile?->lifeStage?->title,
+                'health_goal' => $user->profile?->healthGoals?->pluck('title')->implode(', '),
+                'activity' => $user->profile?->activity?->title,
+                'life_journey' => $user->profile?->lifeJourneys?->pluck('title')->implode(', '),
+                'health_condition' => $user->profile?->bio,
+            ],
+        ],
+    ], 200);
+}
 }
