@@ -169,5 +169,5 @@ Route::prefix('v1')->group(function () {
 
     //Admin Dashboard
     Route::get('/users', [UserManagementController::class, 'index']);
-
+Route::get('/users-details/{id}', [UserManagementController::class, 'show']);
 });
