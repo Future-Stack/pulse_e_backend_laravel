@@ -117,28 +117,51 @@ class SubscriptionPlanController extends Controller
                     $plan->stripe_product_id = $product->id;
                 }
 
-                // Prices are immutable → create new if amounts change
-                if ($plan->price_monthly > $request->price_monthly) {
-                    $priceMonthly = $stripe->prices->create([
-                        'unit_amount' => $plan->price_monthly * 100,
+                // 🔹 Fetch existing prices for this product
+                $existingPrices = $stripe->prices->all([
+                    'product' => $plan->stripe_product_id,
+                    'active' => true,
+                    'limit' => 100,
+                ]);
+
+                $priceMonthlyId = null;
+                $priceAnnualId = null;
+
+                foreach ($existingPrices->data as $price) {
+                    if ($price->recurring->interval === 'month' && $price->unit_amount == $validated['price_monthly'] * 100) {
+                        $priceMonthlyId = $price->id;
+                    }
+                    if ($price->recurring->interval === 'year' && $price->unit_amount == $validated['price_annual'] * 100) {
+                        $priceAnnualId = $price->id;
+                    }
+                }
+
+                // 🔹 Create only if not found
+                if (!$priceMonthlyId && $validated['price_monthly'] > 0) {
+                    $newMonthly = $stripe->prices->create([
+                        'unit_amount' => $validated['price_monthly'] * 100,
                         'currency' => 'usd',
                         'recurring' => ['interval' => 'month'],
                         'product' => $plan->stripe_product_id,
                     ]);
-                    $plan->stripe_price_monthly_id = $priceMonthly->id;
+                    $priceMonthlyId = $newMonthly->id;
                 }
 
-                if ($plan->price_annual > 0) {
-                    $priceAnnual = $stripe->prices->create([
-                        'unit_amount' => $plan->price_annual * 100,
+                if (!$priceAnnualId && $validated['price_annual'] > 0) {
+                    $newAnnual = $stripe->prices->create([
+                        'unit_amount' => $validated['price_annual'] * 100,
                         'currency' => 'usd',
                         'recurring' => ['interval' => 'year'],
                         'product' => $plan->stripe_product_id,
                     ]);
-                    $plan->stripe_price_annual_id = $priceAnnual->id;
+                    $priceAnnualId = $newAnnual->id;
                 }
 
-                $plan->save();
+                // 🔹 Save IDs
+                $plan->update([
+                    'stripe_price_monthly_id' => $priceMonthlyId,
+                    'stripe_price_annual_id' => $priceAnnualId,
+                ]);
             }
 
             DB::commit();
