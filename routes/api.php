@@ -24,7 +24,8 @@ use App\Http\Controllers\CommunityPostReportController;
 use App\Http\Controllers\TerraWebhookController;
 use App\Http\Controllers\User\HealthLogController;
 use App\Http\Controllers\LabReportController;
-
+use App\Http\Controllers\Life_journey\LifeJourneyController;
+use App\Http\Controllers\SkinScan\SkinScanController;
 
 Route::prefix('v1')->group(function () {
     Route::get('/', function () {
@@ -163,6 +164,14 @@ Route::prefix('v1')->group(function () {
         Route::post('/subscriptions/cancel', [SubscriptionController::class, 'cancelSubscription']);
         Route::get('/terra/scores', [TerraWebhookController::class, 'getScores']);
         Route::get('/terra/today-scores', [TerraWebhookController::class, 'getTodayScores']);
+
+        //Life Journey
+        Route::get('/life-journeys', [LifeJourneyController::class, 'index']);
+        Route::get('/life-journeys/{id}', [LifeJourneyController::class, 'show']);
+
+        //Skin Scan
+        Route::get('/skin-scans/history', [SkinScanController::class, 'index']);
+        Route::post('/skin-scans/analyze', [SkinScanController::class, 'store']);
     });
 
     // Stripe webhook endpoint
@@ -171,5 +180,9 @@ Route::prefix('v1')->group(function () {
 
     //Admin Dashboard
     Route::get('/users', [UserManagementController::class, 'index']);
-Route::get('/users-details/{id}', [UserManagementController::class, 'show']);
+    Route::get('/users-details/{id}', [UserManagementController::class, 'show']);
+    Route::get('/user/subscription', [UserManagementController::class, 'subscriptions']);
+    Route::get('/admin/dashboard', [UserManagementController::class, 'dashboard']);
+    Route::get('/analytics', [UserManagementController::class, 'analytic']);
+
 });
