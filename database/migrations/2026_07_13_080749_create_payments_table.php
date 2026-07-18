@@ -24,7 +24,7 @@ return new class extends Migration
             $table->string('type')->comment('subscription', 'topup', 'refund');
 
             // --- Subscription-specific (null when type = topup) ---
-            $table->enum('billing_cycle', ['monthly', 'annual'])->nullable();
+            $table->enum('billing_cycle', ['month', 'year'])->nullable();
             $table->timestamp('current_period_start')->nullable();
             $table->timestamp('current_period_end')->nullable();
             $table->string('stripe_subscription_id')->nullable()->unique();

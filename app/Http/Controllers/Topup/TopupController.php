@@ -123,4 +123,9 @@ class TopupController extends Controller
             ], 500);
         }
     }
+
+    public function topUpPayment()
+    {
+
+    }
 }
