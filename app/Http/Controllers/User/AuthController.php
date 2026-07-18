@@ -20,179 +20,179 @@ use Illuminate\Support\Facades\Mail;
 class AuthController extends Controller
 {
 
-public function register(Request $request)
-{
-    try {
+    public function register(Request $request)
+    {
+        try {
 
-        $request->validate([
-            'full_name' => 'required|string|max:255',
-            'email' => 'required|email|max:255|unique:users,email',
-            'password' => [
-                'required',
-                'confirmed',
-                Password::min(8)
-                    ->letters()
-                    ->mixedCase()
-                    ->numbers()
-                    ->symbols(),
-            ],
-            'is_privacy_accepted' => 'required|accepted',
-        ], [
-            'full_name.required' => 'Full name field is required.',
+            $request->validate([
+                'full_name' => 'required|string|max:255',
+                'email' => 'required|email|max:255|unique:users,email',
+                'password' => [
+                    'required',
+                    'confirmed',
+                    Password::min(8)
+                        ->letters()
+                        ->mixedCase()
+                        ->numbers()
+                        ->symbols(),
+                ],
+                'is_privacy_accepted' => 'required|accepted',
+            ], [
+                'full_name.required' => 'Full name field is required.',
 
-            'email.required' => 'Email field is required.',
-            'email.email' => 'Please enter a valid email address.',
-            'email.unique' => 'Email is already registered.',
+                'email.required' => 'Email field is required.',
+                'email.email' => 'Please enter a valid email address.',
+                'email.unique' => 'Email is already registered.',
 
-            'password.required' => 'Password is required.',
-            'password.confirmed' => 'Password confirmation does not match.',
+                'password.required' => 'Password is required.',
+                'password.confirmed' => 'Password confirmation does not match.',
 
-            'is_privacy_accepted.required' => 'You must accept the terms and conditions.',
-            'is_privacy_accepted.accepted' => 'You must accept the terms and conditions.',
-        ]);
+                'is_privacy_accepted.required' => 'You must accept the terms and conditions.',
+                'is_privacy_accepted.accepted' => 'You must accept the terms and conditions.',
+            ]);
 
-        // Generate OTP
-        $otp = random_int(1000, 9999);
+            // Generate OTP
+            $otp = random_int(1000, 9999);
 
-        // Create User
-        $user = User::create([
-            'full_name' => $request->full_name,
-            'email' => $request->email,
-            'password' => Hash::make($request->password),
+            // Create User
+            $user = User::create([
+                'full_name' => $request->full_name,
+                'email' => $request->email,
+                'password' => Hash::make($request->password),
 
-            'user_type' => 'user',
-            'status' => 'active',
+                'user_type' => 'user',
+                'status' => 'active',
 
-            'otp' => $otp,
-            'otp_expire_at' => Carbon::now()->addMinutes(5),
+                'otp' => $otp,
+                'otp_expire_at' => Carbon::now()->addMinutes(5),
 
-            'is_privacy_accepted' => true,
-            'onboardingCompleted' => false,
-        ]);
+                'is_privacy_accepted' => true,
+                'onboardingCompleted' => false,
+            ]);
 
-        // Send OTP Email
-        SendOtpEmail::dispatch($user->id, 'verify', $otp);
+            // Send OTP Email
+            SendOtpEmail::dispatch($user->id, 'verify', $otp);
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Registration successful. OTP sent to your email.',
-            'data' => [
-                'id' => $user->id,
-                'full_name' => $user->full_name,
-                'email' => $user->email,
-                'user_type' => $user->user_type,
-                'status' => $user->status,
-                'is_privacy_accepted' => $user->is_privacy_accepted,
-                'onboardingCompleted' => $user->onboardingCompleted, // false
-                'email_verified_at' => $user->email_verified_at,
-                'created_at' => $user->created_at,
-            ]
-        ], 201);
-
-    } catch (\Illuminate\Validation\ValidationException $e) {
-
-        return response()->json([
-            'success' => false,
-            'message' => collect($e->errors())->flatten()->first(),
-        ], 422);
-
-    } catch (\Exception $e) {
-
-        Log::error('Registration Error: '.$e->getMessage());
-
-        return response()->json([
-            'success' => false,
-            'message' => 'Something went wrong. Please try again.',
-        ], 500);
-    }
-}
-
-public function login(Request $request)
-{
-    try {
-
-        $request->validate([
-            'email' => 'required|email',
-            'password' => 'required|string|min:8',
-        ], [
-            'email.required' => 'Email field is required.',
-            'email.email' => 'Please enter a valid email address.',
-            'password.required' => 'Password field is required.',
-            'password.min' => 'Password must be at least 8 characters.',
-        ]);
-
-        $user = User::where('email', $request->email)->first();
-
-        if (! $user || ! Hash::check($request->password, $user->password)) {
             return response()->json([
-                'success' => false,
-                'message' => 'Invalid email or password.',
-            ], 401);
-        }
-
-        // Email verification
-        if (is_null($user->email_verified_at)) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Please verify your email before logging in.',
-            ], 403);
-        }
-
-        // Suspended account
-        if ($user->status === 'suspended') {
-            return response()->json([
-                'success' => false,
-                'message' => $user->suspend_reason
-                    ? 'Your account has been suspended. Reason: ' . $user->suspend_reason
-                    : 'Your account has been suspended.',
-            ], 403);
-        }
-
-        // Update last login time
-        $user->update([
-            'last_login_at' => now(),
-        ]);
-
-        // Remove old tokens
-        $user->tokens()->delete();
-
-        // Create new token
-        $token = $user->createToken('auth_token')->plainTextToken;
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Login successful.',
-            'data' => [
-                'user' => [
+                'success' => true,
+                'message' => 'Registration successful. OTP sent to your email.',
+                'data' => [
                     'id' => $user->id,
                     'full_name' => $user->full_name,
                     'email' => $user->email,
                     'user_type' => $user->user_type,
                     'status' => $user->status,
-                    'onboardingCompleted' => $user->onboardingCompleted,
-                ],
-                'token' => $token,
-                'token_type' => 'Bearer',
-            ],
-        ], 200);
+                    'is_privacy_accepted' => $user->is_privacy_accepted,
+                    'onboardingCompleted' => $user->onboardingCompleted, // false
+                    'email_verified_at' => $user->email_verified_at,
+                    'created_at' => $user->created_at,
+                ]
+            ], 201);
 
-    } catch (\Illuminate\Validation\ValidationException $e) {
+        } catch (\Illuminate\Validation\ValidationException $e) {
 
-        return response()->json([
-            'success' => false,
-            'message' => collect($e->errors())->flatten()->first(),
-        ], 422);
+            return response()->json([
+                'success' => false,
+                'message' => collect($e->errors())->flatten()->first(),
+            ], 422);
 
-    } catch (\Exception $e) {
+        } catch (\Exception $e) {
 
-        Log::error('Login Error: ' . $e->getMessage());
+            Log::error('Registration Error: '.$e->getMessage());
 
-        return response()->json([
-            'success' => false,
-            'message' => 'Something went wrong. Please try again later.',
-        ], 500);
+            return response()->json([
+                'success' => false,
+                'message' => 'Something went wrong. Please try again.',
+            ], 500);
+        }
     }
-}
+
+    public function login(Request $request)
+    {
+        try {
+
+            $request->validate([
+                'email' => 'required|email',
+                'password' => 'required|string|min:8',
+            ], [
+                'email.required' => 'Email field is required.',
+                'email.email' => 'Please enter a valid email address.',
+                'password.required' => 'Password field is required.',
+                'password.min' => 'Password must be at least 8 characters.',
+            ]);
+
+            $user = User::where('email', $request->email)->first();
+
+            if (! $user || ! Hash::check($request->password, $user->password)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Invalid email or password.',
+                ], 401);
+            }
+
+            // Email verification
+            if (is_null($user->email_verified_at)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Please verify your email before logging in.',
+                ], 403);
+            }
+
+            // Suspended account
+            if ($user->status === 'suspended') {
+                return response()->json([
+                    'success' => false,
+                    'message' => $user->suspend_reason
+                        ? 'Your account has been suspended. Reason: ' . $user->suspend_reason
+                        : 'Your account has been suspended.',
+                ], 403);
+            }
+
+            // Update last login time
+            $user->update([
+                'last_login_at' => now(),
+            ]);
+
+            // Remove old tokens
+            $user->tokens()->delete();
+
+            // Create new token
+            $token = $user->createToken('auth_token')->plainTextToken;
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Login successful.',
+                'data' => [
+                    'user' => [
+                        'id' => $user->id,
+                        'full_name' => $user->full_name,
+                        'email' => $user->email,
+                        'user_type' => $user->user_type,
+                        'status' => $user->status,
+                        'onboardingCompleted' => $user->onboardingCompleted,
+                    ],
+                    'token' => $token,
+                    'token_type' => 'Bearer',
+                ],
+            ], 200);
+
+        } catch (\Illuminate\Validation\ValidationException $e) {
+
+            return response()->json([
+                'success' => false,
+                'message' => collect($e->errors())->flatten()->first(),
+            ], 422);
+
+        } catch (\Exception $e) {
+
+            Log::error('Login Error: ' . $e->getMessage());
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Something went wrong. Please try again later.',
+            ], 500);
+        }
+    }
     public function me(Request $request)
     {
         return response()->json([
@@ -200,7 +200,6 @@ public function login(Request $request)
             'user'    => $request->user(),
         ], 200);
     }
-
 
     public function logout(Request $request)
     {
@@ -211,7 +210,6 @@ public function login(Request $request)
             'message' => 'Logged out successfully.',
         ], 200);
     }
-
 
     public function forgotPassword(Request $request)
     {
@@ -259,7 +257,6 @@ public function login(Request $request)
             ], 500);
         }
     }
-
 
     public function verifyOtp(Request $request)
     {
@@ -353,7 +350,6 @@ public function login(Request $request)
             ], 500);
         }
     }
-
 
     public function resendOtp(Request $request)
     {
@@ -459,7 +455,6 @@ public function login(Request $request)
         }
     }
 
-
     public function changePassword(Request $request)
     {
         try {
@@ -500,117 +495,110 @@ public function login(Request $request)
         }
     }
 
-
-
-
-//save device token
+    //save device token
     public function saveFcmToken(Request $request)
-{
-    try {
+    {
+        try {
 
-        $request->validate([
-            'fcm_token' => [
-                'required',
-                'string',
+            $request->validate([
+                'fcm_token' => [
+                    'required',
+                    'string',
 
-            ],
-        ], [
-            'fcm_token.required' => 'FCM token is required.',
-            'fcm_token.string'   => 'Invalid FCM token.',
+                ],
+            ], [
+                'fcm_token.required' => 'FCM token is required.',
+                'fcm_token.string'   => 'Invalid FCM token.',
 
-        ]);
+            ]);
 
-        $user = Auth::user();
+            $user = Auth::user();
 
-        if (!$user) {
+            if (!$user) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Unauthorized.',
+                ], 401);
+            }
+
+            $user->update([
+                'fcm_token' => $request->fcm_token,
+            ]);
+
+            Log::info("Device token updated for user {$user->id}");
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Device token saved successfully.',
+            ], 200);
+
+        } catch (\Illuminate\Validation\ValidationException $e) {
+
             return response()->json([
                 'success' => false,
-                'message' => 'Unauthorized.',
-            ], 401);
-        }
+                'message' => collect($e->errors())->flatten()->first(),
+            ], 422);
 
-        $user->update([
-            'fcm_token' => $request->fcm_token,
+        } catch (\Exception $e) {
+
+            Log::error('Save Fcm Token Error: ' . $e->getMessage());
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to save fcm token.',
+            ], 500);
+        }
+    }
+
+    //suspend reason
+    public function suspendUser(Request $request)
+    {
+        $request->validate([
+            'user_id' => 'required|exists:users,id',
+            'suspend_reason' => 'required|string|max:1000',
         ]);
 
-        Log::info("Device token updated for user {$user->id}");
+        $user = User::findOrFail($request->user_id);
+
+        $user->update([
+            'status' => 'suspended',
+            'suspend_reason' => $request->suspend_reason,
+        ]);
+
+        Mail::raw(
+            "Dear {$user->full_name},\n\n" .
+            "Your account has been suspended.\n\n" .
+            "Reason:\n{$request->suspend_reason}\n\n" .
+            "If you believe this is a mistake, please contact our support team.",
+            function ($message) use ($user) {
+                $message->to($user->email)
+                        ->subject('Account Suspended');
+            }
+        );
 
         return response()->json([
             'success' => true,
-            'message' => 'Device token saved successfully.',
-        ], 200);
-
-    } catch (\Illuminate\Validation\ValidationException $e) {
-
-        return response()->json([
-            'success' => false,
-            'message' => collect($e->errors())->flatten()->first(),
-        ], 422);
-
-    } catch (\Exception $e) {
-
-        Log::error('Save Fcm Token Error: ' . $e->getMessage());
-
-        return response()->json([
-            'success' => false,
-            'message' => 'Failed to save fcm token.',
-        ], 500);
+            'message' => 'User suspended successfully and email sent.',
+        ]);
     }
-}
 
+    public function updateStatus(Request $request)
+    {
+        $request->validate([
+            'user_id' => 'required|exists:users,id',
+            'status' => 'required|in:active,suspended',
+        ]);
 
+        $user = User::findOrFail($request->user_id);
 
-//suspend reason
-public function suspendUser(Request $request)
-{
-    $request->validate([
-        'user_id' => 'required|exists:users,id',
-        'suspend_reason' => 'required|string|max:1000',
-    ]);
+        $user->update([
+            'status' => $request->status,
+        ]);
 
-    $user = User::findOrFail($request->user_id);
-
-    $user->update([
-        'status' => 'suspended',
-        'suspend_reason' => $request->suspend_reason,
-    ]);
-
-    Mail::raw(
-        "Dear {$user->full_name},\n\n" .
-        "Your account has been suspended.\n\n" .
-        "Reason:\n{$request->suspend_reason}\n\n" .
-        "If you believe this is a mistake, please contact our support team.",
-        function ($message) use ($user) {
-            $message->to($user->email)
-                    ->subject('Account Suspended');
-        }
-    );
-
-    return response()->json([
-        'success' => true,
-        'message' => 'User suspended successfully and email sent.',
-    ]);
-}
-
-
-
-public function updateStatus(Request $request)
-{
-    $request->validate([
-        'user_id' => 'required|exists:users,id',
-        'status' => 'required|in:active,suspended',
-    ]);
-
-    $user = User::findOrFail($request->user_id);
-
-    $user->update([
-        'status' => $request->status,
-    ]);
-
-    return response()->json([
-        'success' => true,
-        'message' => 'User status updated successfully.',
-        'data' => $user,
-    ]);
-}
+        return response()->json([
+            'success' => true,
+            'message' => 'User status updated successfully.',
+            'data' => $user,
+        ]);
+    }
 }

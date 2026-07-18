@@ -94,31 +94,72 @@ class SubscriptionPlanSeeder extends Seeder
                 $priceMonthlyId = $existing->stripe_price_monthly_id;
                 $priceAnnualId = $existing->stripe_price_annual_id;
             } else {
-                // Create new product
-                $product = $stripe->products->create([
-                    'name' => $plan['name'],
-                    'description' => $plan['description'],
+                // Check if product with same name exists
+                $existingProducts = $stripe->products->all([
                     'active' => true,
+                    'limit' => 100,
                 ]);
 
-                // Create prices
-                $priceMonthly = $stripe->prices->create([
-                    'unit_amount' => $plan['price_monthly'] * 100,
-                    'currency' => 'usd',
-                    'recurring' => ['interval' => 'month'],
-                    'product' => $product->id,
+                $productId = null;
+                foreach ($existingProducts->data as $product) {
+                    if (strcasecmp($product->name, $plan['name']) === 0) {
+                        $productId = $product->id;
+                        // Update description if needed
+                        $stripe->products->update($productId, [
+                            'description' => $plan['description'],
+                        ]);
+                        break;
+                    }
+                }
+
+                if (!$productId) {
+                    // Create new product if not found
+                    $newProduct = $stripe->products->create([
+                        'name' => $plan['name'],
+                        'description' => $plan['description'],
+                        'active' => true,
+                    ]);
+                    $productId = $newProduct->id;
+                }
+
+                // Deduplicate prices (check existing before creating)
+                $existingPrices = $stripe->prices->all([
+                    'product' => $productId,
+                    'active' => true,
+                    'limit' => 100,
                 ]);
 
-                $priceAnnual = $stripe->prices->create([
-                    'unit_amount' => $plan['price_annual'] * 100,
-                    'currency' => 'usd',
-                    'recurring' => ['interval' => 'year'],
-                    'product' => $product->id,
-                ]);
+                $priceMonthlyId = null;
+                $priceAnnualId = null;
 
-                $productId = $product->id;
-                $priceMonthlyId = $priceMonthly->id;
-                $priceAnnualId = $priceAnnual->id;
+                foreach ($existingPrices->data as $price) {
+                    if ($price->recurring->interval === 'month' && $price->unit_amount == $plan['price_monthly'] * 100) {
+                        $priceMonthlyId = $price->id;
+                    }
+                    if ($price->recurring->interval === 'year' && $price->unit_amount == $plan['price_annual'] * 100) {
+                        $priceAnnualId = $price->id;
+                    }
+                }
+
+                if (!$priceMonthlyId && $plan['price_monthly'] > 0) {
+                    $newMonthly = $stripe->prices->create([
+                        'unit_amount' => $plan['price_monthly'] * 100,
+                        'currency' => 'usd',
+                        'recurring' => ['interval' => 'month'],
+                        'product' => $productId,
+                    ]);
+                    $priceMonthlyId = $newMonthly->id;
+                }
+
+                if (!$priceAnnualId && $plan['price_annual'] > 0) {
+                    $newAnnual = $stripe->prices->create([
+                        'unit_amount' => $plan['price_annual'] * 100,
+                        'currency' => 'usd',
+                        'recurring' => ['interval' => 'year'],
+                        'product' => $productId,
+                    ]);
+                    $priceAnnualId = $newAnnual->id;
+                }
             }
 
             // Save/update locally
