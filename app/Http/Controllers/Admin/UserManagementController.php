@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\Payment;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 
@@ -91,4 +92,57 @@ class UserManagementController extends Controller
         ],
     ], 200);
 }
+
+//payments
+ /**
+     * Display subscription payment list.
+     */
+    public function subscriptions(): JsonResponse
+    {
+        $subscriptions = Payment::with([
+                'user',
+                'subscriptionPlan',
+            ])
+            ->where('type', 'subscription')
+            ->whereIn('status', ['paid', 'cancel'])
+            ->latest()
+            ->paginate(10);
+
+        $data = $subscriptions->getCollection()->map(function (Payment $payment) {
+            return [
+                'id' => $payment->id,
+                'user' => $payment->user?->full_name,
+                'email' => $payment->user?->email,
+                'plan' => $payment->subscriptionPlan?->name,
+                'amount' => '$' . number_format($payment->amount, 2),
+                'date' => $payment->created_at->format('d M Y'),
+
+                // UI Status
+                'status' => $payment->status === 'paid'
+                    ? 'Paid'
+                    : 'Cancel',
+            ];
+        });
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Subscription list retrieved successfully.',
+            'data' => $data,
+
+            'pagination' => [
+                'current_page' => $subscriptions->currentPage(),
+                'next_page' => $subscriptions->hasMorePages()
+                    ? $subscriptions->currentPage() + 1
+                    : null,
+                'prev_page' => $subscriptions->currentPage() > 1
+                    ? $subscriptions->currentPage() - 1
+                    : null,
+                'last_page' => $subscriptions->lastPage(),
+                'per_page' => $subscriptions->perPage(),
+                'total' => $subscriptions->total(),
+            ],
+        ], 200);
+    }
+
+
 }
