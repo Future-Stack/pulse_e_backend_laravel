@@ -13,6 +13,8 @@ use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
 
+
+
 class UserManagementController extends Controller
 {
     /**
@@ -377,5 +379,241 @@ class UserManagementController extends Controller
             ],
         ], 200);
     }
-}
+
+
+
+
+
+    //Analytics part
+     public function analytic(): JsonResponse
+    {
+
+        /*
+        |--------------------------------------------------------------------------
+        | Community Activity Growth
+        |--------------------------------------------------------------------------
+        */
+
+        $communityGrowth = CommunityPost::selectRaw("
+                YEAR(created_at) as year,
+                MONTH(created_at) as month,
+                COUNT(*) as total
+            ")
+            ->groupByRaw("YEAR(created_at), MONTH(created_at)")
+            ->orderByRaw("YEAR(created_at), MONTH(created_at)")
+            ->get()
+            ->map(function ($item) {
+
+                return [
+                    'month' => Carbon::create(
+                        $item->year,
+                        $item->month
+                    )->format('M'),
+
+                    'posts' => (int) $item->total,
+                ];
+            });
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Queries By Journey
+        |--------------------------------------------------------------------------
+        */
+
+        $queriesByJourney = DB::table('life_journeys')
+            ->leftJoin(
+                'community_post_life_journey',
+                'life_journeys.id',
+                '=',
+                'community_post_life_journey.life_journey_id'
+            )
+            ->select(
+                'life_journeys.title',
+                DB::raw('COUNT(community_post_life_journey.community_post_id) as total')
+            )
+            ->groupBy('life_journeys.title')
+            ->orderByDesc('total')
+            ->get()
+            ->map(function ($item) {
+
+                return [
+                    'journey' => $item->title,
+                    'queries' => (int) $item->total,
+                ];
+            });
+                    /*
+        |--------------------------------------------------------------------------
+        | MRR Growth (Monthly Recurring Revenue)
+        |--------------------------------------------------------------------------
+        */
+
+        $mrrGrowth = Payment::selectRaw("
+                YEAR(created_at) as year,
+                MONTH(created_at) as month,
+                SUM(amount) as revenue
+            ")
+            ->where('type', 'subscription')
+            ->where('status', 'paid')
+            ->groupByRaw("YEAR(created_at), MONTH(created_at)")
+            ->orderByRaw("YEAR(created_at), MONTH(created_at)")
+            ->get()
+            ->map(function ($item) {
+
+                return [
+                    'month' => Carbon::create(
+                        $item->year,
+                        $item->month
+                    )->format('M'),
+
+                    'revenue' => (float) $item->revenue,
+                ];
+            });
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Top Health Concerns Logged
+        |--------------------------------------------------------------------------
+        */
+
+        $symptomCounts = [];
+
+        $logs = HealthLog::whereNotNull('symptoms')->get();
+
+        foreach ($logs as $log) {
+
+            $symptoms = is_array($log->symptoms)
+                ? $log->symptoms
+                : json_decode($log->symptoms, true);
+
+            if (!is_array($symptoms)) {
+                continue;
+            }
+
+            foreach ($symptoms as $symptom) {
+
+                $symptom = trim($symptom);
+
+                if ($symptom === '') {
+                    continue;
+                }
+
+                if (!isset($symptomCounts[$symptom])) {
+                    $symptomCounts[$symptom] = 0;
+                }
+
+                $symptomCounts[$symptom]++;
+            }
+        }
+
+        arsort($symptomCounts);
+
+        $highest = count($symptomCounts)
+            ? max($symptomCounts)
+            : 1;
+
+        $topHealthConcerns = collect($symptomCounts)
+            ->map(function ($count, $name) use ($highest) {
+
+                return [
+                    'concern' => $name,
+                    'count' => $count,
+                    'percentage' => round(($count / $highest) * 100),
+                ];
+            })
+            ->values();
+
+                    /*
+        |--------------------------------------------------------------------------
+        | Life Journey Growth (Monthly)
+        |--------------------------------------------------------------------------
+        */
+
+        $lifeJourneyGrowth = DB::table('life_journey_profile')
+            ->join('profiles', 'profiles.id', '=', 'life_journey_profile.profile_id')
+            ->join('life_journeys', 'life_journeys.id', '=', 'life_journey_profile.life_journey_id')
+            ->selectRaw("
+                YEAR(life_journey_profile.created_at) as year,
+                MONTH(life_journey_profile.created_at) as month,
+                life_journeys.title,
+                COUNT(*) as total
+            ")
+            ->groupByRaw("
+                YEAR(life_journey_profile.created_at),
+                MONTH(life_journey_profile.created_at),
+                life_journeys.title
+            ")
+            ->orderByRaw("
+                YEAR(life_journey_profile.created_at),
+                MONTH(life_journey_profile.created_at)
+            ")
+            ->get()
+            ->groupBy(function ($item) {
+
+                return Carbon::create(
+                    $item->year,
+                    $item->month
+                )->format('M');
+
+            })
+            ->map(function ($items, $month) {
+
+                return [
+                    'month' => $month,
+                    'journeys' => $items->map(function ($item) {
+
+                        return [
+                            'journey' => $item->title,
+                            'users' => (int) $item->total,
+                        ];
+
+                    })->values(),
+                ];
+
+            })
+            ->values();
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Life Journey Metrics Breakdown
+        |--------------------------------------------------------------------------
+        */
+
+        $lifeJourneyBreakdown = LifeJourney::leftJoin(
+                'life_journey_profile',
+                'life_journeys.id',
+                '=',
+                'life_journey_profile.life_journey_id'
+            )
+            ->select(
+                'life_journeys.title',
+                DB::raw('COUNT(life_journey_profile.profile_id) as users')
+            )
+            ->groupBy('life_journeys.id', 'life_journeys.title')
+            ->orderByDesc('users')
+            ->get()
+            ->map(function ($item) {
+
+                return [
+                    'journey' => $item->title,
+                    'users' => (int) $item->users,
+                ];
+
+            });
+            return response()->json([
+            'success' => true,
+            'message' => 'Analytics retrieved successfully.',
+            'data' => [
+                'community_activity_growth' => $communityGrowth,
+                'queries_by_journey' => $queriesByJourney,
+                'mrr_growth' => $mrrGrowth,
+                'top_health_concerns' => $topHealthConcerns,
+                'life_journey_growth' => $lifeJourneyGrowth,
+                'life_journey_metrics_breakdown' => $lifeJourneyBreakdown,
+            ],
+        ], 200);
+        }
+    }
 
