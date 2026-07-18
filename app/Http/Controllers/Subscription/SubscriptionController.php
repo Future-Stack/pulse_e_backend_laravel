@@ -6,8 +6,10 @@ use App\Http\Controllers\Controller;
 use App\Models\Payment;
 use App\Models\SubscriptionPlan;
 use App\Models\UserLimit;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class SubscriptionController extends Controller
 {
@@ -21,6 +23,8 @@ class SubscriptionController extends Controller
                 'billing_cycle' => 'required|in:month,year',
                 'payment_method_id' => 'required|string', // Stripe PaymentMethod ID
             ]);
+
+            DB::beginTransaction();
 
             $plan = SubscriptionPlan::where('slug', $request->plan_slug)->first();
 
@@ -50,7 +54,6 @@ class SubscriptionController extends Controller
             ]);
 
             // Create subscription in Stripe
-
             $subscription = $stripe->subscriptions->create([
                 'customer' => $stripeCustomer,
                 'items' => [[
@@ -66,7 +69,7 @@ class SubscriptionController extends Controller
                 'default_payment_method' => $request->payment_method_id,
             ]);
 
-            DB::beginTransaction();
+
 
             // Record payment
             $payment = Payment::create([
@@ -165,7 +168,26 @@ class SubscriptionController extends Controller
                 Payment::where('stripe_subscription_id', $subscriptionId)
                     ->update(['status' => 'cancel']);
                 break;
+
+            case 'customer.subscription.updated':
+                $subscription = $event->data->object;
+                Payment::where('stripe_subscription_id', $subscription->id)
+                    ->update([
+                        'current_period_end' => Carbon::createFromTimestamp($subscription->current_period_end),
+                        'status' => $subscription->status === 'active' ? 'paid' : 'pending',
+                    ]);
+                break;
+
+            case 'customer.subscription.created':
+                Log::info('New subscription created: '.$event->data->object->id);
+                break;
         }
+
+        //Future Events
+        //customer.subscription.updated
+        //customer.subscription.created
+        //invoice.upcoming
+        //payment_method.attached
 
         return response()->json(['success' => true]);
     }
