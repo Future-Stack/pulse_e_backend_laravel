@@ -12,5 +12,10 @@ class LifeJourney extends Model
     {
         return $this->belongsToMany(Profile::class, 'life_journey_profile');
     }
+
+    public function features()
+    {
+        return $this->hasMany(LifeJourneyFeature::class);
+    }
     
 }
