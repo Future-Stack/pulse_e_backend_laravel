@@ -127,4 +127,140 @@ class TerraWebhookController extends Controller
         return response()->json($connections);
     }
 
+    public function getScores(Request $request)
+    {
+        $request->validate([
+            'type' => 'nullable|in:sleep,energy,hrv,stress,readiness,calories,step',
+            'date' => 'nullable|date',
+        ]);
+
+        $type = $request->type;
+        $date = $request->date;
+
+        $typesToFetch = $type ? [$type] : ['sleep', 'energy', 'hrv', 'stress', 'readiness', 'calories', 'step'];
+
+        $terraTypesNeeded = collect($typesToFetch)
+            ->map(fn($t) => in_array($t, ['sleep', 'hrv', 'readiness', 'energy']) ? 'sleep' : 'daily')
+            ->unique()
+            ->values()
+            ->toArray();
+
+        $query = \App\Models\TerraActivityData::where('user_id', $request->user()->id)
+            ->whereIn('type', $terraTypesNeeded);
+
+        if ($date) {
+            $query->whereDate('data_generated_at', $date);
+        }
+
+        $records = $query->latest()->get();
+
+        $result = [];
+
+        foreach ($records as $item) {
+            $entryDate = $item->data_generated_at ?? $item->created_at;
+            $last_update = $item->updated_at;
+            foreach ($typesToFetch as $t) {
+                $terraType = in_array($t, ['sleep', 'hrv', 'readiness', 'energy']) ? 'sleep' : 'daily';
+
+                if ($item->type !== $terraType) {
+                    continue;
+                }
+
+                $value = $this->extractScore($item->payload, $t);
+
+                if ($value !== null) {
+                    $result[] = [
+                        'date' => $entryDate,
+                        'last_update' => $last_update,
+                        'type' => $t,
+                        'value' => $value,
+                    ];
+                }
+            }
+        }
+
+        return response()->json([
+            'type_filter' => $type ?? 'all',
+            'date_filter' => $date ?? 'all',
+            'data' => $result,
+        ]);
+    }
+
+    public function getTodayScores(Request $request)
+    {
+        $today = now()->timezone(config('app.timezone'))->toDateString(); // যেমন: 2026-07-16
+
+        $types = ['sleep', 'energy', 'hrv', 'stress', 'readiness', 'calories', 'step'];
+
+        $terraTypesNeeded = collect($types)
+            ->map(fn($t) => in_array($t, ['sleep', 'hrv', 'readiness', 'energy']) ? 'sleep' : 'daily')
+            ->unique()
+            ->values()
+            ->toArray();
+
+        $records = \App\Models\TerraActivityData::where('user_id', $request->user()->id)
+            ->whereIn('type', $terraTypesNeeded)
+            ->whereDate('data_generated_at', $today)
+            ->orderByDesc('updated_at') 
+            ->get();
+
+        $result = [];
+
+        foreach ($types as $t) {
+            $terraType = in_array($t, ['sleep', 'hrv', 'readiness', 'energy']) ? 'sleep' : 'daily';
+
+            $latestRecord = $records->firstWhere('type', $terraType);
+
+            if (!$latestRecord) {
+                $result[$t] = null;
+                continue;
+            }
+
+            $value = $this->extractScore($latestRecord->payload, $t);
+
+            $result[$t] = $value; 
+        }
+
+        return response()->json([
+            'date' => $today,
+            'data' => $result,
+        ]);
+    }
+
+    private function extractScore($payload, $type)
+    {
+        $data = $payload['data'][0] ?? null;
+        if (!$data) return null;
+
+        switch ($type) {
+            case 'sleep':
+                return $data['scores']['sleep']
+                    ?? $data['data_enrichment']['sleep_score']
+                    ?? null;
+
+            case 'step':
+                return $data['distance_data']['steps'] ?? null;
+
+            case 'hrv':
+                return $data['heart_rate_data']['summary']['avg_hrv_rmssd'] ?? null;
+
+            case 'readiness':
+                return $data['readiness_data']['readiness']
+                    ?? $data['data_enrichment']['readiness_score']
+                    ?? null;
+
+            case 'energy':
+                return $data['readiness_data']['recovery_level'] ?? null;
+
+            case 'stress':
+                return $data['stress_data']['avg_stress_level'] ?? null;
+
+            case 'calories':
+                return $data['calories_data']['total_burned_calories'] ?? null;
+
+            default:
+                return null;
+        }
+    }
+
 }
