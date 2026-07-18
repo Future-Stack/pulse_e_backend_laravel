@@ -3,9 +3,15 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\CommunityPost;
+use App\Models\HealthLog;
+use App\Models\LabReport;
+use App\Models\LifeJourney;
 use App\Models\Payment;
 use App\Models\User;
+use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\DB;
 
 class UserManagementController extends Controller
 {
@@ -145,4 +151,231 @@ class UserManagementController extends Controller
     }
 
 
+
+
+
+
+     /**
+     * Dashboard Overview
+     */
+    public function dashboard(): JsonResponse
+    {
+        // ==========================
+        // Overview Cards
+        // ==========================
+
+        $totalUsers = User::where('id', '!=', 1)->count();
+
+        $healthLogs = HealthLog::count();
+
+        $monthlyRevenue = Payment::where('status', 'paid')
+            ->whereMonth('created_at', now()->month)
+            ->whereYear('created_at', now()->year)
+            ->sum('amount');
+
+        $communityPosts = CommunityPost::count();
+
+        // ==========================
+        // Weekly Revenue
+        // ==========================
+
+        $weeklyRevenue = [];
+
+        foreach (range(0, 6) as $day) {
+
+            $date = now()->startOfWeek()->addDays($day);
+
+            $weeklyRevenue[] = [
+                'day' => $date->format('D'),
+                'amount' => (float) Payment::where('status', 'paid')
+                    ->whereDate('created_at', $date)
+                    ->sum('amount'),
+            ];
+        }
+
+        // ==========================
+        // User Growth (ALL Months)
+        // ==========================
+
+        $userGrowth = User::where('id', '!=', 1)
+            ->selectRaw("
+                YEAR(created_at) as year,
+                MONTH(created_at) as month,
+                COUNT(*) as users
+            ")
+            ->groupByRaw("
+                YEAR(created_at),
+                MONTH(created_at)
+            ")
+            ->orderByRaw("
+                YEAR(created_at),
+                MONTH(created_at)
+            ")
+            ->get()
+            ->map(function ($item) {
+
+                return [
+                    'month' => Carbon::create(
+                        $item->year,
+                        $item->month
+                    )->format('M Y'),
+
+                    'users' => (int) $item->users,
+                ];
+            });
+                    // ==========================
+        // Recent Activity
+        // ==========================
+
+        $activities = collect();
+
+        // New Users
+        foreach (User::where('id', '!=', 1)
+            ->latest()
+            ->take(5)
+            ->get() as $user) {
+
+            $activities->push([
+                'title' => $user->full_name . ' signed up',
+                'time' => $user->created_at->diffForHumans(),
+                'created_at' => $user->created_at,
+            ]);
+        }
+
+        // Subscription Purchases
+        foreach (
+            Payment::with(['user', 'subscriptionPlan'])
+                ->where('type', 'subscription')
+                ->where('status', 'paid')
+                ->latest()
+                ->take(5)
+                ->get() as $payment
+        ) {
+
+            $activities->push([
+                'title' => $payment->user?->full_name . ' subscribed to ' . ($payment->subscriptionPlan?->name ?? 'Plan'),
+                'time' => $payment->created_at->diffForHumans(),
+                'created_at' => $payment->created_at,
+            ]);
+        }
+
+        // Lab Reports
+        foreach (
+            LabReport::with('user')
+                ->latest()
+                ->take(5)
+                ->get() as $report
+        ) {
+
+            $activities->push([
+                'title' => $report->user?->full_name . ' uploaded a lab report',
+                'time' => $report->created_at->diffForHumans(),
+                'created_at' => $report->created_at,
+            ]);
+        }
+
+        // Community Posts
+        foreach (
+            CommunityPost::with('user')
+                ->latest()
+                ->take(5)
+                ->get() as $post
+        ) {
+
+            $activities->push([
+                'title' => $post->user?->full_name . ' created a community post',
+                'time' => $post->created_at->diffForHumans(),
+                'created_at' => $post->created_at,
+            ]);
+        }
+
+        $recentActivities = $activities
+            ->sortByDesc('created_at')
+            ->take(10)
+            ->values();
+
+        // ==========================
+        // Plan Distribution
+        // ==========================
+
+        $planDistribution = Payment::join(
+                'subscription_plans',
+                'payments.subscription_plan_id',
+                '=',
+                'subscription_plans.id'
+            )
+            ->select(
+                'subscription_plans.name',
+                DB::raw('COUNT(payments.id) as total')
+            )
+            ->where('payments.type', 'subscription')
+            ->where('payments.status', 'paid')
+            ->groupBy('subscription_plans.name')
+            ->get()
+            ->map(function ($item) {
+
+                return [
+                    'plan' => $item->name,
+                    'count' => (int) $item->total,
+                ];
+            });
+
+        // ==========================
+        // Journey Distribution
+        // ==========================
+
+        $journeyDistribution = LifeJourney::leftJoin(
+                'life_journey_profile',
+                'life_journeys.id',
+                '=',
+                'life_journey_profile.life_journey_id'
+            )
+            ->select(
+                'life_journeys.title',
+                DB::raw('COUNT(life_journey_profile.id) as total')
+            )
+            ->groupBy(
+                'life_journeys.id',
+                'life_journeys.title'
+            )
+            ->get();
+
+        $totalJourney = $journeyDistribution->sum('total');
+
+        $journeyDistribution = $journeyDistribution->map(function ($item) use ($totalJourney) {
+
+            return [
+                'journey' => $item->title,
+                'count' => (int) $item->total,
+                'percentage' => $totalJourney > 0
+                    ? round(($item->total / $totalJourney) * 100)
+                    : 0,
+            ];
+        });
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Dashboard overview retrieved successfully.',
+            'data' => [
+
+                'overview' => [
+                    'total_users' => $totalUsers,
+                    'health_logs' => $healthLogs,
+                    'monthly_revenue' => $monthlyRevenue,
+                    'community_posts' => $communityPosts,
+                ],
+
+                'weekly_revenue' => $weeklyRevenue,
+
+                'user_growth' => $userGrowth,
+
+                'recent_activities' => $recentActivities,
+
+                'plan_distribution' => $planDistribution,
+
+                'journey_distribution' => $journeyDistribution,
+            ],
+        ], 200);
+    }
 }
+
