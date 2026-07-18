@@ -32,7 +32,8 @@ class User extends Authenticatable
         'email_verified_at',
         'is_privacy_accepted',
         'onboardingCompleted',
-        'stripe_customer_id'
+        'stripe_customer_id',
+        'last_login_at',
     ];
 
     /**
@@ -51,15 +52,18 @@ class User extends Authenticatable
      * @return array<string, string>
      */
     protected function casts(): array
-    {
-        return [
-            'email_verified_at' => 'datetime',
-            'otp_expire_at' => 'datetime',
-            'password' => 'hashed',
-            'is_privacy_accepted' => 'boolean',
-            'onboardingCompleted' => 'boolean',
-        ];
-    }
+{
+    return [
+        'email_verified_at' => 'datetime',
+        'otp_expire_at' => 'datetime',
+        'last_login_at' => 'datetime',
+
+        'password' => 'hashed',
+
+        'is_privacy_accepted' => 'boolean',
+        'onboardingCompleted' => 'boolean',
+    ];
+}
 
     public function hasRole(string $role): bool
     {
@@ -81,5 +85,19 @@ class User extends Authenticatable
     public function labReports()
 {
     return $this->hasMany(LabReport::class);
+}
+
+
+public function payments()
+{
+    return $this->hasMany(Payment::class);
+}
+
+public function latestSubscription()
+{
+    return $this->hasOne(Payment::class)
+        ->where('type', 'subscription')
+        ->where('status', 'paid')
+        ->latestOfMany();
 }
 }

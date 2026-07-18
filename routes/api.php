@@ -25,6 +25,7 @@ use App\Http\Controllers\TerraWebhookController;
 use App\Http\Controllers\User\HealthLogController;
 use App\Http\Controllers\LabReportController;
 
+
 Route::prefix('v1')->group(function () {
     Route::get('/', function () {
         return response()->json([
@@ -160,10 +161,15 @@ Route::prefix('v1')->group(function () {
         //Subscription Payment
         Route::post('/subscriptions', [SubscriptionController::class, 'createSubscription']);
         Route::post('/subscriptions/cancel', [SubscriptionController::class, 'cancelSubscription']);
+        Route::get('/terra/scores', [TerraWebhookController::class, 'getScores']);
+        Route::get('/terra/today-scores', [TerraWebhookController::class, 'getTodayScores']);
     });
 
     // Stripe webhook endpoint
     Route::post('/subscription-stripe/webhook', [SubscriptionController::class, 'handleStripeWebhook']);
     Route::post('/terra/webhook', [TerraWebhookController::class, 'handle']);
 
+    //Admin Dashboard
+    Route::get('/users', [UserManagementController::class, 'index']);
+Route::get('/users-details/{id}', [UserManagementController::class, 'show']);
 });
