@@ -18,6 +18,20 @@ return new class extends Migration
                 ->cascadeOnDelete();
 
             $table->string('lab_report')->nullable();
+             $table->string('panel')->nullable();
+
+            $table->json('biomarkers')->nullable();
+
+            $table->json('ai_insights')->nullable();
+
+            $table->json('next_steps')->nullable();
+
+            $table->enum('analysis_status', [
+                'pending',
+                'processing',
+                'completed',
+                'failed'
+            ])->default('pending');
 
             $table->timestamps();
         });
