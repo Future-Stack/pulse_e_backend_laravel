@@ -105,6 +105,9 @@ class UserManagementController extends Controller
 /**
  * Display subscription payment list.
  */
+/**
+ * Display subscription payment list.
+ */
 public function subscriptions(): JsonResponse
 {
     $subscriptions = Payment::with([
@@ -127,9 +130,7 @@ public function subscriptions(): JsonResponse
 
             'email' => $payment->user?->email,
 
-            'profile' => $payment->user?->profile?->image
-                ? asset('storage/' . $payment->user->profile->image)
-                : null,
+            'profile' => $payment->user?->profile?->profile_img,
 
             'plan' => $payment->subscriptionPlan?->name,
 
@@ -137,7 +138,6 @@ public function subscriptions(): JsonResponse
 
             'date' => $payment->created_at->format('d M Y'),
 
-            // UI Status
             'status' => $payment->status === 'paid'
                 ? 'Paid'
                 : 'Cancel',
@@ -177,8 +177,6 @@ public function subscriptions(): JsonResponse
 
     ], 200);
 }
-
-
 
 
 
