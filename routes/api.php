@@ -24,7 +24,7 @@ use App\Http\Controllers\CommunityPostReportController;
 use App\Http\Controllers\TerraWebhookController;
 use App\Http\Controllers\User\HealthLogController;
 use App\Http\Controllers\LabReportController;
-
+use App\Http\Controllers\AI\LabReportAIController;
 
 Route::prefix('v1')->group(function () {
     Route::get('/', function () {
@@ -35,6 +35,8 @@ Route::prefix('v1')->group(function () {
         ]);
     });
 
+
+   
     // ----------------------------
     // Public Routes
     // ----------------------------
@@ -70,6 +72,13 @@ Route::prefix('v1')->group(function () {
 
 
         Route::apiResource('lab-reports', LabReportController::class);
+        
+            // Get AI Analysis
+           Route::get(
+                '/ai-lab-reports/{labReport}',
+                [LabReportAIController::class, 'show']
+            );
+            
 
         Route::post('/change-password', [AuthController::class, 'changePassword']);
         // Save Firebase device token
@@ -175,5 +184,7 @@ Route::prefix('v1')->group(function () {
     Route::get('/user/subscription', [UserManagementController::class, 'subscriptions']);
     Route::get('/admin/dashboard', [UserManagementController::class, 'dashboard']);
     Route::get('/analytics', [UserManagementController::class, 'analytic']);
+
+
 
 });
