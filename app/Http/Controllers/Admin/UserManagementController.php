@@ -12,6 +12,7 @@ use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
+use App\Models\TerraActivityData;
 
 
 
@@ -101,57 +102,81 @@ class UserManagementController extends Controller
     ], 200);
 }
 
-//payments
- /**
-     * Display subscription payment list.
-     */
-    public function subscriptions(): JsonResponse
-    {
-        $subscriptions = Payment::with([
-                'user',
-                'subscriptionPlan',
-            ])
-            ->where('type', 'subscription')
-            ->whereIn('status', ['paid', 'cancel'])
-            ->latest()
-            ->paginate(10);
+/**
+ * Display subscription payment list.
+ */
+public function subscriptions(): JsonResponse
+{
+    $subscriptions = Payment::with([
+            'user.profile',
+            'subscriptionPlan',
+        ])
+        ->where('type', 'subscription')
+        ->whereIn('status', ['paid', 'cancel'])
+        ->latest()
+        ->paginate(10);
 
-        $data = $subscriptions->getCollection()->map(function (Payment $payment) {
-            return [
-                'id' => $payment->id,
-                'user' => $payment->user?->full_name,
-                'email' => $payment->user?->email,
-                'plan' => $payment->subscriptionPlan?->name,
-                'amount' => '$' . number_format($payment->amount, 2),
-                'date' => $payment->created_at->format('d M Y'),
 
-                // UI Status
-                'status' => $payment->status === 'paid'
-                    ? 'Paid'
-                    : 'Cancel',
-            ];
-        });
+    $data = $subscriptions->getCollection()->map(function (Payment $payment) {
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Subscription list retrieved successfully.',
-            'data' => $data,
+        return [
 
-            'pagination' => [
-                'current_page' => $subscriptions->currentPage(),
-                'next_page' => $subscriptions->hasMorePages()
-                    ? $subscriptions->currentPage() + 1
-                    : null,
-                'prev_page' => $subscriptions->currentPage() > 1
-                    ? $subscriptions->currentPage() - 1
-                    : null,
-                'last_page' => $subscriptions->lastPage(),
-                'per_page' => $subscriptions->perPage(),
-                'total' => $subscriptions->total(),
-            ],
-        ], 200);
-    }
+            'id' => $payment->id,
 
+            'user' => $payment->user?->full_name,
+
+            'email' => $payment->user?->email,
+
+            'profile' => $payment->user?->profile?->image
+                ? asset('storage/' . $payment->user->profile->image)
+                : null,
+
+            'plan' => $payment->subscriptionPlan?->name,
+
+            'amount' => '$' . number_format($payment->amount, 2),
+
+            'date' => $payment->created_at->format('d M Y'),
+
+            // UI Status
+            'status' => $payment->status === 'paid'
+                ? 'Paid'
+                : 'Cancel',
+
+        ];
+
+    });
+
+
+    return response()->json([
+
+        'success' => true,
+
+        'message' => 'Subscription list retrieved successfully.',
+
+        'data' => $data,
+
+        'pagination' => [
+
+            'current_page' => $subscriptions->currentPage(),
+
+            'next_page' => $subscriptions->hasMorePages()
+                ? $subscriptions->currentPage() + 1
+                : null,
+
+            'prev_page' => $subscriptions->currentPage() > 1
+                ? $subscriptions->currentPage() - 1
+                : null,
+
+            'last_page' => $subscriptions->lastPage(),
+
+            'per_page' => $subscriptions->perPage(),
+
+            'total' => $subscriptions->total(),
+
+        ],
+
+    ], 200);
+}
 
 
 
@@ -168,7 +193,11 @@ class UserManagementController extends Controller
 
         $totalUsers = User::where('id', '!=', 1)->count();
 
-        $healthLogs = HealthLog::count();
+       $totalHealthLogs = HealthLog::count();
+
+    $totalTerraRecords = TerraActivityData::count();
+
+    $totalHealthActivities = $totalHealthLogs + $totalTerraRecords;
 
         $monthlyRevenue = Payment::where('status', 'paid')
             ->whereMonth('created_at', now()->month)
@@ -362,7 +391,7 @@ class UserManagementController extends Controller
 
                 'overview' => [
                     'total_users' => $totalUsers,
-                    'health_logs' => $healthLogs,
+                    'health_logs' => $totalHealthActivities,
                     'monthly_revenue' => $monthlyRevenue,
                     'community_posts' => $communityPosts,
                 ],
@@ -470,109 +499,212 @@ class UserManagementController extends Controller
                 ];
             });
 
+/*
+|--------------------------------------------------------------------------
+| Top Health Concerns Logged (Health Logs + Terra Data)
+|--------------------------------------------------------------------------
+*/
 
-        /*
-        |--------------------------------------------------------------------------
-        | Top Health Concerns Logged
-        |--------------------------------------------------------------------------
-        */
+$healthCounts = [];
 
-        $symptomCounts = [];
 
-        $logs = HealthLog::whereNotNull('symptoms')->get();
+/*
+|--------------------------------------------------------------------------
+| Health Logs (Energy Level Only)
+|--------------------------------------------------------------------------
+*/
 
-        foreach ($logs as $log) {
+/*
+|--------------------------------------------------------------------------
+| Health Logs (Energy Level)
+|--------------------------------------------------------------------------
+*/
 
-            $symptoms = is_array($log->symptoms)
-                ? $log->symptoms
-                : json_decode($log->symptoms, true);
+$healthMetrics = [];
 
-            if (!is_array($symptoms)) {
-                continue;
-            }
+$logs = HealthLog::whereNotNull('energy_level')->get();
 
-            foreach ($symptoms as $symptom) {
+foreach ($logs as $log) {
 
-                $symptom = trim($symptom);
+    $energy = trim($log->energy_level);
 
-                if ($symptom === '') {
-                    continue;
-                }
+    if (!empty($energy)) {
 
-                if (!isset($symptomCounts[$symptom])) {
-                    $symptomCounts[$symptom] = 0;
-                }
+        $healthCounts['Fatigue / Low Energy'] =
+            ($healthCounts['Fatigue / Low Energy'] ?? 0) + 1;
 
-                $symptomCounts[$symptom]++;
-            }
-        }
 
-        arsort($symptomCounts);
+        $healthMetrics['Energy'] = [
+            'status' => $energy,
+        ];
 
-        $highest = count($symptomCounts)
-            ? max($symptomCounts)
-            : 1;
+    }
+}
 
-        $topHealthConcerns = collect($symptomCounts)
-            ->map(function ($count, $name) use ($highest) {
+
+/*
+|--------------------------------------------------------------------------
+| Terra Activity Data
+|--------------------------------------------------------------------------
+*/
+
+$terraActivities = TerraActivityData::all();
+
+
+foreach ($terraActivities as $activity) {
+
+
+    $payload = $activity->payload;
+
+
+    if (!is_array($payload)) {
+
+        $payload = json_decode($payload, true);
+
+    }
+
+
+    if (!is_array($payload)) {
+        continue;
+    }
+
+
+
+    // Sleep
+
+    if (array_key_exists('sleep', $payload)) {
+
+        $healthCounts['Sleep Disruption'] =
+            ($healthCounts['Sleep Disruption'] ?? 0) + 1;
+
+    }
+
+
+
+    // HRV
+
+    if (array_key_exists('hrv', $payload)) {
+
+        $healthCounts['HRV'] =
+            ($healthCounts['HRV'] ?? 0) + 1;
+
+    }
+
+
+
+    // Stress
+
+    if (array_key_exists('stress', $payload)) {
+
+        $healthCounts['Stress'] =
+            ($healthCounts['Stress'] ?? 0) + 1;
+
+    }
+
+
+
+    // Readiness
+
+    if (array_key_exists('readiness', $payload)) {
+
+        $healthCounts['Readiness'] =
+            ($healthCounts['Readiness'] ?? 0) + 1;
+
+    }
+
+
+
+    // Skin
+
+    if (array_key_exists('skin', $payload)) {
+
+        $healthCounts['Skin Redness / Breakout'] =
+            ($healthCounts['Skin Redness / Breakout'] ?? 0) + 1;
+
+    }
+
+
+}
+
+
+
+/*
+|--------------------------------------------------------------------------
+| Percentage Calculation
+|--------------------------------------------------------------------------
+*/
+
+
+arsort($healthCounts);
+
+
+$highest = max($healthCounts ?? [1]);
+
+
+
+$topHealthConcerns = collect($healthCounts)
+    ->map(function ($count, $name) use ($highest) {
+
+
+        return [
+
+            'concern' => $name,
+
+            'count' => $count,
+
+            'percentage' => round(
+                ($count / $highest) * 100
+            ),
+
+        ];
+
+    })
+    ->values();
+
+/*
+|--------------------------------------------------------------------------
+| Life Journey Growth (Monthly)
+|--------------------------------------------------------------------------
+*/
+
+$lifeJourneyGrowth = DB::table('life_journey_profile')
+    ->join('profiles', 'profiles.id', '=', 'life_journey_profile.profile_id')
+    ->join('life_journeys', 'life_journeys.id', '=', 'life_journey_profile.life_journey_id')
+    ->selectRaw("
+        YEAR(life_journey_profile.created_at) as year,
+        MONTH(life_journey_profile.created_at) as month,
+        life_journeys.title,
+        COUNT(*) as total
+    ")
+    ->groupByRaw("
+        YEAR(life_journey_profile.created_at),
+        MONTH(life_journey_profile.created_at),
+        life_journeys.title
+    ")
+    ->orderByRaw("
+        YEAR(life_journey_profile.created_at),
+        MONTH(life_journey_profile.created_at)
+    ")
+    ->get()
+    ->groupBy(function ($item) {
+        return Carbon::create($item->year, $item->month)->format('M');
+    })
+    ->map(function ($items, $month) {
+
+        return [
+            'month' => $month,
+            'journeys' => $items->map(function ($item) {
 
                 return [
-                    'concern' => $name,
-                    'count' => $count,
-                    'percentage' => round(($count / $highest) * 100),
-                ];
-            })
-            ->values();
-
-                    /*
-        |--------------------------------------------------------------------------
-        | Life Journey Growth (Monthly)
-        |--------------------------------------------------------------------------
-        */
-
-        $lifeJourneyGrowth = DB::table('life_journey_profile')
-            ->join('profiles', 'profiles.id', '=', 'life_journey_profile.profile_id')
-            ->join('life_journeys', 'life_journeys.id', '=', 'life_journey_profile.life_journey_id')
-            ->selectRaw("
-                YEAR(life_journey_profile.created_at) as year,
-                MONTH(life_journey_profile.created_at) as month,
-                life_journeys.title,
-                COUNT(*) as total
-            ")
-            ->groupByRaw("
-                YEAR(life_journey_profile.created_at),
-                MONTH(life_journey_profile.created_at),
-                life_journeys.title
-            ")
-            ->orderByRaw("
-                YEAR(life_journey_profile.created_at),
-                MONTH(life_journey_profile.created_at)
-            ")
-            ->get()
-            ->groupBy(function ($item) {
-
-                return Carbon::create(
-                    $item->year,
-                    $item->month
-                )->format('M');
-
-            })
-            ->map(function ($items, $month) {
-
-                return [
-                    'month' => $month,
-                    'journeys' => $items->map(function ($item) {
-
-                        return [
-                            'journey' => $item->title,
-                            'users' => (int) $item->total,
-                        ];
-
-                    })->values(),
+                    'journey' => $item->title,
+                    'users' => (int) $item->total,
                 ];
 
-            })
-            ->values();
+            })->values(),
+        ];
+
+    })
+    ->values();
 
 
         /*
