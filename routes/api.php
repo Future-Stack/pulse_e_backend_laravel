@@ -173,4 +173,6 @@ Route::prefix('v1')->group(function () {
     Route::get('/users', [UserManagementController::class, 'index']);
 Route::get('/users-details/{id}', [UserManagementController::class, 'show']);
 Route::get('/user/subscription', [UserManagementController::class, 'subscriptions']);
+Route::get('/admin/dashboard', [UserManagementController::class, 'dashboard']);
+
 });
