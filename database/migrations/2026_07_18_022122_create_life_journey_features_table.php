@@ -11,13 +11,10 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('life_journeys', function (Blueprint $table) {
+        Schema::create('life_journey_features', function (Blueprint $table) {
             $table->id();
-            $table->text('icon')->nullable();
-            $table->string('title');
-            $table->string('subtitle')->nullable();
-            $table->text('description')->nullable();
-            $table->tinyInteger('status')->default(1);
+            $table->foreignId('life_journey_id')->constrained('life_journeys')->onDelete('cascade');
+            $table->string('feature_name'); // e.g., "Skin Health Tracking", "Ovulation Prediction"
             $table->timestamps();
         });
     }
@@ -27,6 +24,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('life_journeys');
+        Schema::dropIfExists('life_journey_features');
     }
 };
