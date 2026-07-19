@@ -27,6 +27,7 @@ use App\Http\Controllers\LabReportController;
 use App\Http\Controllers\AI\LabReportAIController;
 use App\Http\Controllers\Life_journey\LifeJourneyController;
 use App\Http\Controllers\SkinScan\SkinScanController;
+use App\Http\Controllers\SnapshotController;
 
 Route::prefix('v1')->group(function () {
     Route::get('/', function () {
@@ -194,7 +195,12 @@ Route::prefix('v1')->group(function () {
     Route::get('/user/subscription', [UserManagementController::class, 'subscriptions']);
     Route::get('/admin/dashboard', [UserManagementController::class, 'dashboard']);
     Route::get('/analytics', [UserManagementController::class, 'analytic']);
+    Route::get('/admin/revenue-breakdown', [SubscriptionController::class, 'revenueBreakdown']);
+    //app
+    // routes/api.php
 
+
+Route::get('/snapshot/{userId}', [SnapshotController::class, 'snapshot']);
 
 
 });
