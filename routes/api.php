@@ -194,7 +194,7 @@ Route::prefix('v1')->group(function () {
     Route::get('/user/subscription', [UserManagementController::class, 'subscriptions']);
     Route::get('/admin/dashboard', [UserManagementController::class, 'dashboard']);
     Route::get('/analytics', [UserManagementController::class, 'analytic']);
-
+    Route::get('/admin/revenue-breakdown', [SubscriptionController::class, 'revenueBreakdown']);
 
 
 });
