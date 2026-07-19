@@ -8,6 +8,8 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
+use App\Models\TerraActivityData;
+use App\Models\SkinScan;
 
 class User extends Authenticatable
 {
@@ -99,5 +101,14 @@ public function latestSubscription()
         ->where('type', 'subscription')
         ->where('status', 'paid')
         ->latestOfMany();
+}
+
+public function terraActivities()
+{
+    return $this->hasMany(TerraActivityData::class);
+}
+public function skinAnalyses()
+{
+    return $this->hasMany(SkinScan::class);
 }
 }
