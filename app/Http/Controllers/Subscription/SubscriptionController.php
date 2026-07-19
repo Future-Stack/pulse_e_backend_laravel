@@ -10,6 +10,7 @@ use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Http\JsonResponse;
 
 class SubscriptionController extends Controller
 {
@@ -202,4 +203,47 @@ class SubscriptionController extends Controller
 //                ],
 //            ]);
 
+
+
+
+
+
+
+//revenue breakdown
+
+public function revenueBreakdown(): JsonResponse
+{
+    $plans = SubscriptionPlan::withCount([
+            'payments as subscribers' => function ($query) {
+                $query->where('type', 'subscription')
+                      ->where('status', 'paid');
+            }
+        ])
+        ->get();
+
+    $data = $plans->map(function ($plan) {
+
+        $monthlyRevenue = $plan->subscribers * $plan->price_monthly;
+        $annualRevenue = $plan->subscribers * $plan->price_annual;
+
+        return [
+            'plan' => $plan->name,
+            'subscribers' => $plan->subscribers,
+
+            'monthly_revenue' => $plan->price_monthly > 0
+                ? '$' . number_format($monthlyRevenue, 2)
+                : '-',
+
+            'annual_revenue' => $plan->price_annual > 0
+                ? '$' . number_format($annualRevenue, 2)
+                : '-',
+        ];
+    });
+
+    return response()->json([
+        'success' => true,
+        'message' => 'Revenue breakdown retrieved successfully.',
+        'data' => $data,
+    ]);
+}
 }
