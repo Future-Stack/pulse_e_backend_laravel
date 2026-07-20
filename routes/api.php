@@ -182,6 +182,7 @@ Route::prefix('v1')->group(function () {
 
         //Skin Scan
         Route::get('/skin-scans/history', [SkinScanController::class, 'index']);
+        Route::get('/skin-scans/{id}', [SkinScanController::class, 'show']);
         Route::post('/skin-scans/analyze', [SkinScanController::class, 'store']);
     });
 
