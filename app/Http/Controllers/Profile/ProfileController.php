@@ -66,7 +66,9 @@ public function saveProfile(Request $request)
 
         // Handle image upload
         $imagePath = null;
-        if ($request->hasFile('profile_img')) { // key এখন profile_img
+        if ($request->hasFile('profile_img')) 
+            {
+           
             $storedPath = $request->file('profile_img')->store('profiles', 'public');
             $imagePath  = asset('storage/' . $storedPath);
         }
