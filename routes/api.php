@@ -6,6 +6,7 @@ use App\Http\Controllers\Profile\ProfileController;
 use App\Http\Controllers\Subscription\SubscriptionController;
 use App\Http\Controllers\Subscription\SubscriptionPlanController;
 use App\Http\Controllers\Topup\TopupController;
+use App\Http\Controllers\Topup\TopupPaymentController;
 use App\Http\Controllers\User\AppleAuthController;
 use App\Http\Controllers\User\GoogleAuthController;
 use App\Http\Controllers\Faq\FaqController;
@@ -39,7 +40,7 @@ Route::prefix('v1')->group(function () {
     });
 
 
-   
+
     // ----------------------------
     // Public Routes
     // ----------------------------
@@ -75,13 +76,13 @@ Route::prefix('v1')->group(function () {
 
 
         Route::apiResource('lab-reports', LabReportController::class);
-        
+
             // Get AI Analysis
            Route::get(
                 '/ai-lab-reports/{labReport}',
                 [LabReportAIController::class, 'show']
             );
-            
+
 
         Route::post('/change-password', [AuthController::class, 'changePassword']);
         // Save Firebase device token
@@ -170,8 +171,11 @@ Route::prefix('v1')->group(function () {
         Route::get('/topup/{slug}',[TopupController::class, 'getBySlug']);
         Route::post('/update-topup/{slug}',[TopupController::class, 'createOrUpdate']);
 
+        //topup-payment
+        Route::post('/topup-payment',[TopupPaymentController::class, 'topUpPayment']);
+
         //Subscription Payment
-        Route::post('/subscriptions', [SubscriptionController::class, 'createSubscription']);
+        Route::post('/subscriptions', [SubscriptionController::class, 'creatbscription']);
         Route::post('/subscriptions/cancel', [SubscriptionController::class, 'cancelSubscription']);
         Route::get('/terra/scores', [TerraWebhookController::class, 'getScores']);
         Route::get('/terra/today-scores', [TerraWebhookController::class, 'getTodayScores']);
@@ -188,6 +192,7 @@ Route::prefix('v1')->group(function () {
 
     // Stripe webhook endpoint
     Route::post('/subscription-stripe/webhook', [SubscriptionController::class, 'handleStripeWebhook']);
+    Route::post('/topup-stripe/webhook', [TopupPaymentController::class, 'handleWebhook']);
     Route::post('/terra/webhook', [TerraWebhookController::class, 'handle']);
 
     //Admin Dashboard
