@@ -687,5 +687,48 @@ public function subscriptions(): JsonResponse
                 ],
             ], 200);
         }
+
+
+
+
+        //export
+        public function exportAnalytics()
+{
+    $headers = [
+        'Content-Type' => 'text/csv',
+        'Content-Disposition' => 'attachment; filename=analytics.csv',
+    ];
+
+    $callback = function () {
+        $file = fopen('php://output', 'w');
+
+        // Header
+        fputcsv($file, ['Journey', 'Users']);
+
+        $data = LifeJourney::leftJoin(
+                'life_journey_profile',
+                'life_journeys.id',
+                '=',
+                'life_journey_profile.life_journey_id'
+            )
+            ->select(
+                'life_journeys.title',
+                DB::raw('COUNT(life_journey_profile.profile_id) as users')
+            )
+            ->groupBy('life_journeys.id', 'life_journeys.title')
+            ->get();
+
+        foreach ($data as $row) {
+            fputcsv($file, [
+                $row->title,
+                $row->users,
+            ]);
+        }
+
+        fclose($file);
+    };
+
+    return response()->stream($callback, 200, $headers);
+}
     }
 
