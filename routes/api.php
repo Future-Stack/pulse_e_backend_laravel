@@ -208,5 +208,6 @@ Route::prefix('v1')->group(function () {
 
 Route::get('/snapshot/{userId}', [SnapshotController::class, 'snapshot']);
 
-
+Route::get('/admin/analytics/export', [UserManagementController::class, 'exportAnalytics']);
 });
+  
