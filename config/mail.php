@@ -95,6 +95,10 @@ return [
             ],
         ],
 
+        'graph' => [
+            'transport' => 'graph',
+        ],
+
     ],
 
     /*
