@@ -39,7 +39,7 @@ return [
         'secret' => env('STRIPE_SECRET'),
         'publishable_key' => env('STRIPE_PUBLIC_KEY'),
         'subscription_webhook_secret' => env('SUBSCRIPTION_WEBHOOK_SECRET'),
-
+        'topup_webhook_secret' => env('TOPUP_WEBHOOK_SECRET'),
     ],
 
     'terra' => [

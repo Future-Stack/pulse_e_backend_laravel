@@ -38,7 +38,6 @@ return new class extends Migration
 
             $table->string('status')->default('pending')->comment('pending,paid,cancel');
 
-            $table->index(['user_id', 'type', 'status']);
             $table->timestamps();
         });
     }
