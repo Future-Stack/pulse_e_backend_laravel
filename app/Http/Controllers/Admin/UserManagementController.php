@@ -13,6 +13,7 @@ use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
 use App\Models\TerraActivityData;
+use Illuminate\Http\Request;
 
 
 
@@ -411,189 +412,300 @@ public function subscriptions(): JsonResponse
 
 
 
-    //Analytics part
-    public function analytic(): JsonResponse
-    {
-        /*
-        |--------------------------------------------------------------------------
-        | Community Activity Growth
-        |--------------------------------------------------------------------------
-        */
-        $communityGrowth = CommunityPost::selectRaw("
-                YEAR(created_at) as year,
-                MONTH(created_at) as month,
-                COUNT(*) as total
-            ")
-            ->groupByRaw("YEAR(created_at), MONTH(created_at)")
-            ->orderByRaw("YEAR(created_at), MONTH(created_at)")
-            ->get()
-            ->map(function ($item) {
-                return [
-                    'month' => Carbon::create($item->year, $item->month)->format('M'),
-                    'posts' => (int) $item->total,
-                ];
-            });
+  // Analytics part
+            public function analytic(Request $request): JsonResponse
+            {
+                $range = $request->query('range');
 
-        /*
-        |--------------------------------------------------------------------------
-        | Queries By Journey
-        |--------------------------------------------------------------------------
-        */
-        $queriesByJourney = DB::table('life_journeys')
-            ->leftJoin(
-                'community_post_life_journey',
-                'life_journeys.id',
-                '=',
-                'community_post_life_journey.life_journey_id'
-            )
-            ->select(
-                'life_journeys.title',
-                DB::raw('COUNT(community_post_life_journey.community_post_id) as total')
-            )
-            ->groupBy('life_journeys.title')
-            ->orderByDesc('total')
-            ->get()
-            ->map(function ($item) {
-                return [
-                    'journey' => $item->title,
-                    'queries' => (int) $item->total,
-                ];
-            });
+                $fromDate = match ($range) {
+                    '7days'  => now()->subDays(7),
+                    '30days' => now()->subDays(30),
+                    '90days' => now()->subDays(90),
+                    '1year'  => now()->subYear(),
+                    default  => null,
+                };
 
-        /*
-        |--------------------------------------------------------------------------
-        | MRR Growth (Monthly Recurring Revenue)
-        |--------------------------------------------------------------------------
-        */
-        $mrrGrowth = Payment::selectRaw("
-                YEAR(created_at) as year,
-                MONTH(created_at) as month,
-                SUM(amount) as revenue
-            ")
-            ->where('type', 'subscription')
-            ->where('status', 'paid')
-            ->groupByRaw("YEAR(created_at), MONTH(created_at)")
-            ->orderByRaw("YEAR(created_at), MONTH(created_at)")
-            ->get()
-            ->map(function ($item) {
-                return [
-                    'month' => Carbon::create($item->year, $item->month)->format('M'),
-                    'revenue' => (float) $item->revenue,
-                ];
-            });
-
-        /*
-        |--------------------------------------------------------------------------
-        | Top Health Concerns Logged (Health Logs + Terra Data)
-        |--------------------------------------------------------------------------
-        */
-        $healthCounts = [];
-
-        // Health Logs
-        $logs = HealthLog::whereNotNull('energy_level')->get();
-        foreach ($logs as $log) {
-            $energy = trim($log->energy_level);
-            if (!empty($energy)) {
-                $healthCounts['Fatigue / Low Energy'] = ($healthCounts['Fatigue / Low Energy'] ?? 0) + 1;
-            }
-        }
-
-        // Terra Activity Data
-        $terraActivities = TerraActivityData::all();
-        foreach ($terraActivities as $activity) {
-            $payload = $activity->payload;
-
-            if (!is_array($payload)) {
-                $payload = json_decode($payload, true);
-            }
-
-            if (!is_array($payload)) {
-                continue;
-            }
-
-            if (array_key_exists('sleep', $payload)) {
-                $healthCounts['Sleep Disruption'] = ($healthCounts['Sleep Disruption'] ?? 0) + 1;
-            }
-            if (array_key_exists('hrv', $payload)) {
-                $healthCounts['HRV'] = ($healthCounts['HRV'] ?? 0) + 1;
-            }
-            if (array_key_exists('stress', $payload)) {
-                $healthCounts['Stress'] = ($healthCounts['Stress'] ?? 0) + 1;
-            }
-            if (array_key_exists('readiness', $payload)) {
-                $healthCounts['Readiness'] = ($healthCounts['Readiness'] ?? 0) + 1;
-            }
-            if (array_key_exists('skin', $payload)) {
-                $healthCounts['Skin Redness / Breakout'] = ($healthCounts['Skin Redness / Breakout'] ?? 0) + 1;
-            }
-        }
-
-        /*
-        |--------------------------------------------------------------------------
-        | Percentage Calculation (FIXED HERE)
-        |--------------------------------------------------------------------------
-        */
-        arsort($healthCounts);
-
-        // খালি অ্যারে হলেও যেন crash না করে সেটার জন্য ফিক্স
-        $highest = !empty($healthCounts) ? max($healthCounts) : 1;
-
-        $topHealthConcerns = collect($healthCounts)
-            ->map(function ($count, $name) use ($highest) {
-                return [
-                    'concern' => $name,
-                    'count' => $count,
-                    'percentage' => round(($count / $highest) * 100),
-                ];
-            })
-            ->values();
-
-        /*
-        |--------------------------------------------------------------------------
-        | Life Journey Growth (Monthly)
-        |--------------------------------------------------------------------------
-        */
-        $lifeJourneyGrowth = DB::table('life_journey_profile')
-            ->join('profiles', 'profiles.id', '=', 'life_journey_profile.profile_id')
-            ->join('life_journeys', 'life_journeys.id', '=', 'life_journey_profile.life_journey_id')
-            ->selectRaw("
-                YEAR(life_journey_profile.created_at) as year,
-                MONTH(life_journey_profile.created_at) as month,
-                life_journeys.title,
-                COUNT(*) as total
-            ")
-            ->groupByRaw("
-                YEAR(life_journey_profile.created_at),
-                MONTH(life_journey_profile.created_at),
-                life_journeys.title
-            ")
-            ->orderByRaw("
-                YEAR(life_journey_profile.created_at),
-                MONTH(life_journey_profile.created_at)
-            ")
-            ->get()
-            ->groupBy(function ($item) {
-                return Carbon::create($item->year, $item->month)->format('M');
-            })
-            ->map(function ($items, $month) {
-                return [
-                    'month' => $month,
-                    'journeys' => $items->map(function ($item) {
+                /*
+                |--------------------------------------------------------------------------
+                | Community Activity Growth
+                |--------------------------------------------------------------------------
+                */
+                $communityGrowth = CommunityPost::when($fromDate, function ($query) use ($fromDate) {
+                        $query->where('created_at', '>=', $fromDate);
+                    })
+                    ->selectRaw("
+                        YEAR(created_at) as year,
+                        MONTH(created_at) as month,
+                        COUNT(*) as total
+                    ")
+                    ->groupByRaw("YEAR(created_at), MONTH(created_at)")
+                    ->orderByRaw("YEAR(created_at), MONTH(created_at)")
+                    ->get()
+                    ->map(function ($item) {
                         return [
-                            'journey' => $item->title,
-                            'users' => (int) $item->total,
+                            'month' => Carbon::create($item->year, $item->month)->format('M'),
+                            'posts' => (int) $item->total,
                         ];
-                    })->values(),
-                ];
-            })
-            ->values();
+                    });
+                /*
+            |--------------------------------------------------------------------------
+            | Queries By Journey
+            |--------------------------------------------------------------------------
+            */
+            $queriesByJourney = DB::table('life_journeys')
+                ->leftJoin(
+                    'community_post_life_journey',
+                    'life_journeys.id',
+                    '=',
+                    'community_post_life_journey.life_journey_id'
+                )
+                ->when($fromDate, function ($query) use ($fromDate) {
+                    $query->where('community_post_life_journey.created_at', '>=', $fromDate);
+                })
+                ->select(
+                    'life_journeys.title',
+                    DB::raw('COUNT(community_post_life_journey.community_post_id) as total')
+                )
+                ->groupBy('life_journeys.title')
+                ->orderByDesc('total')
+                ->get()
+                ->map(function ($item) {
+                    return [
+                        'journey' => $item->title,
+                        'queries' => (int) $item->total,
+                    ];
+                });
 
-        /*
-        |--------------------------------------------------------------------------
-        | Life Journey Metrics Breakdown
-        |--------------------------------------------------------------------------
-        */
-        $lifeJourneyBreakdown = LifeJourney::leftJoin(
+            /*
+            |--------------------------------------------------------------------------
+            | MRR Growth (Monthly Recurring Revenue)
+            |--------------------------------------------------------------------------
+            */
+           $mrrGrowth = Payment::when($fromDate, function ($query) use ($fromDate) {
+                    $query->where('created_at', '>=', $fromDate);
+                })
+                ->where('status', 'paid')
+                ->selectRaw("
+                    YEAR(created_at) as year,
+                    MONTH(created_at) as month,
+                    SUM(amount) as revenue
+                ")
+                ->groupByRaw("YEAR(created_at), MONTH(created_at)")
+                ->orderByRaw("YEAR(created_at), MONTH(created_at)")
+                ->get()
+                ->map(function ($item) {
+                    return [
+                        'month'   => Carbon::create($item->year, $item->month)->format('M'),
+                        'revenue' => (float) $item->revenue,
+                    ];
+                });
+
+                /*
+            |--------------------------------------------------------------------------
+            | Top Health Concerns Logged (Health Logs + Terra Data)
+            |--------------------------------------------------------------------------
+            */
+
+            $healthCounts = [];
+
+            /*
+            |--------------------------------------------------------------------------
+            | Health Logs
+            |--------------------------------------------------------------------------
+            */
+
+            $logs = HealthLog::when($fromDate, function ($query) use ($fromDate) {
+                    $query->where('created_at', '>=', $fromDate);
+                })
+                ->whereNotNull('energy_level')
+                ->get();
+
+            foreach ($logs as $log) {
+
+                $energy = trim($log->energy_level);
+
+                if (!empty($energy)) {
+                    $healthCounts['Fatigue / Low Energy'] =
+                        ($healthCounts['Fatigue / Low Energy'] ?? 0) + 1;
+                }
+            }
+
+            /*
+            |--------------------------------------------------------------------------
+            | Terra Activity Data
+            |--------------------------------------------------------------------------
+            */
+
+            $terraActivities = TerraActivityData::when($fromDate, function ($query) use ($fromDate) {
+                    $query->where('created_at', '>=', $fromDate);
+                })
+                ->get();
+
+            foreach ($terraActivities as $activity) {
+
+                $payload = is_array($activity->payload)
+                    ? $activity->payload
+                    : json_decode($activity->payload, true);
+
+                if (!is_array($payload)) {
+                    continue;
+                }
+
+                if (isset($payload['sleep'])) {
+                    $healthCounts['Sleep Disruption'] =
+                        ($healthCounts['Sleep Disruption'] ?? 0) + 1;
+                }
+
+                if (isset($payload['hrv'])) {
+                    $healthCounts['HRV'] =
+                        ($healthCounts['HRV'] ?? 0) + 1;
+                }
+
+                if (isset($payload['stress'])) {
+                    $healthCounts['Stress'] =
+                        ($healthCounts['Stress'] ?? 0) + 1;
+                }
+
+                if (isset($payload['readiness'])) {
+                    $healthCounts['Readiness'] =
+                        ($healthCounts['Readiness'] ?? 0) + 1;
+                }
+
+                if (isset($payload['skin'])) {
+                    $healthCounts['Skin Redness / Breakout'] =
+                        ($healthCounts['Skin Redness / Breakout'] ?? 0) + 1;
+                }
+            }
+
+            /*
+            |--------------------------------------------------------------------------
+            | Percentage Calculation
+            |--------------------------------------------------------------------------
+            */
+
+            arsort($healthCounts);
+
+            $highest = !empty($healthCounts)
+                ? max($healthCounts)
+                : 1;
+
+            $topHealthConcerns = collect($healthCounts)
+                ->map(function ($count, $name) use ($highest) {
+
+                    return [
+                        'concern'   => $name,
+                        'count'     => $count,
+                        'percentage'=> round(($count / $highest) * 100),
+                    ];
+
+                })
+                ->values();
+                /*
+            |--------------------------------------------------------------------------
+            | Life Journey Growth (Monthly)
+            |--------------------------------------------------------------------------
+            */
+
+            $lifeJourneyGrowth = DB::table('life_journey_profile')
+                ->join('profiles', 'profiles.id', '=', 'life_journey_profile.profile_id')
+                ->join('life_journeys', 'life_journeys.id', '=', 'life_journey_profile.life_journey_id')
+                ->when($fromDate, function ($query) use ($fromDate) {
+                    $query->where('life_journey_profile.created_at', '>=', $fromDate);
+                })
+                ->selectRaw("
+                    YEAR(life_journey_profile.created_at) as year,
+                    MONTH(life_journey_profile.created_at) as month,
+                    life_journeys.title,
+                    COUNT(*) as total
+                ")
+                ->groupByRaw("
+                    YEAR(life_journey_profile.created_at),
+                    MONTH(life_journey_profile.created_at),
+                    life_journeys.title
+                ")
+                ->orderByRaw("
+                    YEAR(life_journey_profile.created_at),
+                    MONTH(life_journey_profile.created_at)
+                ")
+                ->get()
+                ->groupBy(function ($item) {
+                    return Carbon::create($item->year, $item->month)->format('M');
+                })
+                ->map(function ($items, $month) {
+                    return [
+                        'month' => $month,
+                        'journeys' => $items->map(function ($item) {
+                            return [
+                                'journey' => $item->title,
+                                'users' => (int) $item->total,
+                            ];
+                        })->values(),
+                    ];
+                })
+                ->values();
+
+            /*
+            |--------------------------------------------------------------------------
+            | Life Journey Metrics Breakdown
+            |--------------------------------------------------------------------------
+            */
+
+            $lifeJourneyBreakdown = LifeJourney::leftJoin(
+                    'life_journey_profile',
+                    'life_journeys.id',
+                    '=',
+                    'life_journey_profile.life_journey_id'
+                )
+                ->when($fromDate, function ($query) use ($fromDate) {
+                    $query->where('life_journey_profile.created_at', '>=', $fromDate);
+                })
+                ->select(
+                    'life_journeys.title',
+                    DB::raw('COUNT(life_journey_profile.profile_id) as users')
+                )
+                ->groupBy('life_journeys.id', 'life_journeys.title')
+                ->orderByDesc('users')
+                ->get()
+                ->map(function ($item) {
+                    return [
+                        'journey' => $item->title,
+                        'users' => (int) $item->users,
+                    ];
+                });
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Analytics retrieved successfully.',
+                'data' => [
+                    'range' => $range,
+                    'community_activity_growth' => $communityGrowth,
+                    'queries_by_journey' => $queriesByJourney,
+                    'mrr_growth' => $mrrGrowth,
+                    'top_health_concerns' => $topHealthConcerns,
+                    'life_journey_growth' => $lifeJourneyGrowth,
+                    'life_journey_metrics_breakdown' => $lifeJourneyBreakdown,
+                ],
+            ], 200);
+        }
+
+
+
+
+        //export
+        public function exportAnalytics()
+{
+    $headers = [
+        'Content-Type' => 'text/csv',
+        'Content-Disposition' => 'attachment; filename=analytics.csv',
+    ];
+
+    $callback = function () {
+        $file = fopen('php://output', 'w');
+
+        // Header
+        fputcsv($file, ['Journey', 'Users']);
+
+        $data = LifeJourney::leftJoin(
                 'life_journey_profile',
                 'life_journeys.id',
                 '=',
@@ -604,27 +716,19 @@ public function subscriptions(): JsonResponse
                 DB::raw('COUNT(life_journey_profile.profile_id) as users')
             )
             ->groupBy('life_journeys.id', 'life_journeys.title')
-            ->orderByDesc('users')
-            ->get()
-            ->map(function ($item) {
-                return [
-                    'journey' => $item->title,
-                    'users' => (int) $item->users,
-                ];
-            });
+            ->get();
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Analytics retrieved successfully.',
-            'data' => [
-                'community_activity_growth' => $communityGrowth,
-                'queries_by_journey' => $queriesByJourney,
-                'mrr_growth' => $mrrGrowth,
-                'top_health_concerns' => $topHealthConcerns,
-                'life_journey_growth' => $lifeJourneyGrowth,
-                'life_journey_metrics_breakdown' => $lifeJourneyBreakdown,
-            ],
-        ], 200);
-    }
+        foreach ($data as $row) {
+            fputcsv($file, [
+                $row->title,
+                $row->users,
+            ]);
+        }
+
+        fclose($file);
+    };
+
+    return response()->stream($callback, 200, $headers);
+}
     }
 

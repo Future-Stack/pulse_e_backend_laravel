@@ -26,6 +26,7 @@ use App\Http\Controllers\TerraWebhookController;
 use App\Http\Controllers\User\HealthLogController;
 use App\Http\Controllers\LabReportController;
 use App\Http\Controllers\AI\LabReportAIController;
+use App\Http\Controllers\ChatController\ChatController;
 use App\Http\Controllers\Life_journey\LifeJourneyController;
 use App\Http\Controllers\SkinScan\SkinScanController;
 use App\Http\Controllers\SnapshotController;
@@ -188,6 +189,10 @@ Route::prefix('v1')->group(function () {
         Route::get('/skin-scans/history', [SkinScanController::class, 'index']);
         Route::get('/skin-scans/{id}', [SkinScanController::class, 'show']);
         Route::post('/skin-scans/analyze', [SkinScanController::class, 'store']);
+
+        //Chat
+
+        Route::post('/chat/response', [ChatController::class, 'handleResponse']);
     });
 
     // Stripe webhook endpoint
@@ -208,5 +213,6 @@ Route::prefix('v1')->group(function () {
 
 Route::get('/snapshot/{userId}', [SnapshotController::class, 'snapshot']);
 
-
+Route::get('/admin/analytics/export', [UserManagementController::class, 'exportAnalytics']);
 });
+  
