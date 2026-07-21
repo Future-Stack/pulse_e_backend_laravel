@@ -49,4 +49,8 @@ return [
         'base_url' => env('TERRA_BASE_URL'),
     ],
 
+    'ai_service' => [
+    'url' => env('AI_SERVICE_URL'),
+],
+
 ];

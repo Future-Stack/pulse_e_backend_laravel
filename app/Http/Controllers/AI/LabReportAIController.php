@@ -50,7 +50,7 @@ class LabReportAIController extends Controller
                 $response = Http::withoutVerifying()
                     ->acceptJson()
                     ->timeout(600)
-                    ->post('https://female-mood-analyzer.onrender.com/api/summarize-pdf', [
+                    ->post(config('services.ai_service.url') . '/api/summarize-pdf', [
                         'report_id'   => $labReport->id,
                         'source_path' => asset('storage/'.$labReport->lab_report),
                     ]);
