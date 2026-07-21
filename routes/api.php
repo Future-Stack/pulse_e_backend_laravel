@@ -28,6 +28,7 @@ use App\Http\Controllers\AI\LabReportAIController;
 use App\Http\Controllers\Life_journey\LifeJourneyController;
 use App\Http\Controllers\SkinScan\SkinScanController;
 use App\Http\Controllers\SnapshotController;
+use App\Http\Controllers\AI\DailyScriptureController;
 
 Route::prefix('v1')->group(function () {
     Route::get('/', function () {
@@ -204,5 +205,7 @@ Route::prefix('v1')->group(function () {
 Route::get('/snapshot/{userId}', [SnapshotController::class, 'snapshot']);
 
 Route::get('/admin/analytics/export', [UserManagementController::class, 'exportAnalytics']);
+Route::get('/daily-scripture/{userId}', [DailyScriptureController::class, 'show']);
+
 });
   

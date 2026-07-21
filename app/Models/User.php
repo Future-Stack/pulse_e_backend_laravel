@@ -111,4 +111,10 @@ public function skinAnalyses()
 {
     return $this->hasMany(SkinScan::class);
 }
+
+
+public function dailyScriptures()
+{
+    return $this->hasMany(DailyScripture::class);
+}
 }

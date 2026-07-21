@@ -50,7 +50,8 @@ return [
     ],
 
     'ai_service' => [
-    'url' => env('AI_SERVICE_URL'),
+    'url' => env('AI_SERVICE_URL', 'https://female-mood-analyzer.onrender.com'),
 ],
+
 
 ];
