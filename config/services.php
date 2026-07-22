@@ -49,8 +49,8 @@ return [
         'base_url' => env('TERRA_BASE_URL'),
     ],
 
-    'ai_service' => [
-    'url' => env('AI_SERVICE_URL', 'https://female-mood-analyzer.onrender.com'),
+    'ai' => [
+    'base_url' => env('AI_SERVICE_URL', 'https://female-mood-analyzer.onrender.com'),
 ],
 
 
