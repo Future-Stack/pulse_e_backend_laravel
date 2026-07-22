@@ -5,8 +5,11 @@ namespace App\Http\Controllers;
 use App\Http\Controllers\Controller;
 use App\Models\CommunityPost;
 use App\Models\CommunityPostReport;
+use App\Models\User;
+use App\Notifications\AdminIconNotification;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Notification;
 
 class CommunityPostReportController extends Controller
 {
@@ -37,6 +40,18 @@ class CommunityPostReportController extends Controller
             'comment'      => $validated['comment'] ?? null,
             'report_cause' => $validated['report_cause'],
         ]);
+
+        //Send Admin Notification
+        $admin = User::where('user_type', 'admin')->first();
+
+        if ($admin) {
+            Notification::send($admin, new AdminIconNotification([
+                'type' => 'report',
+                'title' => 'New Post Report',
+                'message' => 'A new report has been posted.',
+                'sender_id' => null,
+            ]));
+        }
 
         return response()->json([
             'message' => 'Report submitted. Our team will review this post.',
