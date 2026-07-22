@@ -218,6 +218,8 @@ Route::prefix('v1')->group(function () {
         Route::post('/chat/response', [ChatController::class, 'handleResponse']);
     });
 
+    Route::post('/topup-payment2', [TopupPaymentController::class, 'topUpPayment']);
+
     // Stripe webhook endpoint
     Route::post('/subscription-stripe/webhook', [SubscriptionController::class, 'handleStripeWebhook']);
     Route::post('/topup-stripe/webhook', [TopupPaymentController::class, 'handleWebhook']);
