@@ -105,6 +105,25 @@ class User extends Authenticatable
             ->latestOfMany();
     }
 
+public function terraActivities()
+{
+    return $this->hasMany(TerraActivityData::class);
+}
+public function skinAnalyses()
+{
+    return $this->hasMany(SkinScan::class);
+}
+
+
+public function dailyScriptures()
+{
+    return $this->hasMany(DailyScripture::class);
+}
+
+public function healthTrends()
+{
+    return $this->hasMany(HealthTrend::class);
+}
     public function terraActivities()
     {
         return $this->hasMany(TerraActivityData::class);
