@@ -5,12 +5,15 @@ namespace App\Http\Controllers\Subscription;
 use App\Http\Controllers\Controller;
 use App\Models\Payment;
 use App\Models\SubscriptionPlan;
+use App\Models\User;
 use App\Models\UserLimit;
+use App\Notifications\AdminIconNotification;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Notification;
 
 class SubscriptionController extends Controller
 {
@@ -34,7 +37,7 @@ class SubscriptionController extends Controller
             // Create or retrieve Stripe customer
             $stripeCustomer = $user->stripe_customer_id ?? \Stripe\Customer::create([
                 'email' => $user->email,
-                'name'  => $user->full_name,
+                'name' => $user->full_name,
             ])->id;
 
             $user->update(['stripe_customer_id' => $stripeCustomer]);
@@ -60,7 +63,7 @@ class SubscriptionController extends Controller
                 'items' => [[
                     'price_data' => [
                         'currency' => 'usd',
-                        'product'  => $plan->stripe_product_id, // ⚠️ Ensure this matches a valid Stripe product ID
+                        'product' => $plan->stripe_product_id, // ⚠️ Ensure this matches a valid Stripe product ID
                         'unit_amount' => $request->billing_cycle === 'month'
                             ? $plan->price_monthly * 100
                             : $plan->price_annual * 100,
@@ -69,7 +72,6 @@ class SubscriptionController extends Controller
                 ]],
                 'default_payment_method' => $request->payment_method_id,
             ]);
-
 
 
             // Record payment
@@ -104,6 +106,17 @@ class SubscriptionController extends Controller
                 ]
             );
 
+            $admin = User::where('user_type', 'admin')->first();
+            if ($admin) {
+                Notification::send($admin, new AdminIconNotification([
+                    'type' => 'subscription',
+                    'title' => 'New Subscription',
+                    'message' => 'A new subscription has been created.',
+                    'sender_id' => null,
+                ]));
+            }
+
+
             DB::commit();
 
             return response()->json([
@@ -117,7 +130,7 @@ class SubscriptionController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to create subscription.',
-                'error'   => $e->getMessage(),
+                'error' => $e->getMessage(),
             ], 500);
         }
     }
@@ -183,7 +196,7 @@ class SubscriptionController extends Controller
                 break;
 
             case 'customer.subscription.created':
-                Log::info('New subscription created: '.$event->data->object->id);
+                Log::info('New subscription created: ' . $event->data->object->id);
                 break;
         }
 
@@ -207,46 +220,41 @@ class SubscriptionController extends Controller
 //            ]);
 
 
-
-
-
-
-
 //revenue breakdown
 
-public function revenueBreakdown(): JsonResponse
-{
-    $plans = SubscriptionPlan::withCount([
+    public function revenueBreakdown(): JsonResponse
+    {
+        $plans = SubscriptionPlan::withCount([
             'payments as subscribers' => function ($query) {
                 $query->where('type', 'subscription')
-                      ->where('status', 'paid');
+                    ->where('status', 'paid');
             }
         ])
-        ->get();
+            ->get();
 
-    $data = $plans->map(function ($plan) {
+        $data = $plans->map(function ($plan) {
 
-        $monthlyRevenue = $plan->subscribers * $plan->price_monthly;
-        $annualRevenue = $plan->subscribers * $plan->price_annual;
+            $monthlyRevenue = $plan->subscribers * $plan->price_monthly;
+            $annualRevenue = $plan->subscribers * $plan->price_annual;
 
-        return [
-            'plan' => $plan->name,
-            'subscribers' => $plan->subscribers,
+            return [
+                'plan' => $plan->name,
+                'subscribers' => $plan->subscribers,
 
-            'monthly_revenue' => $plan->price_monthly > 0
-                ? '$' . number_format($monthlyRevenue, 2)
-                : '-',
+                'monthly_revenue' => $plan->price_monthly > 0
+                    ? '$' . number_format($monthlyRevenue, 2)
+                    : '-',
 
-            'annual_revenue' => $plan->price_annual > 0
-                ? '$' . number_format($annualRevenue, 2)
-                : '-',
-        ];
-    });
+                'annual_revenue' => $plan->price_annual > 0
+                    ? '$' . number_format($annualRevenue, 2)
+                    : '-',
+            ];
+        });
 
-    return response()->json([
-        'success' => true,
-        'message' => 'Revenue breakdown retrieved successfully.',
-        'data' => $data,
-    ]);
-}
+        return response()->json([
+            'success' => true,
+            'message' => 'Revenue breakdown retrieved successfully.',
+            'data' => $data,
+        ]);
+    }
 }

@@ -84,9 +84,7 @@ Route::prefix('v1')->group(function () {
         );
 
 
-
-        
-            Route::get('/snapshot/{userId}', [SnapshotController::class, 'snapshot']);
+        Route::get('/snapshot/{userId}', [SnapshotController::class, 'snapshot']);
 
         Route::get('/admin/analytics/export', [UserManagementController::class, 'exportAnalytics']);
         Route::get('/daily-scripture/{userId}', [DailyScriptureController::class, 'show']);
@@ -98,7 +96,7 @@ Route::prefix('v1')->group(function () {
             '/numera-insight/{userId}',
             [NumeraInsightController::class,'show']
         );
-            
+
             //Admin Dashboard
             Route::get('/users', [UserManagementController::class, 'index']);
             Route::get('/users-details/{id}', [UserManagementController::class, 'show']);
@@ -150,7 +148,6 @@ Route::prefix('v1')->group(function () {
         Route::get('/notification-settings', [NotificationSettingsController::class, 'getNotificationSettings']);
 
         //Fetch All Notifications Record (Admin)
-        Route::get('/all-notifications', [NotificationController::class, 'fetchAllNotification']);
         Route::get('/admins-notifications', [NotificationController::class, 'fetchAdminNotification']);
 
         // Community Post
@@ -195,7 +192,6 @@ Route::prefix('v1')->group(function () {
         Route::post('/update-topup/{slug}', [TopupController::class, 'createOrUpdate']);
 
 
-
         //Subscription Payment
         Route::post('/subscriptions', [SubscriptionController::class, 'createSubscription']);
         Route::post('/subscriptions/cancel', [SubscriptionController::class, 'cancelSubscription']);
@@ -226,7 +222,7 @@ Route::prefix('v1')->group(function () {
     Route::post('/topup-stripe/webhook', [TopupPaymentController::class, 'handleWebhook']);
     Route::post('/terra/webhook', [TerraWebhookController::class, 'handle']);
 
-  
+
 
 
 

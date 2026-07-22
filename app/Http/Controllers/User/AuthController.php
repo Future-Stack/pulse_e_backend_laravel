@@ -6,12 +6,14 @@ use App\Http\Controllers\Controller;
 use App\Jobs\SendOtpEmail;
 use App\Models\Profile;
 use App\Models\User;
+use App\Notifications\AdminIconNotification;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rules\Password;
 use Illuminate\Support\Facades\Auth;
@@ -72,6 +74,18 @@ class AuthController extends Controller
 
             // Send OTP Email
             SendOtpEmail::dispatch($user->id, 'verify', $otp);
+
+            //Send Admin Notification
+            $admin = User::where('user_type', 'admin')->first();
+
+            if ($admin) {
+                Notification::send($admin, new AdminIconNotification([
+                    'type' => 'registration',
+                    'title' => 'New Registration',
+                    'message' => 'New Registration Created Successfully.',
+                    'sender_id' => null,
+                ]));
+            }
 
             return response()->json([
                 'success' => true,
