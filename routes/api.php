@@ -84,6 +84,29 @@ Route::prefix('v1')->group(function () {
         );
 
 
+
+        
+            Route::get('/snapshot/{userId}', [SnapshotController::class, 'snapshot']);
+
+        Route::get('/admin/analytics/export', [UserManagementController::class, 'exportAnalytics']);
+        Route::get('/daily-scripture/{userId}', [DailyScriptureController::class, 'show']);
+        Route::get('/health-trends/{userId}', [HealthTrendController::class, 'show']);
+
+
+        Route::get('/smart-analysis/{userId}', [SmartAnalysisController::class, 'show']);
+        Route::get(
+            '/numera-insight/{userId}',
+            [NumeraInsightController::class,'show']
+        );
+            
+            //Admin Dashboard
+            Route::get('/users', [UserManagementController::class, 'index']);
+            Route::get('/users-details/{id}', [UserManagementController::class, 'show']);
+            Route::get('/user/subscription', [UserManagementController::class, 'subscriptions']);
+            Route::get('/admin/dashboard', [UserManagementController::class, 'dashboard']);
+            Route::get('/analytics', [UserManagementController::class, 'analytic']);
+            Route::get('/admin/revenue-breakdown', [SubscriptionController::class, 'revenueBreakdown']);
+
         Route::post('/change-password', [AuthController::class, 'changePassword']);
         // Save Firebase device token
         Route::post('/save-fcm-token', [AuthController::class, 'saveFcmToken']);
@@ -202,29 +225,10 @@ Route::prefix('v1')->group(function () {
     Route::post('/topup-stripe/webhook', [TopupPaymentController::class, 'handleWebhook']);
     Route::post('/terra/webhook', [TerraWebhookController::class, 'handle']);
 
-    //Admin Dashboard
-    Route::get('/users', [UserManagementController::class, 'index']);
-    Route::get('/users-details/{id}', [UserManagementController::class, 'show']);
-    Route::get('/user/subscription', [UserManagementController::class, 'subscriptions']);
-    Route::get('/admin/dashboard', [UserManagementController::class, 'dashboard']);
-    Route::get('/analytics', [UserManagementController::class, 'analytic']);
-    Route::get('/admin/revenue-breakdown', [SubscriptionController::class, 'revenueBreakdown']);
-    //app
-    // routes/api.php
+  
 
 
-    Route::get('/snapshot/{userId}', [SnapshotController::class, 'snapshot']);
-
-Route::get('/admin/analytics/export', [UserManagementController::class, 'exportAnalytics']);
-Route::get('/daily-scripture/{userId}', [DailyScriptureController::class, 'show']);
-Route::get('/health-trends/{userId}', [HealthTrendController::class, 'show']);
 
 
-Route::get('/smart-analysis/{userId}', [SmartAnalysisController::class, 'show']);
-Route::get(
-    '/numera-insight/{userId}',
-    [NumeraInsightController::class,'show']
-);
-    Route::get('/admin/analytics/export', [UserManagementController::class, 'exportAnalytics']);
-    Route::post('/topup-payment3', [TopupPaymentController::class, 'topUpPayment']);
+
 });
