@@ -5,6 +5,7 @@ namespace App\Http\Controllers\AI;
 use App\Http\Controllers\Controller;
 use App\Jobs\FetchDailyScriptureJob;
 use App\Models\DailyScripture;
+use App\Models\User;
 use Illuminate\Http\JsonResponse;
 
 class DailyScriptureController extends Controller
@@ -14,43 +15,99 @@ class DailyScriptureController extends Controller
      */
     public function show(int $userId): JsonResponse
     {
-        // আজকের scripture বের করো
+        // User check
+        $user = User::find($userId);
+
+        if (! $user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'User not found.',
+            ], 404);
+        }
+
+
+        // Today's scripture check
         $dailyScripture = DailyScripture::where('user_id', $userId)
             ->whereDate('created_at', today())
             ->latest()
             ->first();
 
-        // যদি আগে complete হয়ে থাকে
+
+        /**
+         * Already completed
+         */
         if ($dailyScripture && $dailyScripture->status === 'completed') {
+
             return response()->json([
                 'success' => true,
                 'message' => 'Daily scripture fetched successfully.',
-                'data'    => $dailyScripture->fresh(),
+                'data' => $dailyScripture,
             ]);
         }
 
-        // যদি এখনও pending বা processing থাকে
-        if ($dailyScripture && in_array($dailyScripture->status, ['pending', 'processing'])) {
+
+        /**
+         * Currently generating
+         */
+        if ($dailyScripture && in_array($dailyScripture->status, [
+            'pending',
+            'processing',
+        ])) {
+
             return response()->json([
                 'success' => true,
                 'message' => 'Daily scripture is being generated.',
-                'status'  => $dailyScripture->status,
+                'data' => [
+                    'id' => $dailyScripture->id,
+                    'status' => $dailyScripture->status,
+                ],
             ], 202);
         }
 
-        // নতুন record তৈরি করো
+
+        /**
+         * Retry failed generation
+         */
+        if ($dailyScripture && $dailyScripture->status === 'failed') {
+
+            $dailyScripture->update([
+                'status' => 'pending',
+            ]);
+
+
+            FetchDailyScriptureJob::dispatch($dailyScripture->id);
+
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Daily scripture regeneration started.',
+                'data' => [
+                    'id' => $dailyScripture->id,
+                    'status' => 'pending',
+                ],
+            ], 202);
+        }
+
+
+        /**
+         * Create new generation request
+         */
         $dailyScripture = DailyScripture::create([
             'user_id' => $userId,
-            'status'  => 'pending',
+            'status' => 'pending',
         ]);
 
-        // Queue Job dispatch করো
+
         FetchDailyScriptureJob::dispatch($dailyScripture->id);
+
 
         return response()->json([
             'success' => true,
             'message' => 'Daily scripture generation started.',
-            'status'  => 'pending',
+            'data' => [
+                'id' => $dailyScripture->id,
+                'status' => 'pending',
+            ],
         ], 202);
     }
 }
