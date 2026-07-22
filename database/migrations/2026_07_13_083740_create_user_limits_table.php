@@ -13,7 +13,8 @@ return new class extends Migration
     {
         Schema::create('user_limits', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('user_id')->unique()->constrained()->cascadeOnDelete();
+            $table->foreignId('user_id')->constrained()->cascadeOnDelete();
+            $table->string('type')->comment('subscription,topup,refund')->nullable();
 
             // Points at the active subscription row in `payments` this cycle's
             // usage belongs to. Nullable for free-plan users with no payment row.

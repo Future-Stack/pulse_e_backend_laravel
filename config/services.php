@@ -39,7 +39,7 @@ return [
         'secret' => env('STRIPE_SECRET'),
         'publishable_key' => env('STRIPE_PUBLIC_KEY'),
         'subscription_webhook_secret' => env('SUBSCRIPTION_WEBHOOK_SECRET'),
-
+        'topup_webhook_secret' => env('TOPUP_WEBHOOK_SECRET'),
     ],
 
     'terra' => [
@@ -53,5 +53,10 @@ return [
     'base_url' => env('AI_SERVICE_URL', 'https://female-mood-analyzer.onrender.com'),
 ],
 
+    'azure' => [
+        'tenant_id'     => env('AZURE_TENANT_ID'),
+        'client_id'     => env('AZURE_CLIENT_ID'),
+        'client_secret' => env('AZURE_CLIENT_SECRET'),
+    ],
 
 ];

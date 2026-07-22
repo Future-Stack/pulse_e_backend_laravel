@@ -91,7 +91,10 @@ class SubscriptionController extends Controller
 
             // Initialize user limits
             UserLimit::updateOrCreate(
-                ['user_id' => $user->id],
+                [
+                    'user_id' => $user->id,
+                    'type' => 'subscription',
+                ],
                 [
                     'payment_id' => $payment->id,
                     'skin_scans_limit' => $plan->skin_scans_limit,
