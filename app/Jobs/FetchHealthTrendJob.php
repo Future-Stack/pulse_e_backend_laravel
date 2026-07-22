@@ -40,7 +40,7 @@ class FetchHealthTrendJob implements ShouldQueue
                 'status' => 'processing',
             ]);
 
-            $url = 'https://female-mood-analyzer.onrender.com/api/health-trends';
+            $url = config('services.ai.base_url') . '/api/health-trends';
 
             Log::info('Calling Health Trend AI API.', [
                 'url' => $url,
