@@ -10,6 +10,7 @@ class HealthTrend extends Model
     protected $fillable = [
         'user_id',
         'title',
+        'period',
         'range_options',
         'sleep_energy_correlation_chart',
         'sleep_energy_correlation_diagram',

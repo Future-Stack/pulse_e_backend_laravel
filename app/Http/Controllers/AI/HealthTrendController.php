@@ -6,16 +6,19 @@ use App\Http\Controllers\Controller;
 use App\Jobs\FetchHealthTrendJob;
 use App\Models\HealthTrend;
 use App\Models\User;
+use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 
 class HealthTrendController extends Controller
 {
-    public function show(int $userId): JsonResponse
+    public function show(Request $request, int $userId): JsonResponse
     {
-        // User check
+        /**
+         * User check
+         */
         $user = User::find($userId);
 
-        if (!$user) {
+        if (! $user) {
             return response()->json([
                 'success' => false,
                 'message' => 'User not found.',
@@ -23,8 +26,27 @@ class HealthTrendController extends Controller
         }
 
 
-        // Today's health trend check
+        /**
+         * Get period from request
+         * Default: 30d
+         */
+        $period = $request->query('period', '30d');
+
+
+        /**
+         * Allow only 7d / 30d
+         */
+        if (! in_array($period, ['7d', '30d'])) {
+            $period = '30d';
+        }
+
+
+
+        /**
+         * Find today's same user + same period analysis
+         */
         $healthTrend = HealthTrend::where('user_id', $userId)
+            ->where('period', $period)
             ->whereDate('created_at', today())
             ->latest()
             ->first();
@@ -46,7 +68,7 @@ class HealthTrendController extends Controller
 
 
         /**
-         * Currently generating
+         * Already running
          */
         if ($healthTrend && in_array($healthTrend->status, [
             'pending',
@@ -58,6 +80,7 @@ class HealthTrendController extends Controller
                 'message' => 'Health trends are being generated.',
                 'data' => [
                     'id' => $healthTrend->id,
+                    'period' => $healthTrend->period,
                     'status' => $healthTrend->status,
                 ],
             ], 202);
@@ -75,7 +98,10 @@ class HealthTrendController extends Controller
             ]);
 
 
-            FetchHealthTrendJob::dispatch($healthTrend->id);
+            FetchHealthTrendJob::dispatch(
+                $healthTrend->id,
+                $period
+            );
 
 
             return response()->json([
@@ -83,6 +109,7 @@ class HealthTrendController extends Controller
                 'message' => 'Health trends regeneration started.',
                 'data' => [
                     'id' => $healthTrend->id,
+                    'period' => $period,
                     'status' => 'pending',
                 ],
             ], 202);
@@ -91,15 +118,23 @@ class HealthTrendController extends Controller
 
 
         /**
-         * First time generation
+         * Create new health trend request
          */
         $healthTrend = HealthTrend::create([
             'user_id' => $userId,
+            'period' => $period,
             'status' => 'pending',
         ]);
 
 
-        FetchHealthTrendJob::dispatch($healthTrend->id);
+
+        /**
+         * Send job to queue
+         */
+        FetchHealthTrendJob::dispatch(
+            $healthTrend->id,
+            $period
+        );
 
 
 
@@ -108,6 +143,7 @@ class HealthTrendController extends Controller
             'message' => 'Health trends generation started.',
             'data' => [
                 'id' => $healthTrend->id,
+                'period' => $period,
                 'status' => 'pending',
             ],
         ], 202);

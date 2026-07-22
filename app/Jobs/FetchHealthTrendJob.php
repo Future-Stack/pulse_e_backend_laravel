@@ -12,19 +12,21 @@ class FetchHealthTrendJob implements ShouldQueue
 {
     use Queueable;
 
-
     public int $tries = 3;
 
     public int $timeout = 600;
 
-
     protected int $healthTrendId;
 
+    protected string $period;
 
 
-    public function __construct(int $healthTrendId)
-    {
+    public function __construct(
+        int $healthTrendId,
+        string $period = '30d'
+    ) {
         $this->healthTrendId = $healthTrendId;
+        $this->period = $period;
     }
 
 
@@ -34,10 +36,10 @@ class FetchHealthTrendJob implements ShouldQueue
         $healthTrend = HealthTrend::find($this->healthTrendId);
 
 
-        if (!$healthTrend) {
+        if (! $healthTrend) {
 
             Log::error('Health Trend record not found.', [
-                'id' => $this->healthTrendId,
+                'health_trend_id' => $this->healthTrendId,
             ]);
 
             return;
@@ -47,8 +49,7 @@ class FetchHealthTrendJob implements ShouldQueue
 
         try {
 
-
-            // Pending -> Processing
+            // pending -> processing
             $healthTrend->update([
                 'status' => 'processing',
             ]);
@@ -62,6 +63,7 @@ class FetchHealthTrendJob implements ShouldQueue
 
             Log::info('Calling Health Trend AI API', [
                 'url' => $url,
+                'period' => $this->period,
                 'health_trend_id' => $healthTrend->id,
                 'user_id' => $healthTrend->user_id,
             ]);
@@ -72,7 +74,9 @@ class FetchHealthTrendJob implements ShouldQueue
                 ->withoutVerifying()
                 ->acceptJson()
                 ->timeout(300)
-                ->get($url);
+                ->get($url, [
+                    'period' => $this->period,
+                ]);
 
 
 
@@ -83,7 +87,7 @@ class FetchHealthTrendJob implements ShouldQueue
 
 
 
-            if (!$response->successful()) {
+            if (! $response->successful()) {
 
                 throw new \Exception(
                     "AI API Error: {$response->status()} {$response->body()}"
@@ -96,10 +100,10 @@ class FetchHealthTrendJob implements ShouldQueue
 
 
 
-            if (!isset($data['health_trends'])) {
+            if (! isset($data['health_trends'])) {
 
                 throw new \Exception(
-                    'health_trends key not found.'
+                    'health_trends key not found in AI response.'
                 );
             }
 
@@ -113,22 +117,28 @@ class FetchHealthTrendJob implements ShouldQueue
 
                 'title' => $trend['title'] ?? null,
 
+                'period' => $this->period,
 
-                'range_options' =>
-                    $trend['range_options'] ?? [],
+                'range_options' => collect($trend['range_options'] ?? [])
+                    ->map(function ($item) {
 
+                        return [
+                            'label' => $item['label'],
+                            'selected' => $item['label'] === $this->period,
+                        ];
+
+                    })
+                    ->values()
+                    ->toArray(),
 
                 'sleep_energy_correlation_chart' =>
                     $trend['sleep_energy_correlation_chart'] ?? [],
 
-
                 'sleep_energy_correlation_diagram' =>
                     $trend['sleep_energy_correlation_diagram'] ?? [],
 
-
                 'hormone_mood' =>
                     $trend['hormone_mood'] ?? [],
-
 
                 'status' => 'completed',
             ]);
@@ -145,10 +155,15 @@ class FetchHealthTrendJob implements ShouldQueue
 
 
             Log::error('Health Trend Job Failed.', [
+
                 'health_trend_id' => $this->healthTrendId,
+
                 'message' => $e->getMessage(),
+
                 'file' => $e->getFile(),
+
                 'line' => $e->getLine(),
+
             ]);
 
 
@@ -156,6 +171,7 @@ class FetchHealthTrendJob implements ShouldQueue
             $healthTrend->update([
                 'status' => 'failed',
             ]);
+
 
 
             throw $e;

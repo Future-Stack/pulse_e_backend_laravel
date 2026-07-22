@@ -20,6 +20,10 @@ return new class extends Migration
                 ->cascadeOnDelete();
 
             $table->string('title')->nullable();
+            $table->enum('period', [
+                                '7d',
+                                '30d'
+                            ])->default('30d');
 
             // 7d / 30d options
             $table->json('range_options')->nullable();
