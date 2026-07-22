@@ -8,6 +8,7 @@ use App\Models\HealthLog;
 use App\Models\LabReport;
 use App\Models\LifeJourney;
 use App\Models\Payment;
+use App\Models\SubscriptionPlan;
 use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
@@ -328,25 +329,16 @@ public function subscriptions(): JsonResponse
         // Plan Distribution
         // ==========================
 
-        $planDistribution = Payment::join(
-                'subscription_plans',
-                'payments.subscription_plan_id',
-                '=',
-                'subscription_plans.id'
-            )
-            ->select(
-                'subscription_plans.name',
-                DB::raw('COUNT(payments.id) as total')
-            )
-            ->where('payments.type', 'subscription')
-            ->where('payments.status', 'paid')
-            ->groupBy('subscription_plans.name')
+        $planDistribution = SubscriptionPlan::where('status', true)
+            ->withCount(['payments as total' => function ($query) {
+                $query->where('type', 'subscription')
+                    ->where('status', 'paid');
+            }])
             ->get()
-            ->map(function ($item) {
-
+            ->map(function ($plan) {
                 return [
-                    'plan' => $item->name,
-                    'count' => (int) $item->total,
+                    'plan'  => $plan->name,
+                    'count' => (int) $plan->total,
                 ];
             });
 
@@ -693,42 +685,42 @@ public function subscriptions(): JsonResponse
 
         //export
         public function exportAnalytics()
-{
-    $headers = [
-        'Content-Type' => 'text/csv',
-        'Content-Disposition' => 'attachment; filename=analytics.csv',
-    ];
+        {
+            $headers = [
+                'Content-Type' => 'text/csv',
+                'Content-Disposition' => 'attachment; filename=analytics.csv',
+            ];
 
-    $callback = function () {
-        $file = fopen('php://output', 'w');
+            $callback = function () {
+                $file = fopen('php://output', 'w');
 
-        // Header
-        fputcsv($file, ['Journey', 'Users']);
+                // Header
+                fputcsv($file, ['Journey', 'Users']);
 
-        $data = LifeJourney::leftJoin(
-                'life_journey_profile',
-                'life_journeys.id',
-                '=',
-                'life_journey_profile.life_journey_id'
-            )
-            ->select(
-                'life_journeys.title',
-                DB::raw('COUNT(life_journey_profile.profile_id) as users')
-            )
-            ->groupBy('life_journeys.id', 'life_journeys.title')
-            ->get();
+                $data = LifeJourney::leftJoin(
+                        'life_journey_profile',
+                        'life_journeys.id',
+                        '=',
+                        'life_journey_profile.life_journey_id'
+                    )
+                    ->select(
+                        'life_journeys.title',
+                        DB::raw('COUNT(life_journey_profile.profile_id) as users')
+                    )
+                    ->groupBy('life_journeys.id', 'life_journeys.title')
+                    ->get();
 
-        foreach ($data as $row) {
-            fputcsv($file, [
-                $row->title,
-                $row->users,
-            ]);
+                foreach ($data as $row) {
+                    fputcsv($file, [
+                        $row->title,
+                        $row->users,
+                    ]);
+                }
+
+                fclose($file);
+            };
+
+            return response()->stream($callback, 200, $headers);
         }
-
-        fclose($file);
-    };
-
-    return response()->stream($callback, 200, $headers);
-}
-    }
+    }   
 
