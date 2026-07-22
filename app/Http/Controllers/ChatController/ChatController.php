@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Controllers\Api;
+namespace App\Http\Controllers\ChatController;
 
 use App\Http\Controllers\Controller;
 use App\Models\ChatMessage;
