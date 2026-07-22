@@ -58,9 +58,9 @@ php artisan db:seed --force
 
 # Clear and cache configuration
 echo "Optimizing application..."
-php artisan config:cache
-php artisan route:cache
-php artisan view:cache
+#php artisan config:cache
+#php artisan route:cache
+#php artisan view:cache
 php artisan storage:link
 
 echo "Laravel application is ready!"
