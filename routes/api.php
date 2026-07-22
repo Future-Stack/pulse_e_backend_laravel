@@ -41,7 +41,6 @@ Route::prefix('v1')->group(function () {
     });
 
 
-
     // ----------------------------
     // Public Routes
     // ----------------------------
@@ -65,24 +64,20 @@ Route::prefix('v1')->group(function () {
     Route::get('pages/{page_id}', [PageController::class, 'show']);
 
 
-
-
-
-
     Route::middleware('auth:sanctum')->group(function () {
 
-         //user health log
-    Route::apiResource('health-logs', HealthLogController::class);
-    Route::get('/health-log/today', [HealthLogController::class, 'today']);
+        //user health log
+        Route::apiResource('health-logs', HealthLogController::class);
+        Route::get('/health-log/today', [HealthLogController::class, 'today']);
 
 
         Route::apiResource('lab-reports', LabReportController::class);
 
-            // Get AI Analysis
-           Route::get(
-                '/ai-lab-reports/{labReport}',
-                [LabReportAIController::class, 'show']
-            );
+        // Get AI Analysis
+        Route::get(
+            '/ai-lab-reports/{labReport}',
+            [LabReportAIController::class, 'show']
+        );
 
 
         Route::post('/change-password', [AuthController::class, 'changePassword']);
@@ -163,17 +158,17 @@ Route::prefix('v1')->group(function () {
         Route::get('/terra/connections', [TerraWebhookController::class, 'getConnections']);
 
         //Subscription Plans
-        Route::get('/subscription-plans',[SubscriptionPlanController::class, 'getAllPlans']);
-        Route::get('/subscription-plan/{slug}',[SubscriptionPlanController::class, 'getPlanBySlug']);
-        Route::post('/update-subscription-plan/{slug}',[SubscriptionPlanController::class, 'createOrUpdate']);
+        Route::get('/subscription-plans', [SubscriptionPlanController::class, 'getAllPlans']);
+        Route::get('/subscription-plan/{slug}', [SubscriptionPlanController::class, 'getPlanBySlug']);
+        Route::post('/update-subscription-plan/{slug}', [SubscriptionPlanController::class, 'createOrUpdate']);
 
         //TopUp
-        Route::get('/topups',[TopupController::class, 'getAll']);
-        Route::get('/topup/{slug}',[TopupController::class, 'getBySlug']);
-        Route::post('/update-topup/{slug}',[TopupController::class, 'createOrUpdate']);
+        Route::get('/topups', [TopupController::class, 'getAll']);
+        Route::get('/topup/{slug}', [TopupController::class, 'getBySlug']);
+        Route::post('/update-topup/{slug}', [TopupController::class, 'createOrUpdate']);
 
         //topup-payment
-        Route::post('/topup-payment',[TopupPaymentController::class, 'topUpPayment']);
+        Route::post('/topup-payment', [TopupPaymentController::class, 'topUpPayment']);
 
         //Subscription Payment
         Route::post('/subscriptions', [SubscriptionController::class, 'createSubscription']);
@@ -191,7 +186,6 @@ Route::prefix('v1')->group(function () {
         Route::post('/skin-scans/analyze', [SkinScanController::class, 'store']);
 
         //Chat
-
         Route::post('/chat/response', [ChatController::class, 'handleResponse']);
     });
 
@@ -211,7 +205,7 @@ Route::prefix('v1')->group(function () {
     // routes/api.php
 
 
-Route::get('/snapshot/{userId}', [SnapshotController::class, 'snapshot']);
+    Route::get('/snapshot/{userId}', [SnapshotController::class, 'snapshot']);
 
-Route::get('/admin/analytics/export', [UserManagementController::class, 'exportAnalytics']);
+    Route::get('/admin/analytics/export', [UserManagementController::class, 'exportAnalytics']);
 });
