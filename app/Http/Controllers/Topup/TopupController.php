@@ -3,9 +3,11 @@
 namespace App\Http\Controllers\Topup;
 
 use App\Http\Controllers\Controller;
+use App\Models\Payment;
 use App\Models\TopupProduct;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use Stripe\StripeClient;
 
 class TopupController extends Controller
 {
@@ -122,10 +124,5 @@ class TopupController extends Controller
                 'error'   => $e->getMessage(),
             ], 500);
         }
-    }
-
-    public function topUpPayment()
-    {
-
     }
 }
