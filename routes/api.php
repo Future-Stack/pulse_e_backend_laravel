@@ -168,7 +168,7 @@ Route::prefix('v1')->group(function () {
         Route::post('/update-topup/{slug}', [TopupController::class, 'createOrUpdate']);
 
         //topup-payment
-        Route::post('/topup-payment', [TopupPaymentController::class, 'topUpPayment']);
+        Route::post('/topup-payment1', [TopupPaymentController::class, 'topUpPayment']);
 
         //Subscription Payment
         Route::post('/subscriptions', [SubscriptionController::class, 'createSubscription']);
