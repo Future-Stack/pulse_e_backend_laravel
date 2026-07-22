@@ -117,4 +117,9 @@ public function dailyScriptures()
 {
     return $this->hasMany(DailyScripture::class);
 }
+
+public function healthTrends()
+{
+    return $this->hasMany(HealthTrend::class);
+}
 }
