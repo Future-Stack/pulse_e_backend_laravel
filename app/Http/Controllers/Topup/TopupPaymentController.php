@@ -76,6 +76,70 @@ class TopupPaymentController extends Controller
         }
     }
 
+    public function paymentTopup(Request $request)
+    {
+        $stripe = new StripeClient(config('services.stripe.secret'));
+
+        try {
+            $user = $request->user();
+
+            $topupProduct = TopupProduct::where('slug', $request->slug)
+                ->where('status', 1)
+                ->firstOrFail();
+
+            // Save payment record
+            $payment = Payment::create([
+                'user_id' => $user->id,
+                'topup_product_id' => $topupProduct->id,
+                'type' => 'topup',
+                'billing_cycle' => 'month',
+                'current_period_start' => now(),
+                'current_period_end' => now()->addMonth(),
+                'amount' => $topupProduct->price,
+                'status' => 'pending',
+
+            ]);
+
+            // Create one-time PaymentIntent for top-up
+            $paymentIntent = $stripe->paymentIntents->create([
+                'amount' => intval($topupProduct->price * 100), // cents
+                'currency' => 'usd',
+                'description' => 'Topup product',
+                'metadata' => [
+                    'type' => 'Topup',
+                    'topup_product' => $topupProduct->slug,
+                    'topup_id' => $topupProduct->id,
+                    'user_id' => $user->id,
+                    'payment_id' => $payment->id,
+                ],
+                'automatic_payment_methods' => [
+                    'enabled' => true,
+                ],
+            ]);
+
+            //Update Payment Intent
+            $payment->update([
+                'stripe_payment_intent_id' => $paymentIntent->id,
+            ]);
+
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Top-up payment processed successfully.',
+                'data' => $payment,
+            ], 200);
+
+        } catch (\Throwable $e) {
+            Log::error('Top-up payment failed: ' . $e->getMessage());
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to process top-up payment.',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
     public function handleWebhook(Request $request)
     {
         Log::info('Webhook Route Hit Successfully! Raw Payload: ' . $request->getContent());
