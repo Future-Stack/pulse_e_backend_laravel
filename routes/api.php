@@ -167,14 +167,16 @@ Route::prefix('v1')->group(function () {
         Route::get('/topup/{slug}', [TopupController::class, 'getBySlug']);
         Route::post('/update-topup/{slug}', [TopupController::class, 'createOrUpdate']);
 
-        //topup-payment
-        Route::post('/topup-payment1', [TopupPaymentController::class, 'topUpPayment']);
+
 
         //Subscription Payment
         Route::post('/subscriptions', [SubscriptionController::class, 'createSubscription']);
         Route::post('/subscriptions/cancel', [SubscriptionController::class, 'cancelSubscription']);
         Route::get('/terra/scores', [TerraWebhookController::class, 'getScores']);
         Route::get('/terra/today-scores', [TerraWebhookController::class, 'getTodayScores']);
+
+        //topup-payment
+        Route::post('/topup-payment1', [TopupPaymentController::class, 'topUpPayment']);
 
         //Life Journey
         Route::get('/life-journeys', [LifeJourneyController::class, 'index']);
