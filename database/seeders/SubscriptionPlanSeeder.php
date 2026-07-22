@@ -17,7 +17,6 @@ class SubscriptionPlanSeeder extends Seeder
         $stripeSecret = config('services.stripe.secret');
 
 
-
         $plans = [
             [
                 'slug' => 'free',

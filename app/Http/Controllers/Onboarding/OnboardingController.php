@@ -9,8 +9,11 @@ use App\Models\HealthGoal;
 use App\Models\LifeJourney;
 use App\Models\LifeStage;
 use App\Models\Page;
+use App\Models\Payment;
 use App\Models\Profile;
+use App\Models\SubscriptionPlan;
 use App\Models\User;
+use App\Models\UserLimit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -188,6 +191,40 @@ class OnboardingController extends Controller
 
             User::where('id', $user_id)->update(['onboardingCompleted' => true]);
 
+            //Assign User to Free plan
+
+            $freePlan = SubscriptionPlan::where('slug', 'free')->first();
+
+            // Check if user already has a subscription payment
+            $existingPayment = Payment::where('user_id', $user_id)
+                ->where('type', 'subscription')
+                ->first();
+
+            if (!$existingPayment) {
+                // Create a payment record for free plan
+                $payment = Payment::create([
+                    'user_id' => $user_id,
+                    'subscription_plan_id' => $freePlan->id,
+                    'type' => 'subscription',
+                    'billing_cycle' => 'month',
+                    'current_period_start' => now(),
+                    'current_period_end' => now()->addMonth(),
+                    'amount' => 0,
+                    'status' => 'paid',
+                ]);
+
+                // Create or update user limits
+                UserLimit::updateOrCreate(
+                    ['user_id' => $user_id],
+                    [
+                        'payment_id' => $payment->id,
+                        'skin_scans_limit' => $freePlan->skin_scans_limit,
+                        'ai_coaching_limit' => $freePlan->ai_coaching_limit,
+                        'deep_reports_limit' => $freePlan->deep_reports_limit,
+                        'subscription_expires_at' => $payment->current_period_end,
+                    ]
+                );
+            }
             DB::commit();
 
             return response()->json([
