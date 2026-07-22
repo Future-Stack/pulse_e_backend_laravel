@@ -107,20 +107,17 @@ class UserManagementController extends Controller
 /**
  * Display subscription payment list.
  */
-/**
- * Display subscription payment list.
- */
 public function subscriptions(): JsonResponse
 {
     $subscriptions = Payment::with([
             'user.profile',
             'subscriptionPlan',
         ])
+        ->where('user_id', '!=', 1)
         ->where('type', 'subscription')
         ->whereIn('status', ['paid', 'cancel'])
         ->latest()
         ->paginate(10);
-
 
     $data = $subscriptions->getCollection()->map(function (Payment $payment) {
 
@@ -147,7 +144,6 @@ public function subscriptions(): JsonResponse
         ];
 
     });
-
 
     return response()->json([
 
