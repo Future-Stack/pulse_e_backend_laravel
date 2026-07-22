@@ -18,7 +18,6 @@ return new class extends Migration
             $table->enum('sender_type', ['user', 'ai']);
             $table->text('message');
             $table->json('data_summary')->nullable();
-            $table->timestamps();
 
             $table->foreign('session_id')
                   ->references('session_id')
