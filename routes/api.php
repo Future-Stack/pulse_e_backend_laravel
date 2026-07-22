@@ -6,6 +6,7 @@ use App\Http\Controllers\Profile\ProfileController;
 use App\Http\Controllers\Subscription\SubscriptionController;
 use App\Http\Controllers\Subscription\SubscriptionPlanController;
 use App\Http\Controllers\Topup\TopupController;
+use App\Http\Controllers\Topup\TopupPaymentController;
 use App\Http\Controllers\User\AppleAuthController;
 use App\Http\Controllers\User\GoogleAuthController;
 use App\Http\Controllers\Faq\FaqController;
@@ -25,6 +26,7 @@ use App\Http\Controllers\TerraWebhookController;
 use App\Http\Controllers\User\HealthLogController;
 use App\Http\Controllers\LabReportController;
 use App\Http\Controllers\AI\LabReportAIController;
+use App\Http\Controllers\ChatController\ChatController;
 use App\Http\Controllers\Life_journey\LifeJourneyController;
 use App\Http\Controllers\SkinScan\SkinScanController;
 use App\Http\Controllers\SnapshotController;
@@ -43,7 +45,6 @@ Route::prefix('v1')->group(function () {
     });
 
 
-   
     // ----------------------------
     // Public Routes
     // ----------------------------
@@ -67,25 +68,21 @@ Route::prefix('v1')->group(function () {
     Route::get('pages/{page_id}', [PageController::class, 'show']);
 
 
-
-
-
-
     Route::middleware('auth:sanctum')->group(function () {
 
-         //user health log
-    Route::apiResource('health-logs', HealthLogController::class);
-    Route::get('/health-log/today', [HealthLogController::class, 'today']);
+        //user health log
+        Route::apiResource('health-logs', HealthLogController::class);
+        Route::get('/health-log/today', [HealthLogController::class, 'today']);
 
 
         Route::apiResource('lab-reports', LabReportController::class);
-        
-            // Get AI Analysis
-           Route::get(
-                '/ai-lab-reports/{labReport}',
-                [LabReportAIController::class, 'show']
-            );
-            
+
+        // Get AI Analysis
+        Route::get(
+            '/ai-lab-reports/{labReport}',
+            [LabReportAIController::class, 'show']
+        );
+
 
         Route::post('/change-password', [AuthController::class, 'changePassword']);
         // Save Firebase device token
@@ -165,20 +162,25 @@ Route::prefix('v1')->group(function () {
         Route::get('/terra/connections', [TerraWebhookController::class, 'getConnections']);
 
         //Subscription Plans
-        Route::get('/subscription-plans',[SubscriptionPlanController::class, 'getAllPlans']);
-        Route::get('/subscription-plan/{slug}',[SubscriptionPlanController::class, 'getPlanBySlug']);
-        Route::post('/update-subscription-plan/{slug}',[SubscriptionPlanController::class, 'createOrUpdate']);
+        Route::get('/subscription-plans', [SubscriptionPlanController::class, 'getAllPlans']);
+        Route::get('/subscription-plan/{slug}', [SubscriptionPlanController::class, 'getPlanBySlug']);
+        Route::post('/update-subscription-plan/{slug}', [SubscriptionPlanController::class, 'createOrUpdate']);
 
         //TopUp
-        Route::get('/topups',[TopupController::class, 'getAll']);
-        Route::get('/topup/{slug}',[TopupController::class, 'getBySlug']);
-        Route::post('/update-topup/{slug}',[TopupController::class, 'createOrUpdate']);
+        Route::get('/topups', [TopupController::class, 'getAll']);
+        Route::get('/topup/{slug}', [TopupController::class, 'getBySlug']);
+        Route::post('/update-topup/{slug}', [TopupController::class, 'createOrUpdate']);
+
+
 
         //Subscription Payment
         Route::post('/subscriptions', [SubscriptionController::class, 'createSubscription']);
         Route::post('/subscriptions/cancel', [SubscriptionController::class, 'cancelSubscription']);
         Route::get('/terra/scores', [TerraWebhookController::class, 'getScores']);
         Route::get('/terra/today-scores', [TerraWebhookController::class, 'getTodayScores']);
+
+        //topup-payment
+        Route::post('/topup-payment1', [TopupPaymentController::class, 'topUpPayment']);
 
         //Life Journey
         Route::get('/life-journeys', [LifeJourneyController::class, 'index']);
@@ -188,10 +190,14 @@ Route::prefix('v1')->group(function () {
         Route::get('/skin-scans/history', [SkinScanController::class, 'index']);
         Route::get('/skin-scans/{id}', [SkinScanController::class, 'show']);
         Route::post('/skin-scans/analyze', [SkinScanController::class, 'store']);
+
+        //Chat
+        Route::post('/chat/response', [ChatController::class, 'handleResponse']);
     });
 
     // Stripe webhook endpoint
     Route::post('/subscription-stripe/webhook', [SubscriptionController::class, 'handleStripeWebhook']);
+    Route::post('/topup-stripe/webhook', [TopupPaymentController::class, 'handleWebhook']);
     Route::post('/terra/webhook', [TerraWebhookController::class, 'handle']);
 
     //Admin Dashboard
@@ -205,7 +211,7 @@ Route::prefix('v1')->group(function () {
     // routes/api.php
 
 
-Route::get('/snapshot/{userId}', [SnapshotController::class, 'snapshot']);
+    Route::get('/snapshot/{userId}', [SnapshotController::class, 'snapshot']);
 
 Route::get('/admin/analytics/export', [UserManagementController::class, 'exportAnalytics']);
 Route::get('/daily-scripture/{userId}', [DailyScriptureController::class, 'show']);
@@ -217,5 +223,5 @@ Route::get(
     '/numera-insight/{userId}',
     [NumeraInsightController::class,'show']
 );
+    Route::get('/admin/analytics/export', [UserManagementController::class, 'exportAnalytics']);
 });
-  

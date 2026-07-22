@@ -4,6 +4,7 @@ namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -20,7 +21,7 @@ class User extends Authenticatable
      *
      * @var list<string>
      */
-       protected $fillable = [
+    protected $fillable = [
         'full_name',
         'email',
         'password',
@@ -54,18 +55,18 @@ class User extends Authenticatable
      * @return array<string, string>
      */
     protected function casts(): array
-{
-    return [
-        'email_verified_at' => 'datetime',
-        'otp_expire_at' => 'datetime',
-        'last_login_at' => 'datetime',
+    {
+        return [
+            'email_verified_at' => 'datetime',
+            'otp_expire_at' => 'datetime',
+            'last_login_at' => 'datetime',
 
-        'password' => 'hashed',
+            'password' => 'hashed',
 
-        'is_privacy_accepted' => 'boolean',
-        'onboardingCompleted' => 'boolean',
-    ];
-}
+            'is_privacy_accepted' => 'boolean',
+            'onboardingCompleted' => 'boolean',
+        ];
+    }
 
     public function hasRole(string $role): bool
     {
@@ -77,6 +78,7 @@ class User extends Authenticatable
         return $this->hasOne(Profile::class);
 
     }
+
 //health log
     public function healthLogs()
     {
@@ -85,23 +87,23 @@ class User extends Authenticatable
     }
 
     public function labReports()
-{
-    return $this->hasMany(LabReport::class);
-}
+    {
+        return $this->hasMany(LabReport::class);
+    }
 
 
-public function payments()
-{
-    return $this->hasMany(Payment::class);
-}
+    public function payments()
+    {
+        return $this->hasMany(Payment::class);
+    }
 
-public function latestSubscription()
-{
-    return $this->hasOne(Payment::class)
-        ->where('type', 'subscription')
-        ->where('status', 'paid')
-        ->latestOfMany();
-}
+    public function latestSubscription()
+    {
+        return $this->hasOne(Payment::class)
+            ->where('type', 'subscription')
+            ->where('status', 'paid')
+            ->latestOfMany();
+    }
 
 public function terraActivities()
 {
@@ -122,4 +124,23 @@ public function healthTrends()
 {
     return $this->hasMany(HealthTrend::class);
 }
+    public function terraActivities()
+    {
+        return $this->hasMany(TerraActivityData::class);
+    }
+
+    public function skinAnalyses()
+    {
+        return $this->hasMany(SkinScan::class);
+    }
+
+    public function userLimits(): HasMany
+    {
+        return $this->hasMany(UserLimit::class);
+    }
+
+    public function userLimit()
+    {
+        return $this->hasOne(UserLimit::class);
+    }
 }
