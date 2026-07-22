@@ -216,6 +216,7 @@ Route::prefix('v1')->group(function () {
 
         //Chat
         Route::post('/chat/response', [ChatController::class, 'handleResponse']);
+        Route::post('/topup-payment4', [TopupPaymentController::class, 'paymentTopup']);
     });
 
     Route::post('/topup-payment2', [TopupPaymentController::class, 'topUpPayment']);
