@@ -49,6 +49,10 @@ return [
         'base_url' => env('TERRA_BASE_URL'),
     ],
 
+    'ai' => [
+    'base_url' => env('AI_SERVICE_URL', 'https://female-mood-analyzer.onrender.com'),
+],
+
     'azure' => [
         'tenant_id'     => env('AZURE_TENANT_ID'),
         'client_id'     => env('AZURE_CLIENT_ID'),
