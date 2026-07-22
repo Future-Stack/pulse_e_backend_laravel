@@ -176,7 +176,7 @@ Route::prefix('v1')->group(function () {
         Route::post('/topup-payment',[TopupPaymentController::class, 'topUpPayment']);
 
         //Subscription Payment
-        Route::post('/subscriptions', [SubscriptionController::class, 'creatbscription']);
+        Route::post('/subscriptions', [SubscriptionController::class, 'createSubscription']);
         Route::post('/subscriptions/cancel', [SubscriptionController::class, 'cancelSubscription']);
         Route::get('/terra/scores', [TerraWebhookController::class, 'getScores']);
         Route::get('/terra/today-scores', [TerraWebhookController::class, 'getTodayScores']);
@@ -215,4 +215,3 @@ Route::get('/snapshot/{userId}', [SnapshotController::class, 'snapshot']);
 
 Route::get('/admin/analytics/export', [UserManagementController::class, 'exportAnalytics']);
 });
-  

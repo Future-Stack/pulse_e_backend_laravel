@@ -112,18 +112,19 @@ class TopupPaymentController extends Controller
                     $skin_scans_limit = 0;
                     $ai_coaching_limit = 0;
 
-                    if ($topupProduct->topup_kind == 'coaching_sessions')
-                    {
+                    if ($topupProduct->topup_kind == 'coaching_sessions') {
                         $ai_coaching_limit = $topupProduct->limit;
-                    }
-                    else
-                    {
+                    } else {
                         $skin_scans_limit = $topupProduct->limit;
                     }
 
                     // Initialize user limits
-                    UserLimit::updateOrCreate(
-                        ['user_id' => $user_id],
+                 $limit =   UserLimit::updateOrCreate(
+                        [
+                            'user_id' => $user_id,
+                            'type' => 'topup',
+                        ],
+
                         [
                             'payment_id' => $payment->id,
                             'skin_scans_topup_limit' => $skin_scans_limit,
@@ -131,8 +132,11 @@ class TopupPaymentController extends Controller
                             'topup_expires_at' => $payment->current_period_end,
                         ]
                     );
+
+                    Log::info('limit inserted status: ' . $limit);
                 }
             }
+
 
 
 //            $admin = User::where('user_type', 'admin')->first();
