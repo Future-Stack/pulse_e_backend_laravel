@@ -13,26 +13,20 @@ class LabReportAIController extends Controller
     {
         $labReport = LabReport::find($id);
 
-
-        if (! $labReport) {
+        if (!$labReport) {
             return response()->json([
                 'success' => false,
                 'message' => 'Lab report not found.'
             ], 404);
         }
 
-
-        /**
-         * Already completed
-         */
+        // Already completed
         if (
-            $labReport->analysis_status === 'completed'
-            && !empty($labReport->panel)
+            $labReport->analysis_status === 'completed' &&
+            !empty($labReport->panel)
         ) {
 
-            $labReport->lab_report_url =
-                asset('storage/'.$labReport->lab_report);
-
+            $labReport->lab_report_url = asset('storage/' . $labReport->lab_report);
 
             return response()->json([
                 'success' => true,
@@ -41,72 +35,71 @@ class LabReportAIController extends Controller
             ]);
         }
 
-
-
-        /**
-         * Already running
-         */
-        if (in_array($labReport->analysis_status, [
-            'pending',
-            'processing'
-        ])) {
+        // Already processing
+        if ($labReport->analysis_status === 'processing') {
 
             return response()->json([
                 'success' => true,
-                'message' => 'AI analysis is being generated.',
+                'message' => 'AI analysis is already running.',
                 'data' => [
                     'id' => $labReport->id,
                     'status' => $labReport->analysis_status
                 ]
-            ],202);
+            ], 202);
         }
 
+        // Pending -> Dispatch Job
+        if ($labReport->analysis_status === 'pending') {
 
+            $labReport->update([
+                'analysis_status' => 'processing'
+            ]);
 
-        /**
-         * Failed retry
-         */
+            ProcessLabReportAI::dispatch($labReport->id);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'AI analysis started.',
+                'data' => [
+                    'id' => $labReport->id,
+                    'status' => 'processing'
+                ]
+            ], 202);
+        }
+
+        // Retry Failed
         if ($labReport->analysis_status === 'failed') {
 
             $labReport->update([
-                'analysis_status'=>'pending'
+                'analysis_status' => 'processing'
             ]);
 
-
-            ProcessLabReportAI::dispatch($labReport);
-
+            ProcessLabReportAI::dispatch($labReport->id);
 
             return response()->json([
-                'success'=>true,
-                'message'=>'AI analysis retry started.',
-                'data'=>[
-                    'id'=>$labReport->id,
-                    'status'=>'pending'
+                'success' => true,
+                'message' => 'AI analysis retry started.',
+                'data' => [
+                    'id' => $labReport->id,
+                    'status' => 'processing'
                 ]
-            ],202);
+            ], 202);
         }
 
-
-
-        /**
-         * First time generate
-         */
+        // Default
         $labReport->update([
-            'analysis_status'=>'pending'
+            'analysis_status' => 'processing'
         ]);
 
-
-        ProcessLabReportAI::dispatch($labReport);
-
-
+        ProcessLabReportAI::dispatch($labReport->id);
 
         return response()->json([
-            'success'=>true,
-            'message'=>'AI analysis started.',
-            'data'=>[
-                'id'=>$labReport->id,
-                'status'=>'pending'
+            'success' => true,
+            'message' => 'AI analysis started.',
+            'data' => [
+                'id' => $labReport->id,
+                'status' => 'processing'
             ]
-        ],202);
+        ], 202);
     }
 }
