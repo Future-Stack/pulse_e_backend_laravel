@@ -149,6 +149,7 @@ Route::prefix('v1')->group(function () {
 
         //Fetch All Notifications Record (Admin)
         Route::get('/admins-notifications', [NotificationController::class, 'fetchAdminNotification']);
+        Route::get('/users-notifications', [NotificationController::class, 'fetchUserNotification']);
 
         // Community Post
 
@@ -199,7 +200,7 @@ Route::prefix('v1')->group(function () {
         Route::get('/terra/today-scores', [TerraWebhookController::class, 'getTodayScores']);
 
         //topup-payment
-        Route::post('/topup-payment1', [TopupPaymentController::class, 'topUpPayment']);
+        Route::post('/topup-payment', [TopupPaymentController::class, 'topUpPayment']);
 
         //Life Journey
         Route::get('/life-journeys', [LifeJourneyController::class, 'index']);
@@ -212,20 +213,12 @@ Route::prefix('v1')->group(function () {
 
         //Chat
         Route::post('/chat/response', [ChatController::class, 'handleResponse']);
-        Route::post('/topup-payment4', [TopupPaymentController::class, 'paymentTopup']);
     });
 
-    Route::post('/topup-payment2', [TopupPaymentController::class, 'topUpPayment']);
 
     // Stripe webhook endpoint
     Route::post('/subscription-stripe/webhook', [SubscriptionController::class, 'handleStripeWebhook']);
     Route::post('/topup-stripe/webhook', [TopupPaymentController::class, 'handleWebhook']);
     Route::post('/terra/webhook', [TerraWebhookController::class, 'handle']);
-
-
-
-
-
-
 
 });

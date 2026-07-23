@@ -4,8 +4,12 @@ namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Models\CommunityPost;
+use App\Models\User;
+use App\Notifications\AdminIconNotification;
+use App\Notifications\PlatformNotification;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Validation\Rule;
 
 class CommunityPostController extends Controller
@@ -62,24 +66,24 @@ class CommunityPostController extends Controller
         ]);
 
         $validated = $request->validate([
-            'life_journey_id'   => 'required|array|min:1',
+            'life_journey_id' => 'required|array|min:1',
             'life_journey_id.*' => 'integer|exists:life_journeys,id|distinct',
-            'title'             => 'nullable|string|max:255',
-            'content'           => 'required|string',
-            'is_anonymous'      => 'boolean',
-            'tags'              => 'nullable|array',
-            'tags.*'            => 'string|max:50',
+            'title' => 'nullable|string|max:255',
+            'content' => 'required|string',
+            'is_anonymous' => 'boolean',
+            'tags' => 'nullable|array',
+            'tags.*' => 'string|max:50',
         ]);
 
         $post = CommunityPost::create([
-            'user_id'      => Auth::id(),
-            'title'        => $validated['title'] ?? null,
-            'slug'         => CommunityPost::generateUniqueSlug($validated['title'] ?? 'post-' . uniqid()),
-            'content'      => $validated['content'],
+            'user_id' => Auth::id(),
+            'title' => $validated['title'] ?? null,
+            'slug' => CommunityPost::generateUniqueSlug($validated['title'] ?? 'post-' . uniqid()),
+            'content' => $validated['content'],
             'is_anonymous' => $validated['is_anonymous'] ?? true,
-            'is_approved'  => true, // flip to false here if posts need moderation before going live
-            'tags'         => $validated['tags'] ?? [],
-            'posted_at'    => now(),
+            'is_approved' => true, // flip to false here if posts need moderation before going live
+            'tags' => $validated['tags'] ?? [],
+            'posted_at' => now(),
         ]);
 
         // THIS WAS MISSING — without it, nothing ever gets written to the
@@ -88,7 +92,7 @@ class CommunityPostController extends Controller
 
         return response()->json([
             'message' => 'Post created successfully.',
-            'post'    => $post->load('lifeJourneys'),
+            'post' => $post->load('lifeJourneys'),
         ], 201);
     }
 
@@ -103,7 +107,7 @@ class CommunityPostController extends Controller
 
         $post->load([
             'lifeJourneys',
-            'comments' => fn ($q) => $q->latest()->with('user:id,full_name'),
+            'comments' => fn($q) => $q->latest()->with('user:id,full_name'),
         ])->loadCount(['likes', 'comments']);
 
         $post->is_liked = $post->isLikedBy(Auth::id());
@@ -125,13 +129,13 @@ class CommunityPostController extends Controller
         }
 
         $validated = $request->validate([
-            'title'              => 'nullable|string|max:255',
-            'content'            => 'sometimes|required|string',
-            'is_anonymous'       => 'boolean',
-            'tags'               => 'nullable|array',
-            'tags.*'             => 'string|max:50',
-            
-            'life_journey_ids'   => 'sometimes|array|min:1',
+            'title' => 'nullable|string|max:255',
+            'content' => 'sometimes|required|string',
+            'is_anonymous' => 'boolean',
+            'tags' => 'nullable|array',
+            'tags.*' => 'string|max:50',
+
+            'life_journey_ids' => 'sometimes|array|min:1',
             'life_journey_ids.*' => 'integer|exists:life_journeys,id|distinct',
         ]);
 
@@ -143,7 +147,7 @@ class CommunityPostController extends Controller
 
         return response()->json([
             'message' => 'Post updated successfully.',
-            'post'    => $post->fresh('lifeJourneys'),
+            'post' => $post->fresh('lifeJourneys'),
         ]);
     }
 
@@ -173,16 +177,29 @@ class CommunityPostController extends Controller
 
         $post->update([
             'is_approved' => true,
-            'posted_at'   => now()
+            'posted_at' => now()
         ]);
 
+        $user_id = $post->user_id;
+
+        $user = User::where('id', $user_id)->first();
+
+        if ($user) {
+            Notification::send($user, new PlatformNotification([
+                'type' => 'approved',
+                'title' => 'Post Approved',
+                'message' => 'Your post has been approved.',
+                'sender_id' => null,
+            ]));
+        }
         return response()->json([
             'message' => 'Post approved successfully.',
-            'post'    => $post
+            'post' => $post
         ], 200);
+
     }
 
-   
+
     public function decline(CommunityPost $post)
     {
         $user = Auth::user();
