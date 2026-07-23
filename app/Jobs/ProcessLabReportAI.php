@@ -15,98 +15,85 @@ class ProcessLabReportAI implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-
     public $tries = 3;
-
     public $timeout = 600;
 
-
     public function __construct(
-        public LabReport $labReport
+        public int $reportId
     ) {}
-
-
 
     public function handle(): void
     {
+        Log::info('ProcessLabReportAI Started', [
+            'report_id' => $this->reportId
+        ]);
+
+        $labReport = LabReport::find($this->reportId);
+
+        if (!$labReport) {
+            Log::error('Lab Report Not Found', [
+                'report_id' => $this->reportId
+            ]);
+
+            return;
+        }
 
         try {
 
-            $this->labReport->update([
-                'analysis_status'=>'processing'
+            $labReport->update([
+                'analysis_status' => 'processing'
             ]);
 
+            $url = config('services.ai.base_url') . '/api/summarize-pdf';
 
-            $url = config('services.ai.base_url')
-                .'/api/summarize-pdf';
-
-
-
-            $response = Http::retry(3,2000)
+            $response = Http::retry(3, 2000)
                 ->withoutVerifying()
                 ->acceptJson()
                 ->timeout(600)
-                ->post($url,[
-                    'report_id'=>$this->labReport->id,
-
-                    'source_path'=>asset(
-                        'storage/'.$this->labReport->lab_report
-                    )
+                ->post($url, [
+                    'report_id' => $labReport->id,
+                    'source_path' => asset('storage/' . $labReport->lab_report)
                 ]);
 
+            Log::info('AI Response', [
+                'status' => $response->status(),
+                'body' => $response->body()
+            ]);
 
-
-            if(! $response->successful()){
-
+            if (!$response->successful()) {
                 throw new \Exception(
-                    'AI service failed. Status: '
-                    .$response->status()
-                    .' Body: '
-                    .$response->body()
+                    'AI Service Error: ' . $response->status() . ' ' . $response->body()
                 );
             }
 
+            $result = $response->json();
 
+            $summary = $result['summary'] ?? [];
 
-            $result=$response->json();
-
-
-            $summary=$result['summary'] ?? [];
-
-
-
-            $this->labReport->update([
-
-                'panel'=>$summary['panel'] ?? null,
-
-                'biomarkers'=>$summary['biomarkers'] ?? null,
-
-                'ai_insights'=>$summary['ai_insights'] ?? null,
-
-                'next_steps'=>$summary['next_steps'] ?? null,
-
-                'analysis_status'=>'completed',
-
+            $labReport->update([
+                'panel' => $summary['panel'] ?? null,
+                'biomarkers' => $summary['biomarkers'] ?? null,
+                'ai_insights' => $summary['ai_insights'] ?? null,
+                'next_steps' => $summary['next_steps'] ?? null,
+                'analysis_status' => 'completed',
             ]);
 
-
-
-        }catch(\Throwable $e){
-
-
-            Log::error('Lab Report AI Error',[
-
-                'report_id'=>$this->labReport->id,
-
-                'message'=>$e->getMessage(),
-
+            Log::info('AI Completed Successfully', [
+                'report_id' => $labReport->id
             ]);
 
+        } catch (\Throwable $e) {
 
-            $this->labReport->update([
-                'analysis_status'=>'failed'
+            Log::error('ProcessLabReportAI Failed', [
+                'report_id' => $labReport->id,
+                'message' => $e->getMessage(),
+                'line' => $e->getLine(),
+                'file' => $e->getFile()
             ]);
 
+            $labReport->update([
+                'analysis_status' => 'failed'
+            ]);
 
             throw $e;
         }
