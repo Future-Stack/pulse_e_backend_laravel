@@ -5,7 +5,7 @@ info:
 
 http:
   method: GET
-  url: "{{url_local}}/check-user-subscription"
+  url: "{{base_url}}/check-user-subscription"
   auth:
     type: bearer
     token: "{{token}}"

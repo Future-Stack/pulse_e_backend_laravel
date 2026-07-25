@@ -1,7 +1,7 @@
 info:
   name: Pages
   type: folder
-  seq: 8
+  seq: 7
 
 request:
   auth: inherit

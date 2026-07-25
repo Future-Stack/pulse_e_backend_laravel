@@ -7,7 +7,7 @@ info:
 
 http:
   method: GET
-  url: "{{baseUrl}}/users-notifications"
+  url: "{{base_url}}/users-notifications"
   auth:
     type: bearer
     token: "{{token}}"

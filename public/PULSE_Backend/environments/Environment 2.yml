@@ -1,4 +1,0 @@
-name: Environment 2
-variables:
-  - name: baseUrl
-    value: https://hard-hulky-diane.ngrok-free.dev

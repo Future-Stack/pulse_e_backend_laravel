@@ -1,6 +1,6 @@
-name: Environment 1
+name: Local
 variables:
   - name: base_url
     value: http://127.0.0.1:8000/api/v1
   - name: token
-    value: 2|nzLN2QZQs9KH4ZLeNNbbzN8q1TpXKNBKgGGmvKN8185d2782
+    value: 3|hioSwP5T6uxSMzUnv4cEFi1haRmXO72pjDmctVwkf2dec422
