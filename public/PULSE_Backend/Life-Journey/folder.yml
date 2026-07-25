@@ -1,0 +1,7 @@
+info:
+  name: Life-Journey
+  type: folder
+  seq: 6
+
+request:
+  auth: inherit

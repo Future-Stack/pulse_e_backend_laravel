@@ -1,0 +1,7 @@
+info:
+  name: Subscription & Topup
+  type: folder
+  seq: 10
+
+request:
+  auth: inherit

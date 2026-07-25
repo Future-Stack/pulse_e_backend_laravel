@@ -1,0 +1,26 @@
+info:
+  name: create-payment-method
+  type: http
+  seq: 2
+  tags:
+    - Subscription & Topup/Stripe (testing)
+
+http:
+  method: POST
+  url: https://api.stripe.com/v1/payment_methods
+  body:
+    type: form-urlencoded
+    data:
+      - name: type
+        value: card
+      - name: card[token]
+        value: tok_visa
+  auth:
+    type: bearer
+    token: sk_test_51ReAPoRqSnOlntqMbvS2llEKmTe8yhti1MMOsBjNbZzKL52APRROCJDmyx2bdJNMSsqAWzbISAThb9MhvVUHzaov00gQwMQfXz
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

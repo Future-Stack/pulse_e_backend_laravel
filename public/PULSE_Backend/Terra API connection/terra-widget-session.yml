@@ -1,0 +1,44 @@
+info:
+  name: terra-widget-session
+  type: http
+  seq: 1
+  tags:
+    - Terra API connection
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/v1/terra/widget-session"
+  body:
+    type: json
+    data: |-
+      {
+        "providers": "FITBIT"
+      }
+  auth:
+    type: bearer
+    token: "{{token}}"
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: 200 Response
+    description: Successful response
+    request:
+      url: "{{baseUrl}}/api/v1/terra/widget-session"
+      method: POST
+      body:
+        type: json
+        data: |-
+          {
+            "providers": "FITBIT"
+          }
+    response:
+      status: 200
+      statusText: OK
+      body:
+        type: text
+        data: ""

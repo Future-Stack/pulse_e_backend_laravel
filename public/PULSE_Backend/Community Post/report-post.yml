@@ -1,0 +1,38 @@
+info:
+  name: report-post
+  type: http
+  seq: 9
+  tags:
+    - Community Post
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/v1/posts/1/report"
+  body:
+    type: json
+    data: '"{\n    \"report_cause\": \"spam\", //spam,sexual_content,harassment,other\n  \t\"comment\": \"This post is not valid\"\n}\n    "'
+  auth:
+    type: bearer
+    token: "{{token}}"
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: 200 Response
+    description: Successful response
+    request:
+      url: "{{baseUrl}}/api/v1/posts/1/report"
+      method: POST
+      body:
+        type: json
+        data: '"{\n    \"report_cause\": \"spam\", //spam,sexual_content,harassment,other\n  \t\"comment\": \"This post is not valid\"\n}\n    "'
+    response:
+      status: 200
+      statusText: OK
+      body:
+        type: text
+        data: ""

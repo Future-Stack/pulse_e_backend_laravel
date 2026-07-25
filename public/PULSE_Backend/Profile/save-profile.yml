@@ -1,0 +1,28 @@
+info:
+  name: save-profile
+  type: http
+  seq: 2
+
+http:
+  method: POST
+  url: "{{base_url}}/profile/update"
+  body:
+    type: json
+    data: |-
+      {
+        "full_name": "Sabbir Ahmed",
+        "age": 28,
+        "height": 170.5,
+        "weight": 65.2,
+        "life_stage_id": 2,
+        "bio": "Passionate about fitness and technology."
+      }
+  auth:
+    type: bearer
+    token: "{{token}}"
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

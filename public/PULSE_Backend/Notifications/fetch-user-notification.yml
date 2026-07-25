@@ -1,0 +1,32 @@
+info:
+  name: fetch-user-notification
+  type: http
+  seq: 2
+  tags:
+    - Notifications
+
+http:
+  method: GET
+  url: "{{baseUrl}}/users-notifications"
+  auth:
+    type: bearer
+    token: "{{token}}"
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: 200 Response
+    description: Successful response
+    request:
+      url: "{{baseUrl}}/users-notifications"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      body:
+        type: text
+        data: ""

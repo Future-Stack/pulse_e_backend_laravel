@@ -1,0 +1,80 @@
+info:
+  name: add-page(admin)
+  type: http
+  seq: 3
+  tags:
+    - Pages
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/v1/pages"
+  body:
+    type: json
+    data: |-
+      {
+        "title": "Privacy Policy",
+        "content": {
+          "heading": "Privacy Policy",
+          "paragraphs": [
+            "Fight The Number collects health data you choose to input.",
+            "We do not sell your personal health data."
+          ],
+          "sections": [
+            {
+              "title": "Data Usage",
+              "body": "Your health data is encrypted end-to-end."
+            },
+            {
+              "title": "AI Disclaimer",
+              "body": "Neumera AI provides informational insights only."
+            }
+          ]
+        },
+        "status": true
+      }
+  auth:
+    type: bearer
+    token: "{{token}}"
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: 200 Response
+    description: Successful response
+    request:
+      url: "{{baseUrl}}/api/v1/pages"
+      method: POST
+      body:
+        type: json
+        data: |-
+          {
+            "title": "Privacy Policy",
+            "content": {
+              "heading": "Privacy Policy",
+              "paragraphs": [
+                "Fight The Number collects health data you choose to input.",
+                "We do not sell your personal health data."
+              ],
+              "sections": [
+                {
+                  "title": "Data Usage",
+                  "body": "Your health data is encrypted end-to-end."
+                },
+                {
+                  "title": "AI Disclaimer",
+                  "body": "Neumera AI provides informational insights only."
+                }
+              ]
+            },
+            "status": true
+          }
+    response:
+      status: 200
+      statusText: OK
+      body:
+        type: text
+        data: ""

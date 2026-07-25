@@ -1,0 +1,44 @@
+info:
+  name: add-file
+  type: http
+  seq: 1
+  tags:
+    - Lab-Report upload image
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/v1/lab-reports"
+  body:
+    type: multipart-form
+    data:
+      - name: lab_report
+        type: file
+        value: []
+  auth:
+    type: bearer
+    token: "{{token}}"
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: 200 Response
+    description: Successful response
+    request:
+      url: "{{baseUrl}}/api/v1/lab-reports"
+      method: POST
+      body:
+        type: multipart-form
+        data:
+          - name: lab_report
+            type: file
+            value: []
+    response:
+      status: 200
+      statusText: OK
+      body:
+        type: text
+        data: ""

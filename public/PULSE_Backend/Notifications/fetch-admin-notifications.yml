@@ -1,0 +1,32 @@
+info:
+  name: fetch-admin-notifications
+  type: http
+  seq: 1
+  tags:
+    - Notifications
+
+http:
+  method: GET
+  url: "{{baseUrl}}/admins-notifications"
+  auth:
+    type: bearer
+    token: "{{token}}"
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: 200 Response
+    description: Successful response
+    request:
+      url: "{{baseUrl}}/admins-notifications"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      body:
+        type: text
+        data: ""

@@ -1,0 +1,46 @@
+info:
+  name: user-status(active,suspen)
+  type: http
+  seq: 2
+  tags:
+    - User Suspend reason (User Management admin dashbaord)
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/v1/users/update-status"
+  body:
+    type: json
+    data: |-
+      {
+        "user_id": 3,
+        "status": "suspended"
+      }
+  auth:
+    type: bearer
+    token: "{{token}}"
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: 200 Response
+    description: Successful response
+    request:
+      url: "{{baseUrl}}/api/v1/users/update-status"
+      method: POST
+      body:
+        type: json
+        data: |-
+          {
+            "user_id": 3,
+            "status": "suspended"
+          }
+    response:
+      status: 200
+      statusText: OK
+      body:
+        type: text
+        data: ""

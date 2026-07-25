@@ -1,0 +1,7 @@
+info:
+  name: AI Part
+  type: folder
+  seq: 14
+
+request:
+  auth: inherit

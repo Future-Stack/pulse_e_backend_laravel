@@ -1,0 +1,56 @@
+info:
+  name: create-update-Settings
+  type: http
+  seq: 2
+  tags:
+    - Settings (Admin)
+
+http:
+  method: POST
+  url: "{{baseUrl}}/settings"
+  body:
+    type: multipart-form
+    data:
+      - name: platform_name
+        type: text
+        value: NEUMERA2
+      - name: email
+        type: text
+        value: support2@neumera.com
+      - name: logo
+        type: text
+        value: ""
+  auth:
+    type: bearer
+    token: "{{token}}"
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: 200 Response
+    description: Successful response
+    request:
+      url: "{{baseUrl}}/settings"
+      method: POST
+      body:
+        type: multipart-form
+        data:
+          - name: platform_name
+            type: text
+            value: NEUMERA2
+          - name: email
+            type: text
+            value: support2@neumera.com
+          - name: logo
+            type: text
+            value: ""
+    response:
+      status: 200
+      statusText: OK
+      body:
+        type: text
+        data: ""

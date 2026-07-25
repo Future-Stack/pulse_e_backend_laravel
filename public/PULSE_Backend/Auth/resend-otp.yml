@@ -1,0 +1,42 @@
+info:
+  name: resend-otp
+  type: http
+  seq: 4
+  tags:
+    - Auth
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/v1/resend-otp"
+  body:
+    type: json
+    data: |-
+      {
+        "email": "jalow33539@dysonc.com"
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: 200 Response
+    description: Successful response
+    request:
+      url: "{{baseUrl}}/api/v1/resend-otp"
+      method: POST
+      body:
+        type: json
+        data: |-
+          {
+            "email": "jalow33539@dysonc.com"
+          }
+    response:
+      status: 200
+      statusText: OK
+      body:
+        type: text
+        data: ""

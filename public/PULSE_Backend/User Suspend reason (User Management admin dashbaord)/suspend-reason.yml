@@ -1,0 +1,46 @@
+info:
+  name: suspend-reason
+  type: http
+  seq: 1
+  tags:
+    - User Suspend reason (User Management admin dashbaord)
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/v1/users/suspend"
+  body:
+    type: json
+    data: |-
+      {
+        "user_id": 3,
+        "suspend_reason": "Your account violated our community guidelines."
+      }
+  auth:
+    type: bearer
+    token: "{{token}}"
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: 200 Response
+    description: Successful response
+    request:
+      url: "{{baseUrl}}/api/v1/users/suspend"
+      method: POST
+      body:
+        type: json
+        data: |-
+          {
+            "user_id": 3,
+            "suspend_reason": "Your account violated our community guidelines."
+          }
+    response:
+      status: 200
+      statusText: OK
+      body:
+        type: text
+        data: ""

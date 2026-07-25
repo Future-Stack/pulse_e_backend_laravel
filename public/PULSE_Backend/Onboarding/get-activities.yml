@@ -1,0 +1,32 @@
+info:
+  name: get-activities
+  type: http
+  seq: 3
+  tags:
+    - Onboarding
+
+http:
+  method: GET
+  url: "{{baseUrl}}/activities"
+  auth:
+    type: bearer
+    token: "{{token}}"
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: 200 Response
+    description: Successful response
+    request:
+      url: "{{baseUrl}}/activities"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      body:
+        type: text
+        data: ""

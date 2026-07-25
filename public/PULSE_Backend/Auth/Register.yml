@@ -1,0 +1,56 @@
+info:
+  name: Register
+  type: http
+  seq: 1
+  tags:
+    - Auth
+
+http:
+  method: POST
+  url: "{{base_url}}/register"
+  body:
+    type: json
+    data: |-
+      {
+        "full_name": "Mahbub",
+        "email": "mahbub.softvence@gmail.com",
+        "password": "Password@123",
+        "password_confirmation": "Password@123",
+        "user_type": "user",
+        "is_privacy_accepted": true
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: 200 Response
+    description: Successful response
+    request:
+      url: "{{baseUrl}}/api/v1/register"
+      method: POST
+      params:
+        - name: url
+          value: http://127.0.0.1:8000/api/v1
+          type: path
+      body:
+        type: json
+        data: |-
+          {
+            "full_name": "Mahbub",
+            "email": "mahbub.softvence@gmail.com",
+            "password": "Password@123",
+            "password_confirmation": "Password@123",
+            "user_type": "user",
+            "is_privacy_accepted": true
+          }
+    response:
+      status: 200
+      statusText: OK
+      body:
+        type: text
+        data: ""

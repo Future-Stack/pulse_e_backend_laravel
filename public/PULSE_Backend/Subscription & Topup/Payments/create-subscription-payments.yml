@@ -1,0 +1,22 @@
+info:
+  name: create-subscription-payments
+  type: http
+  seq: 1
+  tags:
+    - Subscription & Topup/Payments
+
+http:
+  method: POST
+  url: "{{baseUrl}}/subscriptions"
+  body:
+    type: json
+    data: '"{\n  \"plan_slug\": \"premium\",\n  \"billing_cycle\": \"month\", //month/year\n  \"payment_method_id\": \"pm_1TuPagRtGVwEb1tTuJvDoaq7\"\n}"'
+  auth:
+    type: bearer
+    token: "{{token}}"
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

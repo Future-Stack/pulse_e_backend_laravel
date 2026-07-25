@@ -1,0 +1,44 @@
+info:
+  name: comment-post
+  type: http
+  seq: 7
+  tags:
+    - Community Post
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/v1/posts/1/comments"
+  body:
+    type: json
+    data: |-
+      {
+        "content": "This is a very insightful post! Thanks for sharing."
+      }
+  auth:
+    type: bearer
+    token: "{{token}}"
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: 200 Response
+    description: Successful response
+    request:
+      url: "{{baseUrl}}/api/v1/posts/1/comments"
+      method: POST
+      body:
+        type: json
+        data: |-
+          {
+            "content": "This is a very insightful post! Thanks for sharing."
+          }
+    response:
+      status: 200
+      statusText: OK
+      body:
+        type: text
+        data: ""

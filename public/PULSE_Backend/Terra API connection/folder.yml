@@ -1,0 +1,7 @@
+info:
+  name: Terra API connection
+  type: folder
+  seq: 11
+
+request:
+  auth: inherit

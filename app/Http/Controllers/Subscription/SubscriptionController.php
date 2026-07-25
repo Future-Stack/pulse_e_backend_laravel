@@ -22,6 +22,14 @@ class SubscriptionController extends Controller
         try {
             $user = auth()->user();
 
+            if ($user->onboardingCompleted == 0)
+            {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Please Complete Your Onboarding first'
+                ]);
+            }
+
             $request->validate([
                 'plan_slug' => 'required|exists:subscription_plans,slug',
                 'billing_cycle' => 'required|in:month,year',
@@ -88,7 +96,7 @@ class SubscriptionController extends Controller
                 'amount' => $request->billing_cycle === 'month'
                     ? $plan->price_monthly
                     : $plan->price_annual,
-                'status' => 'pending',
+                'status' => 'paid',
             ]);
 
             // Initialize user limits
@@ -115,7 +123,6 @@ class SubscriptionController extends Controller
                     'sender_id' => null,
                 ]));
             }
-
 
             DB::commit();
 
@@ -256,5 +263,32 @@ class SubscriptionController extends Controller
             'message' => 'Revenue breakdown retrieved successfully.',
             'data' => $data,
         ]);
+    }
+
+    public function checkSubscriptionUser()
+    {
+        try {
+            $user = auth()->user();
+
+            $plan = $user->latestSubscription->subscriptionPlan ?? null;
+            $limit = $user->userLimits;
+
+            return response()->json([
+                'success' => true,
+                'message' => 'User Subscription retrieved successfully.',
+                'plan' => $plan,
+                'limit' => $limit,
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Check Subscription:' . $e->getMessage());
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to fetch plan from user',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+
+
     }
 }

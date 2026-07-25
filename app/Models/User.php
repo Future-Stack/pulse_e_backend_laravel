@@ -91,10 +91,14 @@ class User extends Authenticatable
         return $this->hasMany(LabReport::class);
     }
 
-
     public function payments()
     {
-        return $this->hasMany(Payment::class);
+        return $this->hasMany(Payment::class)->where('status', 'paid');
+    }
+
+    public function payment()
+    {
+        return $this->hasOne(Payment::class)->latestOfMany()->where('status', 'paid');
     }
 
     public function latestSubscription()
@@ -105,33 +109,33 @@ class User extends Authenticatable
             ->latestOfMany();
     }
 
-        public function terraActivities()
-        {
-            return $this->hasMany(TerraActivityData::class);
-        }
+    public function terraActivities()
+    {
+        return $this->hasMany(TerraActivityData::class);
+    }
 
-        public function skinAnalyses()
-        {
-            return $this->hasMany(SkinScan::class);
-        }
+    public function skinAnalyses()
+    {
+        return $this->hasMany(SkinScan::class);
+    }
 
-        public function dailyScriptures()
-        {
-            return $this->hasMany(DailyScripture::class);
-        }
+    public function dailyScriptures()
+    {
+        return $this->hasMany(DailyScripture::class);
+    }
 
-        public function healthTrends()
-        {
-            return $this->hasMany(HealthTrend::class);
-        }
+    public function healthTrends()
+    {
+        return $this->hasMany(HealthTrend::class);
+    }
 
-        public function userLimits(): HasMany
-        {
-            return $this->hasMany(UserLimit::class);
-        }
+    public function userLimits(): HasMany
+    {
+        return $this->hasMany(UserLimit::class);
+    }
 
-        public function userLimit(): HasOne
-        {
-            return $this->hasOne(UserLimit::class);
-        }
+    public function userLimit(): HasOne
+    {
+        return $this->hasOne(UserLimit::class);
+    }
 }
