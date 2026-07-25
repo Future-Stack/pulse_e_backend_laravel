@@ -1,0 +1,48 @@
+info:
+  name: update-notification-settings
+  type: http
+  seq: 4
+  tags:
+    - Settings (Admin)
+
+http:
+  method: POST
+  url: "{{baseUrl}}/notification-settings"
+  body:
+    type: json
+    data: |-
+      {
+        "email": true,
+        "push": false,
+        "security_alert": true
+      }
+  auth:
+    type: bearer
+    token: "{{token}}"
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: 200 Response
+    description: Successful response
+    request:
+      url: "{{baseUrl}}/notification-settings"
+      method: POST
+      body:
+        type: json
+        data: |-
+          {
+            "email": true,
+            "push": false,
+            "security_alert": true
+          }
+    response:
+      status: 200
+      statusText: OK
+      body:
+        type: text
+        data: ""

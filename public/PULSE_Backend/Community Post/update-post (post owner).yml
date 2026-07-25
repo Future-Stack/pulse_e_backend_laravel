@@ -1,0 +1,64 @@
+info:
+  name: update-post (post owner)
+  type: http
+  seq: 4
+  tags:
+    - Community Post
+
+http:
+  method: PUT
+  url: "{{baseUrl}}/api/v1/posts/2"
+  body:
+    type: json
+    data: |-
+      {
+        "life_journey_id": [
+          1,
+          4
+        ],
+        "title": "How I raised my Vitamin D in 5 weeks",
+        "content": "Started at 15 ng/mL, retested after 7 weeks...",
+        "is_anonymous": false,
+        "tags": [
+          "vitamin-a",
+          "progress"
+        ]
+      }
+  auth:
+    type: bearer
+    token: "{{token}}"
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: 200 Response
+    description: Successful response
+    request:
+      url: "{{baseUrl}}/api/v1/posts/2"
+      method: PUT
+      body:
+        type: json
+        data: |-
+          {
+            "life_journey_id": [
+              1,
+              4
+            ],
+            "title": "How I raised my Vitamin D in 5 weeks",
+            "content": "Started at 15 ng/mL, retested after 7 weeks...",
+            "is_anonymous": false,
+            "tags": [
+              "vitamin-a",
+              "progress"
+            ]
+          }
+    response:
+      status: 200
+      statusText: OK
+      body:
+        type: text
+        data: ""

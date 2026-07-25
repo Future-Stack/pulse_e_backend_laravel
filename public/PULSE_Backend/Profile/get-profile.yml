@@ -1,0 +1,19 @@
+info:
+  name: get-profile
+  type: http
+  seq: 1
+  tags:
+    - Profile
+
+http:
+  method: GET
+  url: "{{base_url}}/user-profile"
+  auth:
+    type: bearer
+    token: "{{token}}"
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

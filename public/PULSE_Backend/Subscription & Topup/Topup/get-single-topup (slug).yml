@@ -1,0 +1,38 @@
+info:
+  name: get-single-topup (slug)
+  type: http
+  seq: 3
+  tags:
+    - Subscription & Topup/Topup
+
+http:
+  method: GET
+  url: "{{baseUrl}}/topup/coaching_sessions_20"
+  body:
+    type: json
+    data: ""
+  auth:
+    type: bearer
+    token: "{{token}}"
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: 200 Response
+    description: Successful response
+    request:
+      url: "{{baseUrl}}/topup/coaching_sessions_20"
+      method: GET
+      body:
+        type: json
+        data: ""
+    response:
+      status: 200
+      statusText: OK
+      body:
+        type: text
+        data: ""

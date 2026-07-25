@@ -1,0 +1,4 @@
+name: Environment 7
+variables:
+  - name: baseUrl
+    value: https://api.stripe.com

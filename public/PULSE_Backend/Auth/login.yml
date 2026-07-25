@@ -1,0 +1,53 @@
+info:
+  name: login
+  type: http
+  seq: 3
+  tags:
+    - Auth
+
+http:
+  method: POST
+  url: "{{base_url}}/login"
+  body:
+    type: json
+    data: |-
+      {
+           // "email": "lemew60645@epaynine.com",
+          // "password": "Password@123"
+
+         // "email": "romichaparvin35@gmail.com",
+         //  "password": "Password@123"
+        
+         // "email": "hosepe5472@suahi.com",
+         //  "password": "@Pass1234"
+
+        "email": "user@gmail.com",
+        
+       "password": "Password@123"
+        
+      }
+  auth:
+    type: bearer
+    token: "{{url_local}}"
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: 200 Response
+    description: Successful response
+    request:
+      url: "{{baseUrl}}/api/v1/login"
+      method: POST
+      body:
+        type: json
+        data: '"{\n  \t // \"email\": \"pigexol992@dysonc.com\",\n    // \"password\": \"Password@123\"\n\n   \"email\": \"romichaparvin35@gmail.com\",\n    \"password\": \"Password@123\"\n  \n   // \"email\": \"user@gmail.com\",\n   //  \"password\": \"Password@123\"\n\n  \n}"'
+    response:
+      status: 200
+      statusText: OK
+      body:
+        type: text
+        data: ""

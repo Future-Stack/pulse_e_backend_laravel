@@ -1,0 +1,44 @@
+info:
+  name: otp-verify
+  type: http
+  seq: 2
+  tags:
+    - Auth
+
+http:
+  method: POST
+  url: "{{base_url}}/verify-otp"
+  body:
+    type: json
+    data: |-
+      {
+        "email": "mahbub.softvence@gmail.com",
+        "otp": "3136"
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: 200 Response
+    description: Successful response
+    request:
+      url: "{{baseUrl}}/api/v1/verify-otp"
+      method: POST
+      body:
+        type: json
+        data: |-
+          {
+            "email": "mahbub.softvence@gmail.com",
+            "otp": "7612"
+          }
+    response:
+      status: 200
+      statusText: OK
+      body:
+        type: text
+        data: ""

@@ -1,0 +1,38 @@
+info:
+  name: delete-page(useing page -id)(admin)
+  type: http
+  seq: 5
+  tags:
+    - Pages
+
+http:
+  method: DELETE
+  url: "{{baseUrl}}/api/v1/pages/5"
+  body:
+    type: json
+    data: ""
+  auth:
+    type: bearer
+    token: "{{token}}"
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: 200 Response
+    description: Successful response
+    request:
+      url: "{{baseUrl}}/api/v1/pages/5"
+      method: DELETE
+      body:
+        type: json
+        data: ""
+    response:
+      status: 200
+      statusText: OK
+      body:
+        type: text
+        data: ""

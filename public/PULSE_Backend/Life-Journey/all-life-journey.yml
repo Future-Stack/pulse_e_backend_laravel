@@ -1,0 +1,32 @@
+info:
+  name: all-life-journey
+  type: http
+  seq: 1
+  tags:
+    - Life-Journey
+
+http:
+  method: GET
+  url: "{{baseUrl}}/api/v1/life-journeys"
+  auth:
+    type: bearer
+    token: "{{token}}"
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: 200 Response
+    description: Successful response
+    request:
+      url: "{{baseUrl}}/api/v1/life-journeys"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      body:
+        type: text
+        data: ""

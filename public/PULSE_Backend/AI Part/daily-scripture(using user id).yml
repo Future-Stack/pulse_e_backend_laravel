@@ -1,0 +1,32 @@
+info:
+  name: daily-scripture(using user id)
+  type: http
+  seq: 1
+  tags:
+    - AI Part
+
+http:
+  method: GET
+  url: "{{baseUrl}}/api/v1/daily-scripture/3"
+  auth:
+    type: bearer
+    token: "{{token}}"
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: 200 Response
+    description: Successful response
+    request:
+      url: "{{baseUrl}}/api/v1/daily-scripture/3"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      body:
+        type: text
+        data: ""

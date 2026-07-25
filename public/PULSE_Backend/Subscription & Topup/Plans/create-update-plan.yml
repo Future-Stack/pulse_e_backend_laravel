@@ -1,0 +1,72 @@
+info:
+  name: create-update-plan
+  type: http
+  seq: 3
+  tags:
+    - Subscription & Topup/Plans
+
+http:
+  method: POST
+  url: "{{baseUrl}}/update-subscription-plan/premium"
+  body:
+    type: json
+    data: |-
+      {
+        "name": "Premium123",
+        "description": "Full multi-stage access with wearables and lab OCR.",
+        "price_monthly": 15.99,
+        "price_annual": 126,
+        "skin_scans_limit": 6,
+        "ai_coaching_limit": 75,
+        "ai_coaching_model": "all",
+        "deep_reports_limit": 0,
+        "daily_summary_frequency": "unlimited",
+        "tracking_label": "Full multi-stage, all wearables, lab OCR",
+        "tracking_integrations": [
+          "wearables",
+          "lab_ocr"
+        ],
+        "status": true
+      }
+  auth:
+    type: bearer
+    token: "{{token}}"
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: 200 Response
+    description: Successful response
+    request:
+      url: "{{baseUrl}}/update-subscription-plan/premium"
+      method: POST
+      body:
+        type: json
+        data: |-
+          {
+            "name": "Premium123",
+            "description": "Full multi-stage access with wearables and lab OCR.",
+            "price_monthly": 15.99,
+            "price_annual": 126,
+            "skin_scans_limit": 6,
+            "ai_coaching_limit": 75,
+            "ai_coaching_model": "all",
+            "deep_reports_limit": 0,
+            "daily_summary_frequency": "unlimited",
+            "tracking_label": "Full multi-stage, all wearables, lab OCR",
+            "tracking_integrations": [
+              "wearables",
+              "lab_ocr"
+            ],
+            "status": true
+          }
+    response:
+      status: 200
+      statusText: OK
+      body:
+        type: text
+        data: ""

@@ -1,0 +1,42 @@
+info:
+  name: gooogle-login
+  type: http
+  seq: 12
+  tags:
+    - Auth
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/v1/google/token"
+  body:
+    type: json
+    data: |-
+      {
+        "id_token": "ya29.a0AfH6SMDexampletoken"
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: 200 Response
+    description: Successful response
+    request:
+      url: "{{baseUrl}}/api/v1/google/token"
+      method: POST
+      body:
+        type: json
+        data: |-
+          {
+            "id_token": "ya29.a0AfH6SMDexampletoken"
+          }
+    response:
+      status: 200
+      statusText: OK
+      body:
+        type: text
+        data: ""

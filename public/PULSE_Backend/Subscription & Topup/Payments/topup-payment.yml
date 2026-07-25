@@ -1,0 +1,22 @@
+info:
+  name: topup-payment
+  type: http
+  seq: 2
+  tags:
+    - Subscription & Topup/Payments
+
+http:
+  method: POST
+  url: "{{baseUrl}}/topup-payment"
+  body:
+    type: json
+    data: '"{\n  \"slug\": \"coaching_sessions_20\" //skin_scans_5, coaching_sessions_20\n}"'
+  auth:
+    type: bearer
+    token: "{{token}}"
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

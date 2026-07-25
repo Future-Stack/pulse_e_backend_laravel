@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Payment extends Model
 {
@@ -14,7 +15,7 @@ class Payment extends Model
         return $this->belongsTo(User::class);
     }
 
-    public function subscriptionPlan()
+    public function subscriptionPlan() :BelongsTo
     {
         return $this->belongsTo(SubscriptionPlan::class);
     }
@@ -45,4 +46,5 @@ class Payment extends Model
                 $q->where('type', 'topup');
             });
     }
+
 }

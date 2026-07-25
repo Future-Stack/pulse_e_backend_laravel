@@ -16,7 +16,7 @@ class ProfileController extends Controller
     {
         try {
 //            $user = auth()->user();
-            $user = User::where('id',auth()->id())->select('id','full_name','email')->with('profile:id,user_id,life_stage_id,bio,profile_img,age,height,weight','profile.lifeStage','profile.connectDevices','profile.lifeJourneys')->first();
+            $user = User::where('id',auth()->id())->select('id','full_name','email')->with('profile:id,user_id,life_stage_id,bio,profile_img,age,height,weight','profile.lifeStage','profile.connectDevices','profile.lifeJourneys','latestSubscription.subscriptionPlan')->first();
 
             return response()->json([
                 'success' => true,
@@ -66,9 +66,9 @@ public function saveProfile(Request $request)
 
         // Handle image upload
         $imagePath = null;
-        if ($request->hasFile('profile_img')) 
+        if ($request->hasFile('profile_img'))
             {
-           
+
             $storedPath = $request->file('profile_img')->store('profiles', 'public');
             $imagePath  = asset('storage/' . $storedPath);
         }

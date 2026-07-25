@@ -1,0 +1,32 @@
+info:
+  name: approve-post (for admin)
+  type: http
+  seq: 11
+  tags:
+    - Community Post
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/v1/posts/1/approve"
+  auth:
+    type: bearer
+    token: "{{token}}"
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: 200 Response
+    description: Successful response
+    request:
+      url: "{{baseUrl}}/api/v1/posts/1/approve"
+      method: POST
+    response:
+      status: 200
+      statusText: OK
+      body:
+        type: text
+        data: ""

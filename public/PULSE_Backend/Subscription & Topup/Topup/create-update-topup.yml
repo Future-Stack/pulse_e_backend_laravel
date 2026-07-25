@@ -1,0 +1,38 @@
+info:
+  name: create-update-topup
+  type: http
+  seq: 1
+  tags:
+    - Subscription & Topup/Topup
+
+http:
+  method: POST
+  url: "{{baseUrl}}/update-topup/coaching_sessions_20"
+  body:
+    type: json
+    data: '"{\n \n    \"name\": \"+20 Coaching Sessions\",\n    \"description\": \"One-time top-up that expires at the end of the month.\",\n    \"topup_kind\": \"coaching_sessions\",\n    \"limit\": 20,\n    \"price\": 2.99,\n    \"status\": 1,\n    \"created_at\": \"2026-07-15T13:44:00Z\",\n    \"updated_at\": \"2026-07-15T13:44:00Z\"\n  },"'
+  auth:
+    type: bearer
+    token: "{{token}}"
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: 200 Response
+    description: Successful response
+    request:
+      url: "{{baseUrl}}/update-topup/coaching_sessions_20"
+      method: POST
+      body:
+        type: json
+        data: '"{\n \n    \"name\": \"+20 Coaching Sessions\",\n    \"description\": \"One-time top-up that expires at the end of the month.\",\n    \"topup_kind\": \"coaching_sessions\",\n    \"limit\": 20,\n    \"price\": 2.99,\n    \"status\": 1,\n    \"created_at\": \"2026-07-15T13:44:00Z\",\n    \"updated_at\": \"2026-07-15T13:44:00Z\"\n  },"'
+    response:
+      status: 200
+      statusText: OK
+      body:
+        type: text
+        data: ""

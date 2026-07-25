@@ -202,6 +202,9 @@ Route::prefix('v1')->group(function () {
         //topup-payment
         Route::post('/topup-payment', [TopupPaymentController::class, 'topUpPayment']);
 
+        //Check Subscription by User
+        Route::get('/check-user-subscription', [SubscriptionController::class, 'checkSubscriptionUser']);
+
         //Life Journey
         Route::get('/life-journeys', [LifeJourneyController::class, 'index']);
         Route::get('/life-journeys/{id}', [LifeJourneyController::class, 'show']);

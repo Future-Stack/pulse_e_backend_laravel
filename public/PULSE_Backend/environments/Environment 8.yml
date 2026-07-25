@@ -1,0 +1,4 @@
+name: Environment 8
+variables:
+  - name: baseUrl
+    value: https://echo.hoppscotch.io
