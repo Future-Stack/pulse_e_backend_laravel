@@ -90,6 +90,19 @@ class CommunityPostController extends Controller
         // community_post_life_journey pivot table.
         $post->lifeJourneys()->attach($validated['life_journey_id']);
 
+        $user = Auth::user();
+
+        $user = User::where('id', $user->id)->first();
+
+        if ($user) {
+            Notification::send($user, new PlatformNotification([
+                'type' => 'approved',
+                'title' => 'Post Approved',
+                'message' => 'Your post has been approved.',
+                'sender_id' => null,
+            ]));
+        }
+
         return response()->json([
             'message' => 'Post created successfully.',
             'post' => $post->load('lifeJourneys'),
