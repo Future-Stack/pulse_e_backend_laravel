@@ -1,6 +1,6 @@
-name: Local
+name: Local (Sabbir)
 variables:
   - name: base_url
     value: http://127.0.0.1:8000/api/v1
   - name: token
-    value: 3|hioSwP5T6uxSMzUnv4cEFi1haRmXO72pjDmctVwkf2dec422
+    value: 4|jHjnK9Hq3g14zeUA5YyVi85SEvbGA8rGvmLsLCM0eb8f9ab2
