@@ -12,7 +12,7 @@ http:
     type: json
     data: |-
       {
-        "full_name": "Mahbub",
+        "full_name": "",
         "email": "mahbub.softvence@gmail.com",
         "password": "Password@123",
         "password_confirmation": "Password@123",

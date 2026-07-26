@@ -3,4 +3,4 @@ variables:
   - name: base_url
     value: https://api.fightthenumber.com/api/v1
   - name: token
-    value: 43|OdSgfxsxYO9aicBxGIrgSugQIh8FJi5WBZ8nW5TPc895e36f
+    value: 47|KFI6RQViVAn9leYvbhW0tdzUXhPlLxCMkMJW2p7Q7b78bd06
