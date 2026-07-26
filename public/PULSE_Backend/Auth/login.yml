@@ -15,15 +15,15 @@ http:
            // "email": "lemew60645@epaynine.com",
           // "password": "Password@123"
 
-         // "email": "romichaparvin35@gmail.com",
-         //  "password": "Password@123"
+         "email": "romichaparvin35@gmail.com",
+          "password": "Password@123"
         
          // "email": "hosepe5472@suahi.com",
          //  "password": "@Pass1234"
 
-        "email": "user@gmail.com",
+      //   "email": "user@gmail.com",
         
-       "password": "Password@123"
+      //  "password": "Password@123"
         
       }
   auth:
