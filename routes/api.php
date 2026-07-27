@@ -16,6 +16,7 @@ use App\Http\Controllers\Page\PageController;
 use App\Http\Controllers\Settings\SettingsController;
 use App\Http\Controllers\User\AuthController;
 use App\Http\Controllers\User\DeleteUsersController;
+use App\Http\Controllers\Waitlist\WaitlistController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Admin\UserManagementController;
 use App\Http\Controllers\CommunityCommentController;
@@ -225,6 +226,7 @@ Route::prefix('v1')->group(function () {
         Route::post('/chat/response', [ChatController::class, 'handleResponse']);
 
         //Waitlist
+        Route::post('/waitlist/submit',[WaitlistController::class, 'submit']);
 
     });
 
