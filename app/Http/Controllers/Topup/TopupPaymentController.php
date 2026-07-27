@@ -63,6 +63,7 @@ class TopupPaymentController extends Controller
                 'success' => true,
                 'message' => 'Top-up payment processed successfully.',
                 'data' => $payment,
+                'stripe' => $paymentIntent,
             ], 200);
 
         } catch (\Throwable $e) {

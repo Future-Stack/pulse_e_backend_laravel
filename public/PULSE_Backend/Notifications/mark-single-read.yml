@@ -1,13 +1,11 @@
 info:
-  name: fetch-user-notification
+  name: mark-single-read
   type: http
-  seq: 2
-  tags:
-    - Notifications
+  seq: 4
 
 http:
   method: GET
-  url: "{{base_url}}/users-notifications"
+  url: "{{base_url}}/notifications/33e8e068-d181-49e3-a45a-b4f9953bb185/read"
   auth:
     type: bearer
     token: "{{token}}"

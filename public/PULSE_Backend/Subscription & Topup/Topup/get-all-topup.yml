@@ -7,7 +7,7 @@ info:
 
 http:
   method: GET
-  url: "{{baseUrl}}/topups"
+  url: "{{base_url}}/topups"
   auth:
     type: bearer
     token: "{{token}}"

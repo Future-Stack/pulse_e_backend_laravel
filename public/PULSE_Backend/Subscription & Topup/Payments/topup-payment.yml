@@ -7,10 +7,13 @@ info:
 
 http:
   method: POST
-  url: "{{baseUrl}}/topup-payment"
+  url: "{{base_url}}/topup-payment"
   body:
     type: json
-    data: '"{\n  \"slug\": \"coaching_sessions_20\" //skin_scans_5, coaching_sessions_20\n}"'
+    data: |-
+      {
+        "slug": "coaching_sessions_20" //skin_scans_5, coaching_sessions_20
+      }
   auth:
     type: bearer
     token: "{{token}}"

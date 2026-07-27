@@ -13,11 +13,6 @@ config:
         username: ""
         password: ""
       bypassProxy: ""
-
-request:
-  variables:
-    - name: url_local
-      value: http://127.0.0.1:8000/api/v1
 bundled: false
 extensions:
   bruno:

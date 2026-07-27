@@ -30,10 +30,10 @@ http:
         contentType: image/jpeg
       - name: height
         type: text
-        value: "170"
+        value: "170.5"
       - name: weight
         type: text
-        value: "65"
+        value: "65.52"
       - name: life_journey_id[0]
         type: text
         value: "1"

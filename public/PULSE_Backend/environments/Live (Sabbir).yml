@@ -1,6 +1,6 @@
-name: Live
+name: Live (Sabbir)
 variables:
   - name: base_url
     value: https://api.fightthenumber.com/api/v1
   - name: token
-    value: 43|OdSgfxsxYO9aicBxGIrgSugQIh8FJi5WBZ8nW5TPc895e36f
+    value: 75|lMYIPiiXYLo1L3wFWBex7dvHoAfas54YInIS8yO57bf2b362
