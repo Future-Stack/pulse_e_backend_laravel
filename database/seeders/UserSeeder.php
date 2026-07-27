@@ -14,10 +14,10 @@ class UserSeeder extends Seeder
         // Admin
         $admin = User::updateOrCreate(
 
-            ['email' => 'romichaparvin35@gmail.com'],
+            ['email' => 'info@fightthenumber.com'],
             [
                 'full_name' => 'Super Admin',
-               
+
                 'password'   => Hash::make('Password@123'),
                 'status'     => 'active',
                 'user_type'  => 'admin',
@@ -29,7 +29,7 @@ class UserSeeder extends Seeder
             ['email' => 'user@gmail.com'],
             [
                 'full_name' => 'User',
-               
+
                 'password'   => Hash::make('Password@123'),
                 'status'     => 'active',
                 'user_type'  => 'user',

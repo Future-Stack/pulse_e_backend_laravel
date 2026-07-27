@@ -223,6 +223,9 @@ Route::prefix('v1')->group(function () {
 
         //Chat
         Route::post('/chat/response', [ChatController::class, 'handleResponse']);
+
+        //Waitlist
+
     });
 
 
