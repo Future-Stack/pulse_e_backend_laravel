@@ -22,8 +22,9 @@ class CommunityPostController extends Controller
     {
         $query = CommunityPost::query()
             ->where('is_approved', true)
+            ->whereDoesntHave('reports', fn($q) => $q->where('is_active', true))
             ->with(['user:id,full_name', 'lifeJourneys'])
-            ->withCount(['likes', 'comments'])
+            ->withCount(['likes', 'comments', 'reports'])
             ->latest('posted_at');
 
         if ($request->filled('life_journey_id')) {
@@ -114,7 +115,7 @@ class CommunityPostController extends Controller
      */
     public function show(CommunityPost $post)
     {
-        if (!$post->is_approved) {
+         if (!$post->is_approved || $post->reports()->where('is_active', true)->exists()) {
             return response()->json(['message' => 'Post not found or not approved.'], 404);
         }
 

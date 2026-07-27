@@ -8,13 +8,14 @@ use App\Models\ChatSession;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Auth;
 
 class ChatController extends Controller
 {
     public function handleResponse(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'user_id' => 'required|exists:users,id',
             'message' => 'required|string',
             'session_id' => 'required|string',
         ]);
@@ -25,7 +26,7 @@ class ChatController extends Controller
             ], 422);
         }
 
-        $userId = $request->input('user_id');
+        $userId = Auth::id();
         $sessionId = $request->input('session_id');
         $userMessage = $request->input('message');
 
@@ -41,12 +42,15 @@ class ChatController extends Controller
             'message' => $userMessage,
         ]);
 
-        try {
-            $aiUrl = config('services.ai.mood_analyzer_url', 'https://female-mood-analyzer.onrender.com/api/chat/response');
+        $aiUrl = config('services.ai.mood_analyzer_url', 'https://female-mood-analyzer.onrender.com/api/chat/response');
 
-            $aiResponse = Http::connectTimeout(30)
-                ->timeout(120)
-                ->retry(1, 1000)
+        try {
+            $aiResponse = Http::connectTimeout(10)
+                ->timeout(60)
+                ->retry(1, 3000, function ($exception, $request) {
+                    // Only retry on connection issues (e.g. cold start), not on 4xx/5xx app responses
+                    return $exception instanceof \Illuminate\Http\Client\ConnectionException;
+                })
                 ->post($aiUrl, [
                     'user_id' => (string) $userId,
                     'message' => $userMessage,
@@ -54,6 +58,14 @@ class ChatController extends Controller
                 ]);
 
             if ($aiResponse->failed()) {
+                Log::error('AI Service failed', [
+                    'status' => $aiResponse->status(),
+                    'body' => $aiResponse->body(),
+                    'url' => $aiUrl,
+                    'user_id' => $userId,
+                    'session_id' => $sessionId,
+                ]);
+
                 return response()->json([
                     'message' => 'AI Service connection failed',
                     'error' => $aiResponse->body()
@@ -81,11 +93,26 @@ class ChatController extends Controller
             ], 200);
 
         } catch (\Illuminate\Http\Client\ConnectionException $e) {
+            Log::error('AI Service connection exception', [
+                'error' => $e->getMessage(),
+                'url' => $aiUrl,
+                'user_id' => $userId,
+                'session_id' => $sessionId,
+            ]);
+
             return response()->json([
                 'message' => 'AI Service is warming up or unresponsive',
                 'error' => 'The request timed out. Render server might be in sleep mode.'
             ], 504);
+
         } catch (\Exception $e) {
+            Log::error('AI Service processing error', [
+                'error' => $e->getMessage(),
+                'url' => $aiUrl,
+                'user_id' => $userId,
+                'session_id' => $sessionId,
+            ]);
+
             return response()->json([
                 'message' => 'AI Service processing error',
                 'error' => $e->getMessage()
