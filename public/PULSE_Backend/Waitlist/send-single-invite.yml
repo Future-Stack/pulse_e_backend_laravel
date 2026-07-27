@@ -1,0 +1,24 @@
+info:
+  name: send-single-invite
+  type: http
+  seq: 4
+
+http:
+  method: POST
+  url: "{{base_url}}/waitlist/invite"
+  body:
+    type: json
+    data: |-
+      {
+        "waitlist_entry_id": 12,
+        "link": "https://api.fightthenumber.com/"
+      }
+  auth:
+    type: bearer
+    token: "{{token}}"
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

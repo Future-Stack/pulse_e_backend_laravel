@@ -6,5 +6,5 @@ use Illuminate\Database\Eloquent\Model;
 
 class WaitlistEntry extends Model
 {
-    //
+    protected $guarded = [];
 }

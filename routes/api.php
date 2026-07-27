@@ -226,10 +226,12 @@ Route::prefix('v1')->group(function () {
         Route::post('/chat/response', [ChatController::class, 'handleResponse']);
 
         //Waitlist
-        Route::post('/waitlist/submit',[WaitlistController::class, 'submit']);
 
+        Route::get('/waitlist/list',[WaitlistController::class, 'getWaitlist']);
     });
-
+    Route::post('/waitlist/submit',[WaitlistController::class, 'submit']);
+    Route::get('/waitlist/confirmation/{token}', [WaitlistController::class, 'confirmation']);
+    Route::post('/waitlist/invite', [WaitlistController::class, 'sendSingleInvite']);
 
     // Stripe webhook endpoint
     Route::post('/subscription-stripe/webhook', [SubscriptionController::class, 'handleStripeWebhook']);
