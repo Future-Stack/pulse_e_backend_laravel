@@ -5,25 +5,28 @@ namespace App\Mail;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Mail\Mailable;
-use Illuminate\Mail\Mailables\Attachment;
-use Illuminate\Mail\Mailables\Content;
-use Illuminate\Mail\Mailables\Envelope;
 use Illuminate\Queue\SerializesModels;
 
-class WaitlistConfirmation extends Mailable
+class WaitlistConfirmation extends Mailable implements ShouldQueue
 {
-    public $user;
+    use Queueable, SerializesModels;
+
+    public $entry;
     public $confirmationUrl;
 
-    public function __construct($user, $confirmationUrl)
+    public function __construct($entry, $confirmationUrl)
     {
-        $this->user = $user;
+        $this->entry = $entry;
         $this->confirmationUrl = $confirmationUrl;
     }
 
     public function build()
     {
         return $this->subject('Confirm your spot on the Neumera waitlist')
-            ->view('emails.waitlist_confirmation');
+            ->view('emails.waitlist_confirmation')
+            ->with([
+                'entry' => $this->entry,
+                'confirmationUrl' => $this->confirmationUrl,
+            ]);
     }
 }
