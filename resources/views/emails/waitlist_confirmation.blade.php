@@ -6,9 +6,9 @@
     <style>
         body { font-family: Arial, sans-serif; background-color: #f9f9f9; margin: 0; padding: 0; }
         .container { max-width: 600px; margin: 40px auto; background: #ffffff; border-radius: 8px; overflow: hidden; }
-        .header { background: #4CAF50; color: #ffffff; padding: 20px; text-align: center; }
+        .header { background: #2a9d8f; color: #ffffff; padding: 20px; text-align: center; }
         .content { padding: 30px; color: #333333; }
-        .button { display: inline-block; padding: 12px 20px; background: #4CAF50; color: #ffffff; text-decoration: none; border-radius: 4px; }
+        .button { display: inline-block; padding: 12px 20px; background: #2a9d8f; color: #ffffff; text-decoration: none; border-radius: 4px; }
         .footer { padding: 20px; text-align: center; font-size: 12px; color: #888888; }
     </style>
 </head>
@@ -18,15 +18,16 @@
         <h2>Welcome to Our Beta Waitlist</h2>
     </div>
     <div class="content">
-        <p>Hi {{ $user->name ?? 'there' }}, </p>
-        <p>Thank you for joining our waitlist! To confirm your spot, please click the button below:</p>
-        <p style="text-align:center;">
+        <p>Hi {{ $entry->full_name?? 'there' }}, thanks for your interest in Neumera.</p>
+        <p>Please confirm you'd like to join the waitlist. One click and you're set:</p>
+        <p style="text-align:center; color: white">
             <a href="{{ $confirmationUrl }}" class="button">Confirm My Email</a>
         </p>
-        <p>If you did not request to join, you can safely ignore this message.</p>
+        <p>If you didn't request this, you can ignore this email and nothing will happen. This link expires in 14 days.</p>
     </div>
     <div class="footer">
-        <p>&copy; {{ date('Y') }} Your Company. All rights reserved.</p>
+        <p>&copy; {{ date('Y') }} The Neumera team</p>
+        <p>[Unsubscribe]. [Mailing Address]</p>
     </div>
 </div>
 </body>

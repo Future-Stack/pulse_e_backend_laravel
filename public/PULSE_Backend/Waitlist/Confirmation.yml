@@ -1,0 +1,17 @@
+info:
+  name: Confirmation
+  type: http
+  seq: 2
+
+http:
+  method: GET
+  url: "{{base_url}}/waitlist/confirmation/hjgKsy0PMIgpbput74HfMeTuXZHTp8wf"
+  auth:
+    type: bearer
+    token: "{{token}}"
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
