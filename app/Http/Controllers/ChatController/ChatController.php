@@ -44,15 +44,18 @@ class ChatController extends Controller
         try {
             $aiUrl = config('services.ai.mood_analyzer_url', 'https://female-mood-analyzer.onrender.com/api/chat/response');
 
-            $aiResponse = Http::timeout(60)->post($aiUrl, [
-                'user_id' => (string) $userId,
-                'message' => $userMessage,
-                'session_id' => $sessionId,
-            ]);
+            $aiResponse = Http::connectTimeout(30)
+                ->timeout(120)
+                ->retry(1, 1000)
+                ->post($aiUrl, [
+                    'user_id' => (string) $userId,
+                    'message' => $userMessage,
+                    'session_id' => $sessionId,
+                ]);
 
             if ($aiResponse->failed()) {
                 return response()->json([
-                    'message' => 'AI Service Not connected',
+                    'message' => 'AI Service connection failed',
                     'error' => $aiResponse->body()
                 ], 502);
             }
@@ -77,9 +80,14 @@ class ChatController extends Controller
                 'data_summary' => $aiMessage->data_summary,
             ], 200);
 
+        } catch (\Illuminate\Http\Client\ConnectionException $e) {
+            return response()->json([
+                'message' => 'AI Service is warming up or unresponsive',
+                'error' => 'The request timed out. Render server might be in sleep mode.'
+            ], 504);
         } catch (\Exception $e) {
             return response()->json([
-                'message' => 'AI Service not found',
+                'message' => 'AI Service processing error',
                 'error' => $e->getMessage()
             ], 500);
         }
