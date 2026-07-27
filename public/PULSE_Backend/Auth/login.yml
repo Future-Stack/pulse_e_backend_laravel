@@ -15,8 +15,8 @@ http:
            // "email": "lemew60645@epaynine.com",
           // "password": "Password@123"
 
-         "email": "romichaparvin35@gmail.com",
-          "password": "Password@123"
+      //    "email": "romichaparvin35@gmail.com",
+      //     "password": "Password@123"
         
          // "email": "hosepe5472@suahi.com",
          //  "password": "@Pass1234"
@@ -24,6 +24,10 @@ http:
       //   "email": "user@gmail.com",
         
       //  "password": "Password@123"
+        
+          "email": "rehanakabirmim@gmail.com",
+        
+       "password": "Password@1234"
         
       }
   auth:

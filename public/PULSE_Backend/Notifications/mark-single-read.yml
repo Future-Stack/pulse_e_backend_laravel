@@ -5,7 +5,7 @@ info:
 
 http:
   method: GET
-  url: "{{base_url}}/notifications/e59fb099-875c-4cca-b34e-88e79a5555fb/read"
+  url: "{{base_url}}/notifications/33e8e068-d181-49e3-a45a-b4f9953bb185/read"
   auth:
     type: bearer
     token: "{{token}}"
