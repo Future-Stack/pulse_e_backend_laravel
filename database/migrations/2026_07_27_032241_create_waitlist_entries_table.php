@@ -15,7 +15,7 @@ return new class extends Migration
             $table->id();
             $table->string('full_name');
             $table->string('email');
-            $table->foreignId('life_journey_id')->constrained('life_journeys')->onDelete('cascade');
+            $table->foreignId('life_journey_id')->nullable()->constrained('life_journeys')->onDelete('cascade');
 
             $table->string('status')->default('pending_confirmation')->comment('pending_confirmation', 'confirmed', 'invited', 'activated');
             $table->string('confirmation_token')->nullable();
