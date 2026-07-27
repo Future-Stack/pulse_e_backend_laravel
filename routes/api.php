@@ -180,6 +180,9 @@ Route::prefix('v1')->group(function () {
 
         Route::get('/reports', [CommunityPostReportController::class, 'index']);
 
+        Route::patch('/reports/{report}/approve', [CommunityPostReportController::class, 'approve']);
+        Route::patch('/reports/{report}/decline', [CommunityPostReportController::class, 'decline']);
+
         // Approve Post
         Route::post('/posts/{post}/approve', [CommunityPostController::class, 'approve']);
 
@@ -227,6 +230,9 @@ Route::prefix('v1')->group(function () {
 
         //Waitlist
         Route::post('/waitlist/submit',[WaitlistController::class, 'submit']);
+
+        Route::patch('/admin/community/reports/{report}/approve', [CommunityPostReportController::class, 'approve']);
+        Route::patch('/admin/community/reports/{report}/decline', [CommunityPostReportController::class, 'decline']);
 
     });
 
