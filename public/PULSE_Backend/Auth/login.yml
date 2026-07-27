@@ -21,13 +21,13 @@ http:
          // "email": "hosepe5472@suahi.com",
          //  "password": "@Pass1234"
 
-      //   "email": "user@gmail.com",
+        "email": "user@gmail.com",
         
-      //  "password": "Password@123"
+       "password": "Password@123"
         
-          "email": "rehanakabirmim@gmail.com",
+      //     "email": "rehanakabirmim@gmail.com",
         
-       "password": "Password@1234"
+      //  "password": "Password@1234"
         
       }
   auth:
