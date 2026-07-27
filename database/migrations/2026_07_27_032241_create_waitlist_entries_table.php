@@ -13,6 +13,18 @@ return new class extends Migration
     {
         Schema::create('waitlist_entries', function (Blueprint $table) {
             $table->id();
+            $table->string('full_name');
+            $table->string('email');
+            $table->foreignId('fore')->constrained('users');
+
+            $table->string('status')->default('pending_confirmation')->comment('pending_confirmation', 'confirmed', 'invited', 'activated');
+            $table->string('confirmation_token')->nullable();
+
+            $table->timestamp('confirmed_at')->nullable();
+            $table->timestamp('invited_at')->nullable();
+            $table->timestamp('activated_at')->nullable();
+
+            $table->integer('wave_id')->nullable();
             $table->timestamps();
         });
     }
