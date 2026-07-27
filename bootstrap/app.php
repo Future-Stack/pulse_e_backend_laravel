@@ -21,6 +21,13 @@ return Application::configure(basePath: dirname(__DIR__))
             'stripe/webhook', 
         ]);
     })
+
+    ->withMiddleware(function (Middleware $middleware) {
+        $middleware->alias([
+            'marketplace.admin' => \App\Http\Middleware\EnsureUserIsMarketplaceAdmin::class,
+        ]);
+    })
+
     ->withExceptions(function (Exceptions $exceptions) {
 
         $exceptions->render(function (AuthenticationException $e, Request $request) {
