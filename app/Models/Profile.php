@@ -46,7 +46,7 @@ class Profile extends Model
         return $this->belongsToMany(
             HealthGoal::class,
             'health_goal_profile'
-        );
+        )->withTimestamps();
     }
 
     public function lifeJourneys(): BelongsToMany
@@ -54,7 +54,7 @@ class Profile extends Model
         return $this->belongsToMany(
             LifeJourney::class,
             'life_journey_profile'
-        );
+        )->withTimestamps();
     }
 
     public function connectDevices(): BelongsToMany
@@ -62,7 +62,7 @@ class Profile extends Model
         return $this->belongsToMany(
             ConnectDevice::class,
             'connect_device_profile'
-        );
+        )->withTimestamps();
 
     }
 }
