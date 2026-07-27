@@ -237,3 +237,5 @@ Route::prefix('v1')->group(function () {
     Route::post('/terra/webhook', [TerraWebhookController::class, 'handle']);
 
 });
+
+require __DIR__.'/marketplace_api.php';
