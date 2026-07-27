@@ -150,6 +150,13 @@ Route::prefix('v1')->group(function () {
         //Fetch All Notifications Record (Admin)
         Route::get('/admins-notifications', [NotificationController::class, 'fetchAdminNotification']);
         Route::get('/users-notifications', [NotificationController::class, 'fetchUserNotification']);
+        Route::get('/admin-read-notifications', [NotificationController::class, 'fetchReadAdminNotification']);
+
+        //Mark single notification as read
+        Route::get('/notifications/{id}/read', [NotificationController::class, 'markAsRead']);
+        //Mark all notification as read
+        Route::get('/notifications/read-all', [NotificationController::class, 'markAllAsRead']);
+
 
         // Community Post
 
