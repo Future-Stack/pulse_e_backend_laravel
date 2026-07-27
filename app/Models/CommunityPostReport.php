@@ -13,6 +13,7 @@ class CommunityPostReport extends Model
         'post_id',
         'user_id',
         'comment',
+        'is_active',
         'report_cause',
     ];
 
