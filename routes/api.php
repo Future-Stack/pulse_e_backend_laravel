@@ -229,10 +229,9 @@ Route::prefix('v1')->group(function () {
         Route::post('/chat/response', [ChatController::class, 'handleResponse']);
         Route::get('/chat/response/{sessionId}', [ChatController::class, 'getLatestMessages']);
 
-        //Waitlist
-
-
     });
+
+    //Waitlist
     Route::get('/waitlist/list',[WaitlistController::class, 'getWaitlist']);
     Route::post('/waitlist/submit',[WaitlistController::class, 'submit']);
     Route::get('/waitlist/confirmation/{token}', [WaitlistController::class, 'confirmation']);
