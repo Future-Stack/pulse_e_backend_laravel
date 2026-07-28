@@ -5,7 +5,12 @@ info:
 
 http:
   method: GET
-  url: "{{base_url}}/waitlist/list"
+  url: "{{base_url}}/waitlist/list?filter=confirmed"
+  params:
+    - name: filter
+      value: confirmed
+      type: query
+      description: pending_confirmation, confirmed, invited, activated
   auth:
     type: bearer
     token: "{{token}}"
