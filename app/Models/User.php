@@ -138,4 +138,37 @@ class User extends Authenticatable
     {
         return $this->hasOne(UserLimit::class);
     }
+
+
+    //new
+    public function cycleMode()
+{
+    return $this->hasOne(CycleMode::class);
+}
+
+public function cycleSetting()
+{
+    return $this->hasOne(CycleSetting::class);
+}
+
+public function cycleStatistic()
+{
+    return $this->hasOne(CycleStatistic::class);
+}
+
+public function menstrualCycles()
+{
+    return $this->hasMany(MenstrualCycle::class);
+}
+
+public function notificationHistories()
+{
+    return $this->hasMany(NotificationHistory::class);
+}
+
+public function cycleConsent()
+{
+    return $this->hasOne(CycleConsent::class);
+}
+
 }
