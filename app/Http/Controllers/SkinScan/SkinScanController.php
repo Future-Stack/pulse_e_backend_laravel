@@ -152,7 +152,7 @@ class SkinScanController extends Controller
 
         if ($userLimit->skin_scans_limit <= 0 && $userLimit->skin_scans_topup_limit <= 0) {
             $refreshDate = $userLimit->subscription_expires_at
-                ? $userLimit->subscription_expires_at->format('M d, Y')
+                ? \Carbon\Carbon::parse($userLimit->subscription_expires_at)->format('M d, Y')
                 : now()->addMonth()->startOfMonth()->format('M d, Y');
 
             return response()->json([
@@ -161,7 +161,6 @@ class SkinScanController extends Controller
                 'code'    => 'QUOTA_EXCEEDED',
             ], 403);
         }
-
         try {
             $skinScan = DB::transaction(function () use ($user, $validated, $scan, $userLimit) {
                 $skinScan = SkinScan::create([
