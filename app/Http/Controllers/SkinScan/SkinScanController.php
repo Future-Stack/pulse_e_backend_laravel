@@ -8,13 +8,11 @@ use App\Models\UserLimit;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\ValidationException;
 
 class SkinScanController extends Controller
 {
-    
     public function index(Request $request): JsonResponse
     {
         $user = $request->user();
@@ -25,7 +23,7 @@ class SkinScanController extends Controller
             ->get();
 
         $insightSummary = "Keep up your consistency to track changes over time!";
-        
+
         if ($history->count() >= 2) {
             $latest = $history->first()->overall_score;
             $previous = $history->skip(1)->first()->overall_score;
@@ -33,7 +31,7 @@ class SkinScanController extends Controller
 
             if ($diff > 0) {
                 $insightSummary = "Your skin score has improved +{$diff} points over the past weeks. The biggest driver is improved sleep consistency. Keep it up!";
-            } else if ($diff < 0) {
+            } elseif ($diff < 0) {
                 $insightSummary = "Your skin score dropped by " . abs($diff) . " points. Consider focusing on your hydration and sleep pattern today.";
             }
         }
@@ -45,7 +43,6 @@ class SkinScanController extends Controller
         ], 200);
     }
 
-    
     public function show(Request $request, $id): JsonResponse
     {
         $scan = SkinScan::where('user_id', $request->user()->id)
@@ -65,23 +62,92 @@ class SkinScanController extends Controller
         ], 200);
     }
 
-    
+    /**
+     * Flutter now runs the multi-frame scan session directly against the AI
+     * service and only sends us the FINAL result JSON once it finalizes
+     * (reason: "client_finalize"). Laravel no longer uploads any image or
+     * calls the AI service itself — it just validates + persists what Flutter sends.
+     *
+     * Expected payload (top-level, matches what the AI service returns to Flutter):
+     * {
+     *   "success": true,
+     *   "session": true,
+     *   "reason": "client_finalize",
+     *   "frame_count": 6,
+     *   "frame_ids": ["frame-1", ...],
+     *   "content_type": "image/jpeg",
+     *   "image_path": "frame-6",
+     *   "scan": { ...overall_score, hydration_score, ..., neumera_insight },
+     *   "recommendations": [ { "icon_type": "drop", "recommendation_text": "..." }, ... ]  // optional
+     * }
+     */
     public function store(Request $request): JsonResponse
     {
-        $request->validate([
-            'image' => 'required|image|mimes:jpeg,png,jpg|max:10240',
+        $validated = $request->validate([
+            'success'      => 'required|boolean',
+            'session'      => 'nullable|boolean',
+            'reason'       => 'nullable|string',
+            'frame_count'  => 'nullable|integer',
+            'frame_ids'    => 'nullable|array',
+            'frame_ids.*'  => 'string',
+            'content_type' => 'nullable|string',
+            'image_path'   => 'nullable|string',
+
+            'scan'                       => 'required|array',
+            'scan.overall_score'         => 'required|integer',
+            'scan.hydration_score'       => 'required|integer',
+            'scan.hydration_status'      => 'required|string',
+            'scan.redness_score'         => 'required|integer',
+            'scan.redness_status'        => 'required|string',
+            'scan.texture_score'         => 'required|integer',
+            'scan.texture_status'        => 'required|string',
+            'scan.glow_index'            => 'required|integer',
+            'scan.glow_status'           => 'required|string',
+            'scan.pore_health_score'     => 'required|integer',
+            'scan.pore_health_status'    => 'required|string',
+            'scan.elasticity_score'      => 'required|integer',
+            'scan.elasticity_status'     => 'required|string',
+            'scan.neumera_insight'       => 'nullable|string',
+
+            'recommendations'                       => 'nullable|array',
+            'recommendations.*.icon_type'           => 'required_with:recommendations|string',
+            'recommendations.*.recommendation_text' => 'required_with:recommendations|string',
         ]);
 
-        $user = $request->user();
+        $user  = $request->user();
+        $scan  = $validated['scan'];
+
+        // The AI service can return success=true even when no face/skin was
+        // detected in any frame (all scores 0, status "Needs attention").
+        // Treat that as a failed scan: don't store it, don't burn a quota credit.
+        $coreScores = [
+            $scan['overall_score'],
+            $scan['hydration_score'],
+            $scan['redness_score'],
+            $scan['texture_score'],
+            $scan['glow_index'],
+            $scan['pore_health_score'],
+            $scan['elasticity_score'],
+        ];
+        $noFaceDetected = !$validated['success'] || array_sum($coreScores) === 0;
+
+        if ($noFaceDetected) {
+            return response()->json([
+                'success' => false,
+                'message' => $scan['neumera_insight']
+                    ?? 'No skin was detected in the scan. Please retake the scan with your face clearly in view.',
+                'code'    => 'NO_SKIN_DETECTED',
+            ], 422);
+        }
 
         $userLimit = UserLimit::firstOrCreate(
             ['user_id' => $user->id],
             [
-                'skin_scans_limit'       => 2,
-                'ai_coaching_limit'      => 5,
-                'deep_reports_limit'     => 0,
-                'skin_scans_topup_limit' => 0,
-                'ai_coaching_topup_limit'=> 0,
+                'skin_scans_limit'        => 2,
+                'ai_coaching_limit'       => 5,
+                'deep_reports_limit'      => 0,
+                'skin_scans_topup_limit'  => 0,
+                'ai_coaching_topup_limit' => 0,
             ]
         );
 
@@ -92,49 +158,34 @@ class SkinScanController extends Controller
 
             return response()->json([
                 'success' => false,
-                'message' => "You’ve used your skin scans this month; they refresh on {$refreshDate}",
+                'message' => "You've used your skin scans this month; they refresh on {$refreshDate}",
                 'code'    => 'QUOTA_EXCEEDED',
             ], 403);
         }
 
-        $uploadedFile = $request->file('image');
-        $path = $uploadedFile->store('skin_scans', 'public');
-
         try {
-            $aiResult = $this->getAiAnalysisResult($uploadedFile);
-        } catch (\Exception $e) {
-            Storage::disk('public')->delete($path);
-            Log::error('AI Scan Error: ' . $e->getMessage());
-
-            return response()->json([
-                'success' => false,
-                'message' => 'Unable to analyze skin at this moment. Please try again later.',
-            ], 502);
-        }
-
-        try {
-            $scan = DB::transaction(function () use ($user, $path, $aiResult, $userLimit) {
+            $skinScan = DB::transaction(function () use ($user, $validated, $scan, $userLimit) {
                 $skinScan = SkinScan::create([
                     'user_id'            => $user->id,
-                    'image_path'         => $path,
-                    'overall_score'      => $aiResult['overall_score'],
-                    'hydration_score'    => $aiResult['hydration_score'],
-                    'hydration_status'   => $aiResult['hydration_status'],
-                    'redness_score'      => $aiResult['redness_score'],
-                    'redness_status'     => $aiResult['redness_status'],
-                    'texture_score'      => $aiResult['texture_score'],
-                    'texture_status'     => $aiResult['texture_status'],
-                    'glow_index'         => $aiResult['glow_index'],
-                    'glow_status'        => $aiResult['glow_status'],
-                    'pore_health_score'  => $aiResult['pore_health_score'],
-                    'pore_health_status' => $aiResult['pore_health_status'],
-                    'elasticity_score'   => $aiResult['elasticity_score'],
-                    'elasticity_status'  => $aiResult['elasticity_status'],
-                    'neumera_insight'    => $aiResult['neumera_insight'],
+                    'image_path'         => $validated['image_path'] ?? null,
+                    'overall_score'      => $scan['overall_score'],
+                    'hydration_score'    => $scan['hydration_score'],
+                    'hydration_status'   => $scan['hydration_status'],
+                    'redness_score'      => $scan['redness_score'],
+                    'redness_status'     => $scan['redness_status'],
+                    'texture_score'      => $scan['texture_score'],
+                    'texture_status'     => $scan['texture_status'],
+                    'glow_index'         => $scan['glow_index'],
+                    'glow_status'        => $scan['glow_status'],
+                    'pore_health_score'  => $scan['pore_health_score'],
+                    'pore_health_status' => $scan['pore_health_status'],
+                    'elasticity_score'   => $scan['elasticity_score'],
+                    'elasticity_status'  => $scan['elasticity_status'],
+                    'neumera_insight'    => $scan['neumera_insight'] ?? null,
                 ]);
 
-                if (!empty($aiResult['recommendations'])) {
-                    foreach ($aiResult['recommendations'] as $rec) {
+                if (!empty($validated['recommendations'])) {
+                    foreach ($validated['recommendations'] as $rec) {
                         $skinScan->recommendations()->create([
                             'icon_type'           => $rec['icon_type'],
                             'recommendation_text' => $rec['recommendation_text'],
@@ -153,52 +204,17 @@ class SkinScanController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => 'Skin analyzed successfully. Quota decremented.',
-                'data'    => $scan->load('recommendations'),
+                'message' => 'Skin scan saved successfully. Quota decremented.',
+                'data'    => $skinScan->load('recommendations'),
             ], 201);
 
         } catch (\Exception $e) {
-            Storage::disk('public')->delete($path);
             Log::error('DB Transaction Error in Skin Scan: ' . $e->getMessage());
 
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to process scan result.',
+                'message' => 'Failed to save scan result.',
             ], 500);
         }
-    }
-
-    
-    private function getAiAnalysisResult($file): array
-    {
-        if (config('services.ai_scan.use_mock')) {
-            return [
-                'overall_score'      => 80,
-                'hydration_score'    => 72, 'hydration_status'   => 'Fair',
-                'redness_score'      => 22, 'redness_status'     => 'Low',
-                'texture_score'      => 84, 'texture_status'     => 'Good',
-                'glow_index'         => 68, 'glow_status'        => 'Fair',
-                'pore_health_score'  => 79, 'pore_health_status' => 'Low',
-                'elasticity_score'   => 81, 'elasticity_status'  => 'Good',
-                'neumera_insight'    => "Your redness score correlates with the 2 nights of disrupted sleep detected this week. Prioritising 7h+ sleep tonight could reduce redness by 15-20% within 3 days.",
-                'recommendations'    => [
-                    ['icon_type' => 'drop', 'recommendation_text' => 'Drink 500ml extra water before 3pm'],
-                    ['icon_type' => 'moon', 'recommendation_text' => 'Aim for 7h+ sleep — set 10pm wind-down'],
-                    ['icon_type' => 'sun',  'recommendation_text' => 'Apply SPF 30+ before going outside'],
-                    ['icon_type' => 'food', 'recommendation_text' => 'Add Vitamin C rich foods to your next meal'],
-                ]
-            ];
-        }
-
-        $response = Http::timeout(15)
-            ->withToken(config('services.ai_scan.token'))
-            ->attach('image', file_get_contents($file->getRealPath()), $file->getClientOriginalName())
-            ->post(config('services.ai_scan.url') . '/v1/analyze-skin');
-
-        if ($response->failed()) {
-            throw new \Exception('AI Service HTTP Error: ' . $response->body());
-        }
-
-        return $response->json('data');
     }
 }
