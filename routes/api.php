@@ -224,6 +224,7 @@ Route::prefix('v1')->group(function () {
         Route::get('/skin-scans/history', [SkinScanController::class, 'index']);
         Route::get('/skin-scans/{id}', [SkinScanController::class, 'show']);
         Route::post('/skin-scans/analyze', [SkinScanController::class, 'store']);
+        Route::get('/skin-scans/history-date', [SkinScanController::class, 'historyByDate']);
 
         //Chat
         Route::post('/chat/response', [ChatController::class, 'handleResponse']);
