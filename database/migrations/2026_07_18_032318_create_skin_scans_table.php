@@ -14,7 +14,7 @@ return new class extends Migration
         Schema::create('skin_scans', function (Blueprint $table) {
             $table->id();
             $table->foreignId('user_id')->constrained('users')->onDelete('cascade');
-            $table->string('image_path');
+            $table->string('image_path')->nullable();
             
             // Core Scores (Overview & Breakdown)
             $table->integer('overall_score'); // e.g., 80
