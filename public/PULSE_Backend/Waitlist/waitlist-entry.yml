@@ -14,7 +14,8 @@ http:
     data: |-
       {
         "full_name": "Sabbir Hossain",
-        "email": "bsabbir76@gmail.com"
+        "email": "bsabbir76@gmail.com",
+        "life_journey_id": 1
       }
   auth:
     type: bearer
