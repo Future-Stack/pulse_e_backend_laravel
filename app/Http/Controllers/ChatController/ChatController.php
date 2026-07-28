@@ -3,93 +3,75 @@
 namespace App\Http\Controllers\ChatController;
 
 use App\Http\Controllers\Controller;
+use App\Jobs\ProcessMoodAnalysis;
 use App\Models\ChatMessage;
 use App\Models\ChatSession;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Str;
 
 class ChatController extends Controller
 {
     public function handleResponse(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'user_id' => 'required|exists:users,id',
             'message' => 'required|string',
-            'session_id' => 'required|string',
+            'session_id' => 'nullable|string',
         ]);
 
         if ($validator->fails()) {
-            return response()->json([
-                'detail' => $validator->errors()
-            ], 422);
+            return response()->json(['detail' => $validator->errors()], 422);
         }
 
-        $userId = $request->input('user_id');
-        $sessionId = $request->input('session_id');
+        $userId = Auth::id();
         $userMessage = $request->input('message');
+        $sessionId = $request->input('session_id') ?? $request->query('session_id');
 
-        $chatSession = ChatSession::firstOrCreate(
-            ['session_id' => $sessionId],
-            ['user_id' => $userId]
-        );
+        $chatSession = null;
+        if ($sessionId) {
+            $chatSession = ChatSession::where('session_id', $sessionId)
+                ->where('user_id', $userId)
+                ->first();
+        }
 
-        ChatMessage::create([
+        if (!$chatSession) {
+            $sessionId = (string) Str::uuid();
+            $chatSession = ChatSession::create([
+                'session_id' => $sessionId,
+                'user_id' => $userId,
+            ]);
+        }
+
+        $userChatMessage = ChatMessage::create([
             'user_id' => $userId,
             'session_id' => $sessionId,
             'sender_type' => 'user',
             'message' => $userMessage,
         ]);
 
-        try {
-            $aiUrl = config('services.ai.mood_analyzer_url', 'https://female-mood-analyzer.onrender.com/api/chat/response');
+        ProcessMoodAnalysis::dispatch($userId, $sessionId, $userMessage, $userChatMessage->id);
 
-            $aiResponse = Http::connectTimeout(30)
-                ->timeout(120)
-                ->retry(1, 1000)
-                ->post($aiUrl, [
-                    'user_id' => (string) $userId,
-                    'message' => $userMessage,
-                    'session_id' => $sessionId,
-                ]);
+        return response()->json([
+            'message' => 'Message received, processing your response.',
+            'session_id' => $sessionId,
+            'status' => 'processing',
+        ], 202);
+    }
 
-            if ($aiResponse->failed()) {
-                return response()->json([
-                    'message' => 'AI Service connection failed',
-                    'error' => $aiResponse->body()
-                ], 502);
-            }
+    public function getLatestMessages(Request $request, $sessionId = null)
+    {
+        $sessionId = $sessionId ?? $request->query('session_id') ?? $request->input('session_id');
 
-            $responseData = $aiResponse->json();
-
-            $aiResponseBody = $responseData['response'] ?? 'Sorry, I could not analyze your mood at this time.';
-            $dataSummary = $responseData['data_summary'] ?? null;
-
-            $aiMessage = ChatMessage::create([
-                'user_id' => $userId,
-                'session_id' => $sessionId,
-                'sender_type' => 'ai',
-                'message' => $aiResponseBody,
-                'data_summary' => $dataSummary,
-            ]);
-
-            return response()->json([
-                'response' => $aiMessage->message,
-                'session_id' => $sessionId,
-                'timestamp' => $responseData['timestamp'] ?? $aiMessage->created_at->toISOString(),
-                'data_summary' => $aiMessage->data_summary,
-            ], 200);
-
-        } catch (\Illuminate\Http\Client\ConnectionException $e) {
-            return response()->json([
-                'message' => 'AI Service is warming up or unresponsive',
-                'error' => 'The request timed out. Render server might be in sleep mode.'
-            ], 504);
-        } catch (\Exception $e) {
-            return response()->json([
-                'message' => 'AI Service processing error',
-                'error' => $e->getMessage()
-            ], 500);
+        if (!$sessionId) {
+            return response()->json(['message' => 'session_id is required'], 400);
         }
+
+        $messages = ChatMessage::where('session_id', $sessionId)
+            ->latest()
+            ->take(10)
+            ->get();
+
+        return response()->json($messages);
     }
 }

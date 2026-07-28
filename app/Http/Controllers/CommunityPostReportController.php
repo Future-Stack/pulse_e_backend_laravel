@@ -37,6 +37,7 @@ class CommunityPostReportController extends Controller
         $report = CommunityPostReport::create([
             'post_id'      => $post->id,
             'user_id'      => $userId,
+            'is_active'    => true,
             'comment'      => $validated['comment'] ?? null,
             'report_cause' => $validated['report_cause'],
         ]);
@@ -71,5 +72,53 @@ class CommunityPostReportController extends Controller
             ->paginate(20);
 
         return response()->json($reports);
+    }
+
+    /**
+     * PATCH /api/admin/community/reports/{report}/approve
+     * Admin confirms the report is valid — hides the reported post and resolves the report.
+     */
+    public function approve(CommunityPostReport $report)
+    {
+        $user = Auth::user();
+
+        if (!($user->hasRole('admin') ?? false)) {
+            return response()->json([
+                'message' => 'Unauthorized. Only admins can approve reports.'
+            ], 403);
+        }
+
+        $report->update(['is_active' => true]);
+
+        // Confirmed violation — pull the post from public view too
+        $report->post()->update(['is_approved' => false]);
+
+        return response()->json([
+            'message' => 'Report approved. The post has been hidden.',
+            'report'  => $report->fresh(),
+        ]);
+    }
+
+    /**
+     * PATCH /api/admin/community/reports/{report}/decline
+     * Admin rejects the report as invalid — post stays live, report is resolved.
+     */
+    public function decline(CommunityPostReport $report)
+    {
+        $user = Auth::user();
+
+        if (!($user->hasRole('admin') ?? false)) {
+            return response()->json([
+                'message' => 'Unauthorized. Only admins can decline reports.'
+            ], 403);
+        }
+
+        $report->update(['is_active' => false]);
+        $report->post()->update(['is_approved' => true]);
+
+        return response()->json([
+            'message' => 'Report declined.',
+            'report'  => $report->fresh(),
+        ]);
     }
 }

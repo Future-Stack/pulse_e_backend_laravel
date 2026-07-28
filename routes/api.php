@@ -180,6 +180,9 @@ Route::prefix('v1')->group(function () {
 
         Route::get('/reports', [CommunityPostReportController::class, 'index']);
 
+        Route::patch('/reports/{report}/approve', [CommunityPostReportController::class, 'approve']);
+        Route::patch('/reports/{report}/decline', [CommunityPostReportController::class, 'decline']);
+
         // Approve Post
         Route::post('/posts/{post}/approve', [CommunityPostController::class, 'approve']);
 
@@ -224,6 +227,7 @@ Route::prefix('v1')->group(function () {
 
         //Chat
         Route::post('/chat/response', [ChatController::class, 'handleResponse']);
+        Route::get('/chat/response/{sessionId}', [ChatController::class, 'getLatestMessages']);
 
         //Waitlist
 

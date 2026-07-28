@@ -16,6 +16,7 @@ return new class extends Migration
             $table->foreignId('post_id')->constrained('community_posts')->onDelete('cascade');
             $table->foreignId('user_id')->constrained('users')->onDelete('cascade');
             $table->string('comment')->nullable();
+            $table->boolean('is_active')->default(1);
             $table->enum('report_cause', ['spam', 'sexual_content', 'harassment', 'other']);
             $table->timestamps();
         });
