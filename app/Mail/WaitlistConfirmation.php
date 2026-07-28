@@ -13,11 +13,13 @@ class WaitlistConfirmation extends Mailable implements ShouldQueue
 
     public $entry;
     public $confirmationUrl;
+    public $unsubscribeUrl;
 
-    public function __construct($entry, $confirmationUrl)
+    public function __construct($entry, $confirmationUrl, $unsubscribeUrl)
     {
         $this->entry = $entry;
         $this->confirmationUrl = $confirmationUrl;
+        $this->unsubscribeUrl = $unsubscribeUrl;
     }
 
     public function build()
@@ -27,6 +29,7 @@ class WaitlistConfirmation extends Mailable implements ShouldQueue
             ->with([
                 'entry' => $this->entry,
                 'confirmationUrl' => $this->confirmationUrl,
+                'unsubscribeUrl' => $this->unsubscribeUrl,
             ]);
     }
 }
