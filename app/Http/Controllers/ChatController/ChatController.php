@@ -7,10 +7,9 @@ use App\Jobs\ProcessMoodAnalysis;
 use App\Models\ChatMessage;
 use App\Models\ChatSession;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Validator;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Str;
 
 class ChatController extends Controller
 {
@@ -18,7 +17,7 @@ class ChatController extends Controller
     {
         $validator = Validator::make($request->all(), [
             'message' => 'required|string',
-            'session_id' => 'required|string',
+            'session_id' => 'nullable|string',
         ]);
 
         if ($validator->fails()) {
@@ -26,13 +25,23 @@ class ChatController extends Controller
         }
 
         $userId = Auth::id();
-        $sessionId = $request->input('session_id');
         $userMessage = $request->input('message');
+        $sessionId = $request->input('session_id') ?? $request->query('session_id');
 
-        ChatSession::firstOrCreate(
-            ['session_id' => $sessionId],
-            ['user_id' => $userId]
-        );
+        $chatSession = null;
+        if ($sessionId) {
+            $chatSession = ChatSession::where('session_id', $sessionId)
+                ->where('user_id', $userId)
+                ->first();
+        }
+
+        if (!$chatSession) {
+            $sessionId = (string) Str::uuid();
+            $chatSession = ChatSession::create([
+                'session_id' => $sessionId,
+                'user_id' => $userId,
+            ]);
+        }
 
         $userChatMessage = ChatMessage::create([
             'user_id' => $userId,
@@ -47,11 +56,17 @@ class ChatController extends Controller
             'message' => 'Message received, processing your response.',
             'session_id' => $sessionId,
             'status' => 'processing',
-        ], 202); // 202 Accepted - processing shuru hoyeche
+        ], 202);
     }
 
-    public function getLatestMessages(Request $request, $sessionId)
+    public function getLatestMessages(Request $request, $sessionId = null)
     {
+        $sessionId = $sessionId ?? $request->query('session_id') ?? $request->input('session_id');
+
+        if (!$sessionId) {
+            return response()->json(['message' => 'session_id is required'], 400);
+        }
+
         $messages = ChatMessage::where('session_id', $sessionId)
             ->latest()
             ->take(10)
