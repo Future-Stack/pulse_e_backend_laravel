@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AI\BBTController;
 use App\Http\Controllers\Notification\NotificationSettingsController;
 use App\Http\Controllers\Onboarding\OnboardingController;
 use App\Http\Controllers\Profile\ProfileController;
@@ -228,6 +229,9 @@ Route::prefix('v1')->group(function () {
         //Chat
         Route::post('/chat/response', [ChatController::class, 'handleResponse']);
         Route::get('/chat/response/{sessionId}', [ChatController::class, 'getLatestMessages']);
+
+        //BBT
+        Route::post('/bbt/logs', [BbtController::class, 'logBbtData']);
 
     });
 

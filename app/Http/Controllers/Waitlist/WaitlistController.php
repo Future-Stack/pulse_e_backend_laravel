@@ -49,7 +49,7 @@ class WaitlistController extends Controller
             $unsubscribeUrl = asset('/api/v1/waitlist/unsubscribe/' . $entry->confirmation_token);
 
             Mail::to($entry->email)->queue(
-                new WaitlistConfirmation($entry, $confirmationUrl,$unsubscribeUrl)
+                new WaitlistConfirmation($entry, $confirmationUrl, $unsubscribeUrl)
             );
 
             return response()->json([
@@ -85,10 +85,12 @@ class WaitlistController extends Controller
                     new WaitlistWelcome($unsubscribeUrl)
                 );
 
-                return response()->json([
-                    'success' => true,
-                    'message' => 'Waitlist entry successfully confirmed.',
-                ]);
+//                return response()->json([
+//                    'success' => true,
+//                    'message' => 'Waitlist entry successfully confirmed.',
+//                ]);
+
+                return redirect()->to('https://www.fightthenumber.com/waitlist/confirm/' . $exist->confirmation_token);
             }
 
             return response()->json([
@@ -113,8 +115,7 @@ class WaitlistController extends Controller
 
             if ($filter) {
                 $list = $list->where('status', $filter)->get();
-            }
-            else{
+            } else {
                 $list = $list->get();
             }
 
@@ -205,11 +206,15 @@ class WaitlistController extends Controller
             if ($exist) {
                 $exist->delete();
 
-                return response()->json([
-                    'success' => true,
-                    'message' => 'Unsubscribed successfully.',
-                ]);
+//                return response()->json([
+//                    'success' => true,
+//                    'message' => 'Unsubscribed successfully.',
+//                ]);
+
+                return redirect()->to('https://www.fightthenumber.com/waitlist/unsubscribe');
+
             }
+
             return response()->json([
                 'success' => false,
                 'message' => 'Invalid Token.',
