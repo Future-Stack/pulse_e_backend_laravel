@@ -46,9 +46,10 @@ class WaitlistController extends Controller
             ]);
 
             $confirmationUrl = asset('/api/v1/waitlist/confirmation/' . $entry->confirmation_token);
+            $unsubscribeUrl = asset('/api/v1/waitlist/unsubscribe/' . $entry->confirmation_token);
 
             Mail::to($entry->email)->queue(
-                new WaitlistConfirmation($entry, $confirmationUrl)
+                new WaitlistConfirmation($entry, $confirmationUrl,$unsubscribeUrl)
             );
 
             return response()->json([
@@ -69,7 +70,6 @@ class WaitlistController extends Controller
     public function confirmation(string $token)
     {
         try {
-
             $exist = WaitlistEntry::where('confirmation_token', $token)->first();
 
             if ($exist) {
@@ -78,8 +78,11 @@ class WaitlistController extends Controller
                     'status' => 'confirmed',
                 ]);
 
+                $unsubscribeUrl = asset('/api/v1/waitlist/unsubscribe/' . $exist->confirmation_token);
+
+
                 Mail::to($exist->email)->queue(
-                    new WaitlistWelcome()
+                    new WaitlistWelcome($unsubscribeUrl)
                 );
 
                 return response()->json([
@@ -102,10 +105,18 @@ class WaitlistController extends Controller
         }
     }
 
-    public function getWaitlist()
+    public function getWaitlist(Request $request)
     {
         try {
-            $list = WaitlistEntry::where('status', 'confirmed')->get();
+            $filter = $request->query('filter');
+            $list = WaitlistEntry::with('lifeJourney');
+
+            if ($filter) {
+                $list = $list->where('status', $filter)->get();
+            }
+            else{
+                $list = $list->get();
+            }
 
             return response()->json([
                 'success' => true,
@@ -185,4 +196,31 @@ class WaitlistController extends Controller
 //            ], 500);
 //        }
 //    }
+
+    public function unsubscribe(string $token)
+    {
+        try {
+            $exist = WaitlistEntry::where('confirmation_token', $token)->first();
+
+            if ($exist) {
+                $exist->delete();
+
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Unsubscribed successfully.',
+                ]);
+            }
+            return response()->json([
+                'success' => false,
+                'message' => 'Invalid Token.',
+            ]);
+
+        } catch (\Exception $e) {
+            \Log::error('Unsubscribe failed: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Error',
+            ]);
+        }
+    }
 }

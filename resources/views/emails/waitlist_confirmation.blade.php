@@ -27,7 +27,7 @@
     </div>
     <div class="footer">
         <p>&copy; {{ date('Y') }} The Neumera team</p>
-        <p>[Unsubscribe]. [Mailing Address]</p>
+        <p> <a href="{{ $unsubscribeUrl }}"> [Unsubscribe] </a></p>
     </div>
 </div>
 </body>
