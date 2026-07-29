@@ -38,6 +38,8 @@ use App\Http\Controllers\AI\NumeraInsightController;
 use App\Http\Controllers\AI\CycleSummaryController;
 use App\Http\Controllers\AI\CalendarController;
 use App\Http\Controllers\AI\AvoidingPregnancyController;
+use App\Http\Controllers\AI\OpkLogController;
+
 
 Route::prefix('v1')->group(function () {
     Route::get('/', function () {
@@ -247,30 +249,41 @@ Route::prefix('v1')->group(function () {
         Route::get('/skin-scans/history', [SkinScanController::class, 'index']);
         Route::get('/skin-scans/{id}', [SkinScanController::class, 'show']);
         Route::post('/skin-scans/analyze', [SkinScanController::class, 'store']);
+        Route::get('/skin-scans/history-date', [SkinScanController::class, 'historyByDate']);
 
         //Chat
         Route::post('/chat/response', [ChatController::class, 'handleResponse']);
+        Route::get('/chat/sessions', [ChatController::class, 'getUserSessions']);
+        Route::get('/chat/response/{sessionId}', [ChatController::class, 'getLatestMessages']);
 
         //Waitlist
 
         Route::get('/waitlist/list',[WaitlistController::class, 'getWaitlist']);
-
-
-
-
           
     });
 
 
- 
+
+        // OPK
+        Route::get('/cycle-engine/opk/testing-window', [OpkLogController::class, 'testingWindow']);
+        Route::post('/cycle-engine/opk/log', [OpkLogController::class, 'store']);
+        Route::get('/cycle-engine/opk/today-status', [OpkLogController::class, 'todayStatus']);
+
+    });
+    Route::get('/waitlist/list',[WaitlistController::class, 'getWaitlist']);
+
     Route::post('/waitlist/submit',[WaitlistController::class, 'submit']);
     Route::get('/waitlist/confirmation/{token}', [WaitlistController::class, 'confirmation']);
     Route::post('/waitlist/invite', [WaitlistController::class, 'sendSingleInvite']);
+    Route::get('/waitlist/unsubscribe/{token}', [WaitlistController::class, 'unsubscribe']);
 
     // Stripe webhook endpoint
     Route::post('/subscription-stripe/webhook', [SubscriptionController::class, 'handleStripeWebhook']);
     Route::post('/topup-stripe/webhook', [TopupPaymentController::class, 'handleWebhook']);
     Route::post('/terra/webhook', [TerraWebhookController::class, 'handle']);
+
+
+    
 
 });
 

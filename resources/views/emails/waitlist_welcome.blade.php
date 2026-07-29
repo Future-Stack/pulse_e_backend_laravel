@@ -40,7 +40,7 @@
                 <!-- Footer -->
                 <tr>
                     <td style="background-color:#f1f1f1; padding:20px; text-align:center; font-size:12px; color:#777777;">
-                        <a href="#" style="color:#2a9d8f; text-decoration:none;">unsubscribe</a> · [mailing address]
+                        <a href="{{ $unsubscribeUrl }}" style="color:#2a9d8f; text-decoration:none;">unsubscribe</a>
                     </td>
                 </tr>
             </table>
