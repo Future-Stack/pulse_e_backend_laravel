@@ -36,6 +36,7 @@ use App\Http\Controllers\AI\HealthTrendController;
 use App\Http\Controllers\AI\SmartAnalysisController;
 use App\Http\Controllers\AI\NumeraInsightController;
 use App\Http\Controllers\AI\CycleSummaryController;
+use App\Http\Controllers\AI\CalendarController;
 
 Route::prefix('v1')->group(function () {
     Route::get('/', function () {
@@ -86,11 +87,21 @@ Route::prefix('v1')->group(function () {
         );
 
  //Cycle part
-
+//summary 1st page
         Route::get('/cycle-engine/engine/sync-summary',[CycleSummaryController::class, 'sync']  );
                      
         Route::get('/engine/signal-status-sync', [CycleSummaryController::class, 'syncSignalStatus']);
         Route::get('engine/discrepancy-note-sync', [CycleSummaryController::class, 'syncDiscrepancyNote']);
+
+        //calender
+        Route::get('/calendar/month-sync', [CalendarController::class, 'syncMonth']);
+        Route::post('/calendar/confirm-day', [CalendarController::class, 'confirmDay']);
+
+        
+
+        Route::get('/calendar/next-period-sync', [CalendarController::class, 'syncNextPeriod']);
+
+
 
         Route::get('/snapshot/{userId}', [SnapshotController::class, 'snapshot']);
 
