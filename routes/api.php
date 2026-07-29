@@ -36,6 +36,11 @@ use App\Http\Controllers\AI\DailyScriptureController;
 use App\Http\Controllers\AI\HealthTrendController;
 use App\Http\Controllers\AI\SmartAnalysisController;
 use App\Http\Controllers\AI\NumeraInsightController;
+use App\Http\Controllers\AI\CycleSummaryController;
+use App\Http\Controllers\AI\CalendarController;
+use App\Http\Controllers\AI\AvoidingPregnancyController;
+use App\Http\Controllers\AI\OpkLogController;
+
 
 Route::prefix('v1')->group(function () {
     Route::get('/', function () {
@@ -85,6 +90,26 @@ Route::prefix('v1')->group(function () {
             [LabReportAIController::class, 'show']
         );
 
+ //Cycle part
+//summary 1st page
+        Route::get('/cycle-engine/engine/sync-summary',[CycleSummaryController::class, 'sync']  );
+
+        Route::get('/engine/signal-status-sync', [CycleSummaryController::class, 'syncSignalStatus']);
+        Route::get('engine/discrepancy-note-sync', [CycleSummaryController::class, 'syncDiscrepancyNote']);
+
+        //calender
+        Route::get('/calendar/month-sync', [CalendarController::class, 'syncMonth']);
+        Route::post('/calendar/confirm-day', [CalendarController::class, 'confirmDay']);
+
+
+
+        Route::get('/calendar/next-period-sync', [CalendarController::class, 'syncNextPeriod']);
+
+                Route::get('/avoiding-pregnancy/consent-status', [AvoidingPregnancyController::class, 'consentStatus']);
+
+                Route::post('/avoiding-pregnancy/consent', [AvoidingPregnancyController::class, 'consent']);
+
+                Route::post('/mode', [AvoidingPregnancyController::class, 'setMode']);
 
         Route::get('/snapshot/{userId}', [SnapshotController::class, 'snapshot']);
 
@@ -225,18 +250,28 @@ Route::prefix('v1')->group(function () {
         Route::get('/skin-scans/history', [SkinScanController::class, 'index']);
         Route::get('/skin-scans/{id}', [SkinScanController::class, 'show']);
         Route::post('/skin-scans/analyze', [SkinScanController::class, 'store']);
+        Route::get('/skin-scans/history-date', [SkinScanController::class, 'historyByDate']);
 
         //Chat
         Route::post('/chat/response', [ChatController::class, 'handleResponse']);
+        Route::get('/chat/sessions', [ChatController::class, 'getUserSessions']);
         Route::get('/chat/response/{sessionId}', [ChatController::class, 'getLatestMessages']);
 
         //BBT
         Route::post('/bbt/logs', [BbtController::class, 'logBbtData']);
 
+        //Waitlist
+        Route::get('/waitlist/list',[WaitlistController::class, 'getWaitlist']);
+
+        // OPK
+        Route::get('/cycle-engine/opk/testing-window', [OpkLogController::class, 'testingWindow']);
+        Route::post('/cycle-engine/opk/log', [OpkLogController::class, 'store']);
+        Route::get('/cycle-engine/opk/today-status', [OpkLogController::class, 'todayStatus']);
     });
 
     //Waitlist
     Route::get('/waitlist/list',[WaitlistController::class, 'getWaitlist']);
+
     Route::post('/waitlist/submit',[WaitlistController::class, 'submit']);
     Route::get('/waitlist/confirmation/{token}', [WaitlistController::class, 'confirmation']);
     Route::post('/waitlist/invite', [WaitlistController::class, 'sendSingleInvite']);
@@ -246,6 +281,7 @@ Route::prefix('v1')->group(function () {
     Route::post('/subscription-stripe/webhook', [SubscriptionController::class, 'handleStripeWebhook']);
     Route::post('/topup-stripe/webhook', [TopupPaymentController::class, 'handleWebhook']);
     Route::post('/terra/webhook', [TerraWebhookController::class, 'handle']);
+
 
 });
 
