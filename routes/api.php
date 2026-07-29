@@ -37,6 +37,7 @@ use App\Http\Controllers\AI\SmartAnalysisController;
 use App\Http\Controllers\AI\NumeraInsightController;
 use App\Http\Controllers\AI\CycleSummaryController;
 use App\Http\Controllers\AI\CalendarController;
+use App\Http\Controllers\AI\AvoidingPregnancyController;
 
 Route::prefix('v1')->group(function () {
     Route::get('/', function () {
@@ -101,7 +102,11 @@ Route::prefix('v1')->group(function () {
 
         Route::get('/calendar/next-period-sync', [CalendarController::class, 'syncNextPeriod']);
 
+                Route::get('/avoiding-pregnancy/consent-status', [AvoidingPregnancyController::class, 'consentStatus']);
 
+                Route::post('/avoiding-pregnancy/consent', [AvoidingPregnancyController::class, 'consent']);
+
+                Route::post('/mode', [AvoidingPregnancyController::class, 'setMode']);
 
         Route::get('/snapshot/{userId}', [SnapshotController::class, 'snapshot']);
 

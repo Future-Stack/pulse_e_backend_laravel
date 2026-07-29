@@ -134,86 +134,97 @@ public function syncMonth(Request $request)
 
 
  /**
-     * Next Period Prediction
-     */
-    public function syncNextPeriod(Request $request)
-    {
+ * Next Period Prediction
+ */
+/**
+ * Next Period Prediction
+ */
+public function syncNextPeriod(Request $request)
+{
+    $user = auth()->user();
 
-        $url = config('services.ai.base_url')
-            . '/api/v1/cycle-engine/calendar/next-period';
-
-
-
-        try {
-
-
-            $response = Http::timeout(120)
-                ->acceptJson()
-                ->withToken($request->bearerToken())
-                ->get($url);
+    $url = config('services.ai.base_url')
+        . '/api/v1/cycle-engine/calendar/next-period';
 
 
+    try {
 
-            if (! $response->successful()) {
+        $last4Cycles = MenstrualCycle::where('user_id', $user->id)
+            ->where('is_completed', true)
+            ->whereNotNull('cycle_length')
+            ->orderByDesc('period_start_date')
+            ->limit(4)
+            ->pluck('cycle_length')
+            ->values()
+            ->toArray();
 
+// dd($last4Cycles);
+        $response = Http::timeout(120)
+            ->acceptJson()
+            ->get($url, [
 
-                return response()->json([
+                'user_id' => $user->id,
 
-                    'success'=>false,
-
-                    'message'=>'Unable to fetch next period prediction.',
-
-                    'error'=>$response->body(),
-
-                ],500);
-
-            }
-
-
-
-            $data = $response->json();
-
-
-
-            return response()->json([
-
-                'success'=>true,
-
-                'predicted_date'=>$data['predicted_date'] ?? null,
-
-                'days_until'=>$data['days_until'] ?? null,
-
-                'rolling_avg_length'=>$data['rolling_avg_length'] ?? null,
-
-                'variance_days'=>$data['variance_days'] ?? null,
-
-                'within_normal_range'=>$data['within_normal_range'] ?? null,
-
-                'last_4_cycle_lengths'=>$data['last_4_cycle_lengths'] ?? [],
-
-                'ai_generated'=>$data['ai_generated'] ?? false,
-
-                'ai_cached'=>$data['ai_cached'] ?? false,
+                'last_4_cycle_lengths' => implode(',', $last4Cycles),
 
             ]);
 
 
-
-        } catch (\Exception $e) {
-
+        if (! $response->successful()) {
 
             return response()->json([
 
                 'success'=>false,
 
-                'message'=>'AI service unavailable.',
+                'message'=>'Unable to fetch next period prediction.',
 
-                'error'=>$e->getMessage(),
+                'error'=>$response->body(),
 
             ],500);
 
-
         }
 
+
+        $data = $response->json();
+
+
+        return response()->json([
+
+            'success'=>true,
+
+            'predicted_date'=>$data['predicted_date'] ?? null,
+
+            'days_until'=>$data['days_until'] ?? null,
+
+            'rolling_avg_length'=>$data['rolling_avg_length'] ?? null,
+
+            'variance_days'=>$data['variance_days'] ?? null,
+
+            'within_normal_range'=>$data['within_normal_range'] ?? null,
+
+            'last_4_cycle_lengths'=>$data['last_4_cycle_lengths'] 
+                ?? $last4Cycles,
+
+            'ai_generated'=>$data['ai_generated'] ?? false,
+
+            'ai_cached'=>$data['ai_cached'] ?? false,
+
+        ]);
+
+
+    } catch (\Exception $e) {
+
+
+        return response()->json([
+
+            'success'=>false,
+
+            'message'=>'AI service unavailable.',
+
+            'error'=>$e->getMessage(),
+
+        ],500);
+
     }
+}
 }
