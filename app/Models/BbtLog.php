@@ -9,6 +9,7 @@ class BbtLog extends Model
 {
     protected $fillable = [
         'cycle_id',
+        'user_id',
         'log_date',
         'temperature',
         'unit',

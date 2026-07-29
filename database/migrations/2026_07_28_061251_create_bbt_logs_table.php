@@ -12,9 +12,11 @@ return new class extends Migration
 
             $table->id();
 
-            $table->foreignId('cycle_id')
+            $table->foreignId('cycle_id')->nullable()
                 ->constrained('menstrual_cycles')
                 ->cascadeOnDelete();
+
+            $table->foreignId('user_id')->nullable()->constrained('users');
 
             $table->date('log_date');
 
