@@ -59,6 +59,20 @@ class ChatController extends Controller
         ], 202);
     }
 
+    public function getUserSessions()
+    {
+        $userId = Auth::id();
+
+        $sessions = ChatSession::where('user_id', $userId)
+            ->latest('updated_at')
+            ->get();
+
+        return response()->json([
+            'status' => 'success',
+            'sessions' => $sessions
+        ], 200);
+    }
+
     public function getLatestMessages(Request $request, $sessionId = null)
     {
         $sessionId = $sessionId ?? $request->query('session_id') ?? $request->input('session_id');
@@ -68,8 +82,8 @@ class ChatController extends Controller
         }
 
         $messages = ChatMessage::where('session_id', $sessionId)
+            ->where('user_id', Auth::id())
             ->latest()
-            ->take(10)
             ->get();
 
         return response()->json($messages);
