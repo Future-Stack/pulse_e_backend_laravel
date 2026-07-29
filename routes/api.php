@@ -35,6 +35,7 @@ use App\Http\Controllers\AI\DailyScriptureController;
 use App\Http\Controllers\AI\HealthTrendController;
 use App\Http\Controllers\AI\SmartAnalysisController;
 use App\Http\Controllers\AI\NumeraInsightController;
+use App\Http\Controllers\AI\OpkLogController;
 
 Route::prefix('v1')->group(function () {
     Route::get('/', function () {
@@ -232,6 +233,10 @@ Route::prefix('v1')->group(function () {
 
         //Waitlist
 
+        // OPK
+        Route::get('/cycle-engine/opk/testing-window', [OpkLogController::class, 'testingWindow']);
+        Route::post('/cycle-engine/opk/log', [OpkLogController::class, 'store']);
+        Route::get('/cycle-engine/opk/today-status', [OpkLogController::class, 'todayStatus']);
 
     });
     Route::get('/waitlist/list',[WaitlistController::class, 'getWaitlist']);
@@ -244,6 +249,9 @@ Route::prefix('v1')->group(function () {
     Route::post('/subscription-stripe/webhook', [SubscriptionController::class, 'handleStripeWebhook']);
     Route::post('/topup-stripe/webhook', [TopupPaymentController::class, 'handleWebhook']);
     Route::post('/terra/webhook', [TerraWebhookController::class, 'handle']);
+
+
+    
 
 });
 
