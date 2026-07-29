@@ -171,4 +171,9 @@ public function cycleConsent()
     return $this->hasOne(CycleConsent::class);
 }
 
+
+public function ttcPredictions()
+{
+    return $this->hasMany(TtcPrediction::class);
+}
 }
