@@ -10,13 +10,20 @@ class CycleMode extends Model
     protected $fillable = [
         'user_id',
         'mode',
-        'changed_at',
+        'is_active',
+        'activated_at',
+        'has_consented',
+        'consent_version',
+        'consented_at',
     ];
 
     protected function casts(): array
     {
         return [
-            'changed_at' => 'datetime',
+            'is_active' => 'boolean',
+            'has_consented' => 'boolean',
+            'activated_at' => 'datetime',
+            'consented_at' => 'datetime',
         ];
     }
 
