@@ -12,52 +12,89 @@ return new class extends Migration
 
             $table->id();
 
+            // User
             $table->foreignId('user_id')
                 ->constrained()
                 ->cascadeOnDelete();
 
-            // Cycle Dates
+            /*
+            |--------------------------------------------------------------------------
+            | Cycle Dates
+            |--------------------------------------------------------------------------
+            */
             $table->date('period_start_date');
             $table->date('period_end_date')->nullable();
 
-            // Cycle Information
+            /*
+            |--------------------------------------------------------------------------
+            | Cycle Information
+            |--------------------------------------------------------------------------
+            */
+            $table->unsignedTinyInteger('current_cycle_day')->nullable();
             $table->unsignedTinyInteger('cycle_length')->nullable();
             $table->unsignedTinyInteger('period_length')->nullable();
 
-            // Ovulation
+            /*
+            |--------------------------------------------------------------------------
+            | Ovulation
+            |--------------------------------------------------------------------------
+            */
             $table->unsignedTinyInteger('predicted_ovulation_day')->nullable();
             $table->unsignedTinyInteger('confirmed_ovulation_day')->nullable();
+            $table->unsignedTinyInteger('predicted_peak_day')->nullable();
 
-            // Fertile Window
+            /*
+            |--------------------------------------------------------------------------
+            | Fertile Window
+            |--------------------------------------------------------------------------
+            */
             $table->unsignedTinyInteger('fertile_start_day')->nullable();
             $table->unsignedTinyInteger('fertile_end_day')->nullable();
 
-            // Phase
-            $table->enum('current_phase',[
+            /*
+            |--------------------------------------------------------------------------
+            | Current Phase
+            |--------------------------------------------------------------------------
+            */
+            $table->enum('current_phase', [
                 'menstrual',
                 'follicular',
                 'ovulatory',
-                'luteal'
+                'luteal',
             ])->nullable();
 
-            // Prediction Source
-            $table->enum('prediction_source',[
+            /*
+            |--------------------------------------------------------------------------
+            | Prediction Source
+            |--------------------------------------------------------------------------
+            */
+            $table->enum('prediction_source', [
                 'calendar',
                 'bbt',
                 'opk',
                 'mucus',
-                'combined'
+                'combined',
             ])->default('calendar');
 
-            // Status
+            /*
+            |--------------------------------------------------------------------------
+            | Status
+            |--------------------------------------------------------------------------
+            */
             $table->boolean('is_confirmed')->default(false);
             $table->boolean('is_completed')->default(false);
 
             $table->timestamps();
 
-            $table->index(['user_id','period_start_date']);
+            /*
+            |--------------------------------------------------------------------------
+            | Indexes
+            |--------------------------------------------------------------------------
+            */
+            $table->index(['user_id', 'period_start_date']);
             $table->index('current_phase');
             $table->index('is_completed');
+            $table->index('current_cycle_day');
         });
     }
 
