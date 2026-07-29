@@ -43,6 +43,7 @@ use App\Http\Controllers\AI\CycleSummaryController;
 use App\Http\Controllers\AI\CalendarController;
 use App\Http\Controllers\AI\AvoidingPregnancyController;
 use App\Http\Controllers\AI\OpkLogController;
+use App\Http\Controllers\AI\TryingToConceiveController;
 
 
 Route::prefix('v1')->group(function () {
@@ -113,6 +114,11 @@ Route::prefix('v1')->group(function () {
                 Route::post('/avoiding-pregnancy/consent', [AvoidingPregnancyController::class, 'consent']);
 
                 Route::post('/mode', [AvoidingPregnancyController::class, 'setMode']);
+                Route::get('/ttc/surge-banner', [TryingToConceiveController::class, 'surgeBanner']);
+
+                Route::get('/ttc/priority-map', [TryingToConceiveController::class, 'priorityMap']);
+
+                Route::get('/ttc/priority-banner', [TryingToConceiveController::class, 'priorityBanner']);
 
         Route::get('/snapshot/{userId}', [SnapshotController::class, 'snapshot']);
 

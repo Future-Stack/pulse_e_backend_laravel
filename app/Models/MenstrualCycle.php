@@ -133,6 +133,13 @@ class MenstrualCycle extends Model
         return $this->hasMany(PhaseInsight::class, 'cycle_id');
     }
 
+
+
+    public function ttcPrediction()
+{
+    return $this->hasOne(TtcPrediction::class, 'cycle_id');
+}
+
     /*
     |--------------------------------------------------------------------------
     | Helper Methods
