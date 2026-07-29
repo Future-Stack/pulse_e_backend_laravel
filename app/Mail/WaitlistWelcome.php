@@ -13,15 +13,16 @@ use Illuminate\Queue\SerializesModels;
 class WaitlistWelcome extends Mailable  implements ShouldQueue
 {
     use Queueable, SerializesModels;
-
-    public function __construct()
+    public $unsubscribeUrl;
+    public function __construct($unsubscribeUrl)
     {
-
+        $this->unsubscribeUrl = $unsubscribeUrl;
     }
 
     public function build()
     {
         return $this->subject('Confirm your spot on the Neumera waitlist')
-            ->view('emails.waitlist_welcome');
+            ->view('emails.waitlist_welcome')
+            ->with(['unsubscribeUrl' => $this->unsubscribeUrl]);
     }
 }
