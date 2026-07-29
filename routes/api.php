@@ -35,6 +35,7 @@ use App\Http\Controllers\AI\DailyScriptureController;
 use App\Http\Controllers\AI\HealthTrendController;
 use App\Http\Controllers\AI\SmartAnalysisController;
 use App\Http\Controllers\AI\NumeraInsightController;
+use App\Http\Controllers\AI\CycleSummaryController;
 
 Route::prefix('v1')->group(function () {
     Route::get('/', function () {
@@ -84,6 +85,12 @@ Route::prefix('v1')->group(function () {
             [LabReportAIController::class, 'show']
         );
 
+ //Cycle part
+
+        Route::get('/cycle-engine/engine/sync-summary',[CycleSummaryController::class, 'sync']  );
+                     
+        Route::get('/engine/signal-status-sync', [CycleSummaryController::class, 'syncSignalStatus']);
+        Route::get('engine/discrepancy-note-sync', [CycleSummaryController::class, 'syncDiscrepancyNote']);
 
         Route::get('/snapshot/{userId}', [SnapshotController::class, 'snapshot']);
 
@@ -231,7 +238,15 @@ Route::prefix('v1')->group(function () {
         //Waitlist
 
         Route::get('/waitlist/list',[WaitlistController::class, 'getWaitlist']);
+
+
+
+
+          
     });
+
+
+ 
     Route::post('/waitlist/submit',[WaitlistController::class, 'submit']);
     Route::get('/waitlist/confirmation/{token}', [WaitlistController::class, 'confirmation']);
     Route::post('/waitlist/invite', [WaitlistController::class, 'sendSingleInvite']);

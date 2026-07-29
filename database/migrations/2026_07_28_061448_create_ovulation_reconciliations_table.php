@@ -12,6 +12,12 @@ return new class extends Migration
 
             $table->id();
 
+            // User
+            $table->foreignId('user_id')
+                ->constrained()
+                ->cascadeOnDelete();
+
+            // Cycle
             $table->foreignId('cycle_id')
                 ->constrained('menstrual_cycles')
                 ->cascadeOnDelete();
@@ -25,12 +31,12 @@ return new class extends Migration
             // Final Decision
             $table->unsignedTinyInteger('final_confirmed_day')->nullable();
 
-            $table->enum('final_source',[
+            $table->enum('final_source', [
                 'calendar',
                 'bbt',
                 'opk',
                 'mucus',
-                'combined'
+                'combined',
             ])->nullable();
 
             // Difference
@@ -38,15 +44,21 @@ return new class extends Migration
 
             $table->unsignedTinyInteger('luteal_phase_length')->default(14);
 
-            $table->boolean('is_reconciled')->default(false);
+            // AI Discrepancy
+            $table->boolean('has_discrepancy')->default(false);
+            $table->text('discrepancy_note')->nullable();
 
+            // Status
+            $table->boolean('is_reconciled')->default(false);
             $table->timestamp('reconciled_at')->nullable();
 
             $table->timestamps();
 
             $table->unique('cycle_id');
 
+            $table->index('user_id');
             $table->index('final_source');
+            $table->index('has_discrepancy');
             $table->index('is_reconciled');
         });
     }
