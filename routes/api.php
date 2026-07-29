@@ -229,6 +229,7 @@ Route::prefix('v1')->group(function () {
 
         //Chat
         Route::post('/chat/response', [ChatController::class, 'handleResponse']);
+        Route::get('/chat/sessions', [ChatController::class, 'getUserSessions']);
         Route::get('/chat/response/{sessionId}', [ChatController::class, 'getLatestMessages']);
 
         //Waitlist
