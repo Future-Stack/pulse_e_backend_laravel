@@ -1,6 +1,9 @@
 <?php
 
 use App\Http\Controllers\AI\BBTController;
+use App\Http\Controllers\Blog\BlogCategoryController;
+use App\Http\Controllers\Blog\BlogCommentController;
+use App\Http\Controllers\Blog\BlogController;
 use App\Http\Controllers\Notification\NotificationSettingsController;
 use App\Http\Controllers\Onboarding\OnboardingController;
 use App\Http\Controllers\Profile\ProfileController;
@@ -267,6 +270,29 @@ Route::prefix('v1')->group(function () {
         Route::get('/cycle-engine/opk/testing-window', [OpkLogController::class, 'testingWindow']);
         Route::post('/cycle-engine/opk/log', [OpkLogController::class, 'store']);
         Route::get('/cycle-engine/opk/today-status', [OpkLogController::class, 'todayStatus']);
+
+        //Blog
+        Route::prefix('blog-categories')->group(function () {
+            Route::get('/', [BlogCategoryController::class, 'index']);   // List all categories
+            Route::post('/', [BlogCategoryController::class, 'store']);  // Create new category
+            Route::get('/{slug}', [BlogCategoryController::class, 'show']); // Show single category
+            Route::put('/{slug}', [BlogCategoryController::class, 'update']); // Update category
+            Route::delete('/{slug}', [BlogCategoryController::class, 'destroy']); // Delete category
+        });
+
+        Route::prefix('blogs')->group(function () {
+            Route::get('/', [BlogController::class, 'index']);   // List all blogs
+            Route::post('/', [BlogController::class, 'store']);  // Create new blog
+            Route::get('/{id}', [BlogController::class, 'show']); // Show single blog
+            Route::put('/{id}', [BlogController::class, 'update']); // Update blog
+            Route::delete('/{id}', [BlogController::class, 'destroy']); // Delete blog
+        });
+
+        Route::prefix('blogs/{blogId}/comments')->group(function () {
+            Route::get('/', [BlogCommentController::class, 'index']);   // List comments for a blog
+            Route::post('/', [BlogCommentController::class, 'store']);  // Add new comment
+            Route::delete('/{id}', [BlogCommentController::class, 'destroy']); // Delete comment
+        });
     });
 
     //Waitlist
