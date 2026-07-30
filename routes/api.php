@@ -44,6 +44,7 @@ use App\Http\Controllers\AI\CalendarController;
 use App\Http\Controllers\AI\AvoidingPregnancyController;
 use App\Http\Controllers\AI\OpkLogController;
 use App\Http\Controllers\AI\TryingToConceiveController;
+use App\Http\Controllers\AI\AwarenessController;
 
 
 Route::prefix('v1')->group(function () {
@@ -119,6 +120,7 @@ Route::prefix('v1')->group(function () {
                 Route::get('/ttc/priority-map', [TryingToConceiveController::class, 'priorityMap']);
 
                 Route::get('/ttc/priority-banner', [TryingToConceiveController::class, 'priorityBanner']);
+                Route::get('/awareness/sync', [AwarenessController::class, 'sync']);
 
         Route::get('/snapshot/{userId}', [SnapshotController::class, 'snapshot']);
 
