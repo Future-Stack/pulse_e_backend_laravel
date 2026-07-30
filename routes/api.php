@@ -286,19 +286,21 @@ Route::prefix('v1')->group(function () {
             Route::delete('/{slug}', [BlogCategoryController::class, 'destroy']); // Delete category
         });
 
-        Route::prefix('blogs')->group(function () {
-            Route::get('/', [BlogController::class, 'index']);   // List all blogs
-            Route::post('/', [BlogController::class, 'store']);  // Create new blog
-            Route::get('/{id}', [BlogController::class, 'show']); // Show single blog
-            Route::put('/{id}', [BlogController::class, 'update']); // Update blog
-            Route::delete('/{id}', [BlogController::class, 'destroy']); // Delete blog
-        });
 
-        Route::prefix('blogs/{blogId}/comments')->group(function () {
-            Route::get('/', [BlogCommentController::class, 'index']);   // List comments for a blog
-            Route::post('/', [BlogCommentController::class, 'store']);  // Add new comment
-            Route::delete('/{id}', [BlogCommentController::class, 'destroy']); // Delete comment
-        });
+            Route::get('/blogs', [BlogController::class, 'index']);   // List all blogs
+            Route::post('/blogs', [BlogController::class, 'store']);  // Create new blog
+            Route::get('/blog/{slug}', [BlogController::class, 'show']); // Show single blog
+            Route::post('/blog-update/{slug}', [BlogController::class, 'update']); // Update blog
+            Route::delete('/blog-delete/{slug}', [BlogController::class, 'destroy']); // Delete blog
+
+
+
+    });
+
+    Route::prefix('blogs/{blogId}/comments')->group(function () {
+        Route::get('/', [BlogCommentController::class, 'index']);   // List comments for a blog
+        Route::post('/', [BlogCommentController::class, 'store']);  // Add new comment
+        Route::delete('/{id}', [BlogCommentController::class, 'destroy']); // Delete comment
     });
 
     //Waitlist
