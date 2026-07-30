@@ -6,9 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class BlogComment extends Model
 {
-    protected $fillable = [
-        'blog_id', 'name', 'comment', 'is_approved'
-    ];
+    protected $guarded = [];
 
     public function blog()
     {

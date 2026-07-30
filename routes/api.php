@@ -95,9 +95,9 @@ Route::prefix('v1')->group(function () {
             [LabReportAIController::class, 'show']
         );
 
- //Cycle part
+        //Cycle part
 //summary 1st page
-        Route::get('/cycle-engine/engine/sync-summary',[CycleSummaryController::class, 'sync']  );
+        Route::get('/cycle-engine/engine/sync-summary', [CycleSummaryController::class, 'sync']);
 
         Route::get('/engine/signal-status-sync', [CycleSummaryController::class, 'syncSignalStatus']);
         Route::get('engine/discrepancy-note-sync', [CycleSummaryController::class, 'syncDiscrepancyNote']);
@@ -107,20 +107,19 @@ Route::prefix('v1')->group(function () {
         Route::post('/calendar/confirm-day', [CalendarController::class, 'confirmDay']);
 
 
-
         Route::get('/calendar/next-period-sync', [CalendarController::class, 'syncNextPeriod']);
 
-                Route::get('/avoiding-pregnancy/consent-status', [AvoidingPregnancyController::class, 'consentStatus']);
+        Route::get('/avoiding-pregnancy/consent-status', [AvoidingPregnancyController::class, 'consentStatus']);
 
-                Route::post('/avoiding-pregnancy/consent', [AvoidingPregnancyController::class, 'consent']);
+        Route::post('/avoiding-pregnancy/consent', [AvoidingPregnancyController::class, 'consent']);
 
-                Route::post('/mode', [AvoidingPregnancyController::class, 'setMode']);
-                Route::get('/ttc/surge-banner', [TryingToConceiveController::class, 'surgeBanner']);
+        Route::post('/mode', [AvoidingPregnancyController::class, 'setMode']);
+        Route::get('/ttc/surge-banner', [TryingToConceiveController::class, 'surgeBanner']);
 
-                Route::get('/ttc/priority-map', [TryingToConceiveController::class, 'priorityMap']);
+        Route::get('/ttc/priority-map', [TryingToConceiveController::class, 'priorityMap']);
 
-                Route::get('/ttc/priority-banner', [TryingToConceiveController::class, 'priorityBanner']);
-                Route::get('/awareness/sync', [AwarenessController::class, 'sync']);
+        Route::get('/ttc/priority-banner', [TryingToConceiveController::class, 'priorityBanner']);
+        Route::get('/awareness/sync', [AwarenessController::class, 'sync']);
 
         Route::get('/snapshot/{userId}', [SnapshotController::class, 'snapshot']);
 
@@ -132,16 +131,16 @@ Route::prefix('v1')->group(function () {
         Route::get('/smart-analysis/{userId}', [SmartAnalysisController::class, 'show']);
         Route::get(
             '/numera-insight/{userId}',
-            [NumeraInsightController::class,'show']
+            [NumeraInsightController::class, 'show']
         );
 
-            //Admin Dashboard
-            Route::get('/users', [UserManagementController::class, 'index']);
-            Route::get('/users-details/{id}', [UserManagementController::class, 'show']);
-            Route::get('/user/subscription', [UserManagementController::class, 'subscriptions']);
-            Route::get('/admin/dashboard', [UserManagementController::class, 'dashboard']);
-            Route::get('/analytics', [UserManagementController::class, 'analytic']);
-            Route::get('/admin/revenue-breakdown', [SubscriptionController::class, 'revenueBreakdown']);
+        //Admin Dashboard
+        Route::get('/users', [UserManagementController::class, 'index']);
+        Route::get('/users-details/{id}', [UserManagementController::class, 'show']);
+        Route::get('/user/subscription', [UserManagementController::class, 'subscriptions']);
+        Route::get('/admin/dashboard', [UserManagementController::class, 'dashboard']);
+        Route::get('/analytics', [UserManagementController::class, 'analytic']);
+        Route::get('/admin/revenue-breakdown', [SubscriptionController::class, 'revenueBreakdown']);
 
         Route::post('/change-password', [AuthController::class, 'changePassword']);
         // Save Firebase device token
@@ -272,7 +271,7 @@ Route::prefix('v1')->group(function () {
         Route::post('/bbt/logs', [BbtController::class, 'logBbtData']);
 
         //Waitlist
-        Route::get('/waitlist/list',[WaitlistController::class, 'getWaitlist']);
+        Route::get('/waitlist/list', [WaitlistController::class, 'getWaitlist']);
 
         // OPK
         Route::get('/cycle-engine/opk/testing-window', [OpkLogController::class, 'testingWindow']);
@@ -281,34 +280,37 @@ Route::prefix('v1')->group(function () {
 
         //Blog
         Route::prefix('blog-categories')->group(function () {
-            Route::get('/', [BlogCategoryController::class, 'index']);   // List all categories
+          // List all categories
             Route::post('/', [BlogCategoryController::class, 'store']);  // Create new category
-            Route::get('/{slug}', [BlogCategoryController::class, 'show']); // Show single category
+
             Route::put('/{slug}', [BlogCategoryController::class, 'update']); // Update category
             Route::delete('/{slug}', [BlogCategoryController::class, 'destroy']); // Delete category
         });
 
 
-            Route::get('/blogs', [BlogController::class, 'index']);   // List all blogs
-            Route::post('/blogs', [BlogController::class, 'store']);  // Create new blog
-            Route::get('/blog/{slug}', [BlogController::class, 'show']); // Show single blog
-            Route::post('/blog-update/{slug}', [BlogController::class, 'update']); // Update blog
-            Route::delete('/blog-delete/{slug}', [BlogController::class, 'destroy']); // Delete blog
-
+        // List all blogs
+        Route::post('/blogs', [BlogController::class, 'store']);  // Create new blog
+        Route::post('/blog-update/{slug}', [BlogController::class, 'update']); // Update blog
+        Route::delete('/blog-delete/{slug}', [BlogController::class, 'destroy']); // Delete blog
 
 
     });
+
+    Route::get('/blog-categories', [BlogCategoryController::class, 'index']);
+    Route::get('/blog-categories/{slug}', [BlogCategoryController::class, 'show']); // Show single category
+
+    Route::get('/blogs', [BlogController::class, 'index']);
+    Route::get('/blog/{slug}', [BlogController::class, 'show']); // Show single blog
 
     Route::prefix('blogs/{blogId}/comments')->group(function () {
         Route::get('/', [BlogCommentController::class, 'index']);   // List comments for a blog
         Route::post('/', [BlogCommentController::class, 'store']);  // Add new comment
-        Route::delete('/{id}', [BlogCommentController::class, 'destroy']); // Delete comment
     });
 
     //Waitlist
-    Route::get('/waitlist/list',[WaitlistController::class, 'getWaitlist']);
+    Route::get('/waitlist/list', [WaitlistController::class, 'getWaitlist']);
 
-    Route::post('/waitlist/submit',[WaitlistController::class, 'submit']);
+    Route::post('/waitlist/submit', [WaitlistController::class, 'submit']);
     Route::get('/waitlist/confirmation/{token}', [WaitlistController::class, 'confirmation']);
     Route::post('/waitlist/invite', [WaitlistController::class, 'sendSingleInvite']);
     Route::get('/waitlist/unsubscribe/{token}', [WaitlistController::class, 'unsubscribe']);
@@ -321,4 +323,4 @@ Route::prefix('v1')->group(function () {
 
 });
 
-require __DIR__.'/marketplace_api.php';
+require __DIR__ . '/marketplace_api.php';
