@@ -98,7 +98,6 @@ class BlogCategoryController extends Controller
 
             $category->update([
                 'name' => $validated['name'],
-                'slug' => Str::slug($validated['name']),
                 'description' => $validated['description'] ?? $category->description,
                 'sort_order' => $validated['sort_order'] ?? $category->sort_order,
                 'is_active' => $validated['is_active'] ?? $category->is_active,
