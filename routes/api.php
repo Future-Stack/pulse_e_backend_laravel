@@ -296,6 +296,9 @@ Route::prefix('v1')->group(function () {
 
     });
 
+    //Fetch-BBT-Logs
+    Route::get('/bbt-logs', [BbtController::class, 'fetchLog']);
+
     Route::get('/blog-categories', [BlogCategoryController::class, 'index']);
     Route::get('/blog-categories/{slug}', [BlogCategoryController::class, 'show']); // Show single category
 

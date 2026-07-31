@@ -29,7 +29,7 @@ class BBTController extends Controller
             $log = $response['data']['log'];
 
             $bbtLog = BbtLog::create([
-                'cycle_id'   => $response['data']['reconciliation']['cycle_id'], // adjust if cycle_id is numeric FK
+                'cycleID'   => $response['data']['reconciliation']['cycle_id'], // adjust if cycle_id is numeric FK
                 'user_id'    => $response['data']['reconciliation']['user_id'],
                 'log_date'   => $log['date'],
                 'temperature'=> $log['temperature_f'],
@@ -64,6 +64,28 @@ class BBTController extends Controller
                 'success' => false,
                 'message' => $e->getMessage(),
             ], 500);
+        }
+    }
+
+    public function fetchLog(Request $request)
+    {
+        try {
+            $logs = BbtLog::orderBy('log_date')->get();
+
+            // Group by date using Laravel Collection
+            $grouped = $logs->groupBy('log_date');
+
+            return response()->json([
+                'success' => true,
+                'data' => $grouped,
+            ]);
+        }
+        catch (\Exception $e) {
+            \Log::error('BBT log failed: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ]);
         }
     }
 }
