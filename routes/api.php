@@ -97,6 +97,8 @@ Route::prefix('v1')->group(function () {
 
         //Cycle part
 //summary 1st page
+  Route::get('/cycle-engine/engine/sync', [CycleSummaryController::class, 'sync']);
+
         Route::get('/cycle-engine/engine/sync-summary', [CycleSummaryController::class, 'sync']);
 
         Route::get('/engine/signal-status-sync', [CycleSummaryController::class, 'syncSignalStatus']);
