@@ -10,51 +10,125 @@ use App\Models\OvulationReconciliation;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 
-
-//summary 1st page
 class CycleSummaryController extends Controller
 {
-  public function sync()
-{
-    $user = auth()->user();
+    public function sync()
+    {
+        $user = auth()->user();
 
-    // AI Engine Base URL
-    $url = config('services.ai.base_url')
-        . '/api/v1/cycle-engine/engine/summary';
+        if (! $user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthenticated.',
+            ], 401);
+        }
 
-    $response = Http::timeout(120)->get($url);
 
-    if (! $response->successful()) {
-        return response()->json([
-            'success' => false,
-            'message' => 'Unable to fetch AI cycle summary.',
-        ], 500);
-    }
+        $baseUrl = config('services.ai.base_url')
+            . '/api/v1/cycle-engine/engine';
 
-    $data = $response->json();
+        /*
+        |--------------------------------------------------------------------------
+        | Fetch AI Endpoints Concurrently
+        |--------------------------------------------------------------------------
+        */
 
-    DB::transaction(function () use ($user, $data) {
+           try {
+
+    $responses = Http::pool(function ($pool) use ($baseUrl) {
+
+        return [
+
+            $pool->timeout(120)
+                ->acceptJson()
+                ->get($baseUrl.'/summary'),
+
+            $pool->timeout(120)
+                ->acceptJson()
+                ->get($baseUrl.'/signal-status'),
+
+            $pool->timeout(120)
+                ->acceptJson()
+                ->get($baseUrl.'/discrepancy-note'),
+
+        ];
+
+    });
+
+} catch (\Throwable $e) {
+
+    return response()->json([
+        'success' => false,
+        'message' => 'Unable to connect AI Engine.',
+        'error' => $e->getMessage(),
+    ],500);
+
+}
+
+$summaryResponse = $responses[0];
+$signalResponse = $responses[1];
+$discrepancyResponse = $responses[2];
+        /*
+        |--------------------------------------------------------------------------
+        | Validate Responses
+        |--------------------------------------------------------------------------
+        */
+
+        if (
+    ! $summaryResponse->successful() ||
+    ! $signalResponse->successful() ||
+    ! $discrepancyResponse->successful()
+) {
+    return response()->json([
+        'success' => false,
+        'message' => 'Unable to fetch AI Engine data.',
+    ], 500);
+}
+
+$summary = $summaryResponse->json();
+$signal = $signalResponse->json();
+$discrepancy = $discrepancyResponse->json();
+    try {
+
+    DB::transaction(function () use (
+        $user,
+        $summary,
+        $signal,
+        $discrepancy
+    ) {
 
         /*
         |--------------------------------------------------------------------------
         | Cycle Statistics
         |--------------------------------------------------------------------------
         */
+
         CycleStatistic::updateOrCreate(
             [
                 'user_id' => $user->id,
             ],
             [
-                'average_cycle_length' => $data['cycle_summary']['avg_cycle_length'],
-                'cycle_variance_days'  => $data['cycle_summary']['cycle_variance_days'],
+                'completed_cycles' =>
+                    $summary['reliability']['completed_cycles'],
+
+                'average_cycle_length' =>
+                    $summary['cycle_summary']['avg_cycle_length'],
+
+                'cycle_variance_days' =>
+                    $summary['cycle_summary']['cycle_variance_days'],
+
+                'reliability_level' =>
+                    $summary['reliability']['level'],
             ]
         );
 
+
         /*
         |--------------------------------------------------------------------------
-        | Current Menstrual Cycle
+        | Current Active Cycle
         |--------------------------------------------------------------------------
         */
+
         $cycle = MenstrualCycle::updateOrCreate(
             [
                 'user_id' => $user->id,
@@ -63,155 +137,101 @@ class CycleSummaryController extends Controller
             [
                 'period_start_date' => now()->toDateString(),
 
-                'current_cycle_day' => $data['cycle_summary']['current_cycle_day'],
-                'current_phase'     => $data['cycle_summary']['current_phase'],
+                'current_cycle_day' =>
+                    $summary['cycle_summary']['current_cycle_day'],
 
-                'fertile_start_day' => $data['fertile_window']['start_day'],
-                'fertile_end_day'   => $data['fertile_window']['end_day'],
+                'current_phase' =>
+                    $summary['cycle_summary']['current_phase'],
 
-                'predicted_peak_day' => $data['fertile_window']['peak_day'],
+                'fertile_start_day' =>
+                    $summary['fertile_window']['start_day'],
+
+                'fertile_end_day' =>
+                    $summary['fertile_window']['end_day'],
+
+                'predicted_peak_day' =>
+                    $summary['fertile_window']['peak_day'],
+
+                'prediction_source' =>
+                    $summary['fertile_window']['peak_source'],
             ]
         );
 
-        /*
-        |--------------------------------------------------------------------------
-        | Ovulation Reconciliation
-        |--------------------------------------------------------------------------
-        */
-        OvulationReconciliation::updateOrCreate(
-            [
-                'cycle_id' => $cycle->id,
-            ],
-            [
-                'user_id' => $user->id,
-
-                'calendar_predicted_day' => $data['reconciliation']['calendar_predicted_day'],
-                'bbt_confirmed_day'      => $data['reconciliation']['bbt_confirmed_day'],
-                'lh_surge_day'           => $data['reconciliation']['lh_surge_day'],
-                'mucus_peak_day'         => $data['fertile_window']['mucus_peak_day'],
-
-                'final_confirmed_day' => $data['reconciliation']['final_confirmed_day'],
-                'final_source'        => $data['reconciliation']['final_source'],
-
-                'offset_days'         => $data['reconciliation']['offset_days'],
-                'luteal_phase_length' => $data['reconciliation']['luteal_phase_length'],
-
-                'is_reconciled' => true,
-                'reconciled_at' => now(),
-            ]
-        );
-    });
-
-    return response()->json([
-        'success' => true,
-        'message' => 'Cycle summary synced successfully.',
-        'data' => $data,
-    ]);
-}
-
-
-
-    //signal part 1st page
-   public function syncSignalStatus()
-{
-    $user = auth()->user();
-
-    /*
-    |--------------------------------------------------------------------------
-    | AI Engine URL
-    |--------------------------------------------------------------------------
-    */
-    $url = config('services.ai.base_url')
-        . '/api/v1/cycle-engine/engine/signal-status';
-
-    $response = Http::timeout(120)->get($url);
-
-    if (! $response->successful()) {
-        return response()->json([
-            'success' => false,
-            'message' => 'Unable to fetch signal status.',
-        ], 500);
-    }
-
-    $data = $response->json();
-
-    DB::transaction(function () use ($user, $data) {
-
-        /*
-        |--------------------------------------------------------------------------
-        | Current Active Cycle
-        |--------------------------------------------------------------------------
-        */
-        $cycle = MenstrualCycle::where('user_id', $user->id)
-            ->where('is_completed', false)
-            ->latest()
-            ->first();
-
-        if (! $cycle) {
-            throw new \Exception('No active menstrual cycle found.');
-        }
-
-        /*
-        |--------------------------------------------------------------------------
-        | Default Signal Values
-        |--------------------------------------------------------------------------
-        */
-        $calendar = false;
-        $bbt = false;
-        $opk = false;
-        $mucus = false;
 
         /*
         |--------------------------------------------------------------------------
         | Read AI Signals
         |--------------------------------------------------------------------------
         */
-        foreach ($data['signals'] as $signal) {
 
-            switch ($signal['signal']) {
+        $calendar = false;
+        $bbt = false;
+        $opk = false;
+        $mucus = false;
+
+        $statusMessages = [];
+
+
+        foreach ($signal['signals'] as $item) {
+
+            $statusMessages[] = $item['status_text'];
+
+            switch ($item['signal']) {
 
                 case 'Calendar':
-                    $calendar = $signal['logged_today'];
+                    $calendar = $item['logged_today'];
                     break;
 
                 case 'BBT':
-                    $bbt = $signal['logged_today'];
+                    $bbt = $item['logged_today'];
                     break;
 
                 case 'OPK / LH':
-                    $opk = $signal['logged_today'];
+                    $opk = $item['logged_today'];
                     break;
 
                 case 'Mucus':
-                    $mucus = $signal['logged_today'];
+                    $mucus = $item['logged_today'];
                     break;
             }
         }
 
+
         /*
         |--------------------------------------------------------------------------
-        | Signal Strength
+        | Calculate Signal Strength
         |--------------------------------------------------------------------------
         */
+
         $count = collect([
             $calendar,
             $bbt,
             $opk,
             $mucus,
-        ])->filter()->count();
+        ])
+        ->filter()
+        ->count();
+
 
         $strength = match (true) {
+
             $count == 0 => 'none',
+
             $count == 1 => 'low',
+
             $count <= 3 => 'medium',
+
             default => 'high',
+
         };
+
 
         /*
         |--------------------------------------------------------------------------
-        | Save Daily Signal History
+        | Save Signal History
         |--------------------------------------------------------------------------
         */
+
         SignalHistory::updateOrCreate(
             [
                 'user_id'  => $user->id,
@@ -220,112 +240,124 @@ class CycleSummaryController extends Controller
             ],
             [
                 'calendar_logged' => $calendar,
-                'bbt_logged'      => $bbt,
-                'opk_logged'      => $opk,
-                'mucus_logged'    => $mucus,
+
+                'bbt_logged' => $bbt,
+
+                'opk_logged' => $opk,
+
+                'mucus_logged' => $mucus,
+
                 'symptoms_logged' => false,
 
                 'signal_strength' => $strength,
 
-                // Save original AI response
-                'signals' => $data['signals'],
+                'signals' => $signal['signals'],
 
-                'ai_generated' => $data['ai_generated'],
-                'ai_cached'    => $data['ai_cached'],
+                'ai_generated' => $signal['ai_generated'],
+
+                'ai_cached' => $signal['ai_cached'],
+
+                'sources' => $signal['sources'] ?? null,
+
+                'backend_errors' => $signal['backend_errors'] ?? null,
+
+                'status_message' =>
+                    implode("\n", $statusMessages),
             ]
         );
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Save Ovulation Reconciliation
+        |--------------------------------------------------------------------------
+        */
+
+        OvulationReconciliation::updateOrCreate(
+
+            [
+                'user_id'  => $user->id,
+                'cycle_id' => $cycle->id,
+            ],
+
+            [
+
+                'calendar_predicted_day' =>
+                    $summary['reconciliation']['calendar_predicted_day'],
+
+                'bbt_confirmed_day' =>
+                    $summary['reconciliation']['bbt_confirmed_day'],
+
+                'lh_surge_day' =>
+                    $summary['reconciliation']['lh_surge_day'],
+
+                'mucus_peak_day' =>
+                    $summary['fertile_window']['mucus_peak_day'],
+
+
+                'final_confirmed_day' =>
+                    $summary['reconciliation']['final_confirmed_day'],
+
+                'final_source' =>
+                    $summary['reconciliation']['final_source'],
+
+
+                'offset_days' =>
+                    $summary['reconciliation']['offset_days'],
+
+                'luteal_phase_length' =>
+                    $summary['reconciliation']['luteal_phase_length'],
+
+
+                'has_discrepancy' =>
+                    $discrepancy['active'],
+
+                'discrepancy_note' =>
+                    $discrepancy['message'],
+
+
+                'is_reconciled' =>
+                    ! $discrepancy['active'],
+
+                'reconciled_at' => now(),
+
+            ]
+        );
+
     });
 
-    /*
-    |--------------------------------------------------------------------------
-    | Return Original AI Response
-    |--------------------------------------------------------------------------
-    */
+
+} catch (\Throwable $e) {
+
     return response()->json([
-        'signals' => $data['signals'],
-        'ai_generated' => $data['ai_generated'],
-        'ai_cached' => $data['ai_cached'],
-    ]);
+        'success' => false,
+        'message' => 'Database sync failed.',
+        'error' => $e->getMessage(),
+    ], 500);
+
 }
 
 
+/*
+|--------------------------------------------------------------------------
+| Return Response
+|--------------------------------------------------------------------------
+*/
 
+return response()->json([
 
+    'success' => true,
 
-public function syncDiscrepancyNote()
-{
-    $user = auth()->user();
+    'message' => 'Cycle dashboard synced successfully.',
 
-    /*
-    |--------------------------------------------------------------------------
-    | AI Engine URL
-    |--------------------------------------------------------------------------
-    */
-    $url = config('services.ai.base_url')
-        . '/api/v1/cycle-engine/engine/discrepancy-note';
+    'data' => [
+        'summary' => $summary,
+        'signal_status' => $signal,
+        'discrepancy' => $discrepancy,
+    ]
 
-    $response = Http::timeout(120)->get($url);
+]);
 
-    if (! $response->successful()) {
-        return response()->json([
-            'success' => false,
-            'message' => 'Unable to fetch discrepancy note.',
-        ], 500);
-    }
+    } // sync() method close
 
-    $data = $response->json();
-
-    DB::transaction(function () use ($user, $data) {
-
-        /*
-        |--------------------------------------------------------------------------
-        | Current Active Cycle
-        |--------------------------------------------------------------------------
-        */
-        $cycle = MenstrualCycle::where('user_id', $user->id)
-            ->where('is_completed', false)
-            ->latest()
-            ->first();
-
-        if (! $cycle) {
-            throw new \Exception('No active menstrual cycle found.');
-        }
-
-        /*
-        |--------------------------------------------------------------------------
-        | Existing Reconciliation
-        |--------------------------------------------------------------------------
-        */
-        $reconciliation = OvulationReconciliation::where('cycle_id', $cycle->id)
-            ->first();
-
-        if (! $reconciliation) {
-            throw new \Exception('Please sync cycle summary first.');
-        }
-
-        /*
-        |--------------------------------------------------------------------------
-        | Update Discrepancy Information
-        |--------------------------------------------------------------------------
-        */
-        $reconciliation->update([
-            'has_discrepancy' => $data['active'],
-            'discrepancy_note' => $data['message'],
-            'is_reconciled' => ! $data['active'],
-            'reconciled_at' => now(),
-        ]);
-    });
-
-    /*
-    |--------------------------------------------------------------------------
-    | Return Original AI Response
-    |--------------------------------------------------------------------------
-    */
-    return response()->json([
-        'active' => $data['active'],
-        'message' => $data['message'],
-        'ai_generated' => $data['ai_generated'],
-        'ai_cached' => $data['ai_cached'],
-    ]);
-}
-}
+} // class close
