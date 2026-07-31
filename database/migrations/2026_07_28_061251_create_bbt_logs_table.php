@@ -16,7 +16,9 @@ return new class extends Migration
                 ->constrained('menstrual_cycles')
                 ->cascadeOnDelete();
 
-            $table->foreignId('user_id')->nullable()->constrained('users');
+            $table->string('cycleID')->nullable();
+
+            $table->integer('user_id')->nullable();
 
             $table->date('log_date');
 

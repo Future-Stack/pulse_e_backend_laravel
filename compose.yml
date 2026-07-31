@@ -1,0 +1,39 @@
+services:
+  # Laravel Application Service: The main PHP application
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: softvence/pulse_backend_laravel:latest
+    platform: linux/amd64
+    container_name: laravel_app
+    restart: always
+    ports:
+      - "8000:8000" # Exposes the application on port 8000
+    environment:
+      - DB_PASSWORD="Pul$$e2026_mysql"
+    env_file:
+      - .env.prod
+    networks:
+      - laravel
+
+  # Laravel Queue Worker Service: Processes background jobs
+  queue:
+    image: softvence/pulse_backend_laravel:latest
+    platform: linux/amd64
+    container_name: laravel_queue
+    restart: unless-stopped
+    command: php artisan queue:work --verbose --tries=3 --timeout=90
+    env_file:
+      - .env.prod
+    environment:
+      - DB_PASSWORD="Pul$$e2026_mysql"
+    depends_on:
+      app:
+        condition: service_started
+    networks:
+      - laravel
+
+networks:
+  laravel:
+    driver: bridge # Creates a custom bridge network

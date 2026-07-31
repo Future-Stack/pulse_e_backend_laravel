@@ -7,21 +7,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class BbtLog extends Model
 {
-    protected $fillable = [
-        'cycle_id',
-        'user_id',
-        'log_date',
-        'temperature',
-        'unit',
-        'logged_at',
-        'illness',
-        'poor_sleep',
-        'alcohol',
-        'late_wakeup',
-        'travel',
-        'is_excluded',
-        'notes',
-    ];
+    protected $guarded = [];
 
     protected function casts(): array
     {
