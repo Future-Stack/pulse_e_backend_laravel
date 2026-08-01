@@ -72,24 +72,26 @@ class OpkLogController extends Controller
 
     public function storeOpkUiData(Request $request)
     {
-        $userId = auth()->id();
+        $userId = auth()->id() ?? $request->query('user_id');
 
         if (!$userId) {
             return response()->json(['message' => 'Unauthenticated user.'], 401);
         }
 
         $cardsData = $request->input('cards', []);
-
-        $response = Http::post("https://female-mood-analyzer.onrender.com/api/v1/cycle-engine/opk/ui?user_id={$userId}", [
+        $response = Http::withHeaders([
+            'Accept' => 'application/json',
+            'Content-Type' => 'application/json',
+        ])->post("https://female-mood-analyzer.onrender.com/api/v1/cycle-engine/opk/ui?user_id={$userId}", [
             'cards' => $cardsData
         ]);
 
         if ($response->successful()) {
-            $data = $response->json();
+            $apiData = $response->json();
 
             $opkRecord = OpkData::create([
                 'user_id'       => $userId,
-                'response_data' => $data,
+                'response_data' => $apiData,
             ]);
 
             return response()->json([
