@@ -91,6 +91,7 @@ class SyncNppesJob implements ShouldQueue
                     'city' => $row['city'],
                     'state' => $row['state'],
                     'zip' => $row['zip'],
+                    'location' => $metro->centroid,
                     'metro_id' => $metro->id,
                     'source_nppes' => true,
                     'status' => $isNew ? 'candidate' : Provider::where('npi', $row['npi'])->value('status'),
@@ -106,7 +107,7 @@ class SyncNppesJob implements ShouldQueue
             $count++;
         }
 
-        Storage::disk('local')->delete([$zipPath, $csvPath]);
+        \Illuminate\Support\Facades\File::delete([storage_path("app/{$zipPath}"), storage_path("app/{$csvPath}")]);
 
         Log::info("SyncNppesJob: upserted {$count} providers from the weekly NPPES file ({$skippedNoMetro} taxonomy-matched rows skipped for falling outside every active metro).");
     }
@@ -126,6 +127,9 @@ class SyncNppesJob implements ShouldQueue
         if (! $filename) {
             return null;
         }
+
+        \Illuminate\Support\Facades\File::ensureDirectoryExists(storage_path('app/nppes'));
+        \Illuminate\Support\Facades\File::ensureDirectoryExists(storage_path('app/nppes/extracted'));
 
         $response = Http::timeout(600)->sink(storage_path("app/nppes/{$filename}"))
             ->get(self::BASE_URL . $filename);

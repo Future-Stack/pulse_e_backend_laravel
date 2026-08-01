@@ -28,12 +28,20 @@ class MarketplaceEventController extends Controller
         $categorySlugs = collect($payload['events'])->pluck('category')->filter()->unique();
         $categories = ProviderCategory::whereIn('slug', $categorySlugs)->pluck('id', 'slug');
 
-        $rows = collect($payload['events'])->map(function (array $event) use ($sessionToken, $categories) {
+        $lifeStageSlugs = collect($payload['events'])->pluck('life_stage')->filter()->unique();
+        $lifeStages = \App\Models\MarketplaceLifeStage::whereIn('slug', $lifeStageSlugs)->pluck('id', 'slug');
+
+        $rows = collect($payload['events'])->map(function (array $event) use ($sessionToken, $categories, $lifeStages) {
+            $lifeStageId = $event['marketplace_life_stage_id'] ?? null;
+            if (! $lifeStageId && ! empty($event['life_stage'])) {
+                $lifeStageId = $lifeStages[$event['life_stage']] ?? null;
+            }
+
             return [
                 'occurred_at'                 => $event['occurred_at'] ?? now(),
                 'metro_id'                    => $event['metro_id'] ?? null,
                 'category_id'                 => $categories[$event['category']] ?? null,
-                'marketplace_life_stage_id'   => $event['marketplace_life_stage_id'] ?? null, // 🛠️ Correct column name
+                'marketplace_life_stage_id'   => $lifeStageId,
                 'provider_id'                 => $event['provider_id'] ?? null,
                 'slot_position'               => $event['slot_position'] ?? null,
                 'sponsored'                   => $event['sponsored'] ?? false,

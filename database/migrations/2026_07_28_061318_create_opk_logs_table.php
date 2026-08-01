@@ -20,6 +20,8 @@ return new class extends Migration
 
             $table->enum('result',[
                 'negative',
+                'low',
+                'high',
                 'positive',
                 'peak'
             ]);
