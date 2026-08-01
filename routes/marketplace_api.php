@@ -19,20 +19,13 @@ use Illuminate\Support\Facades\Route;
 | ends up mounted (routes/api.php typically prefixes everything with /api).
 */
 
-// 2.5 Service API — public, member-facing. No auth middleware assumed here since
-// requests carry no member identity by design (privacy boundary, spec 2.1) — wrap
-// with your app's standard rate limiter.
 Route::prefix('v1/marketplace')->middleware('throttle:60,1')->name('marketplace.')->group(function () {
     Route::get('/slate', [MarketplaceController::class, 'slate'])->name('slate');
     Route::post('/events', [MarketplaceEventController::class, 'store'])->name('events.store');
 });
 
-// Admin CRUD — auth:sanctum authenticates the request; marketplace.admin (see
-// App\Http\Middleware\EnsureUserIsMarketplaceAdmin) enforces that the
-// authenticated user is actually allowed to manage the marketplace, not just
-// any logged-in user. Register the 'marketplace.admin' alias per that
-// middleware's docblock before this route group will work.
-Route::prefix('v1/admin')->middleware('auth:sanctum')->group(function () {
+
+Route::prefix('v1/admin')->middleware(['auth:sanctum', 'marketplace.admin'])->name('marketplace.admin.')->group(function () {
     Route::get('/providers', [AdminProviderController::class, 'index'])->name('providers.index');
     Route::get('/providers/{provider}', [AdminProviderController::class, 'show'])->name('providers.show');
     Route::patch('/providers/{provider}', [AdminProviderController::class, 'update'])->name('providers.update');

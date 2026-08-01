@@ -55,20 +55,25 @@ class ZipGeocodingService
     private function geocodeZip(string $zip): ?array
     {
         return Cache::remember("zip-geocode:{$zip}", now()->addDays(30), function () use ($zip) {
-            $response = Http::get('https://maps.googleapis.com/maps/api/geocode/json', [
-                'address' => $zip,
-                'components' => 'country:US',
-                'key' => $this->apiKey,
-            ]);
+            try {
+                $response = Http::timeout(5)->retry(2, 100)->get('https://maps.googleapis.com/maps/api/geocode/json', [
+                    'address' => $zip,
+                    'components' => 'country:US',
+                    'key' => $this->apiKey,
+                ]);
 
-            if (! $response->successful() || $response->json('status') !== 'OK') {
-                Log::warning('ZipGeocodingService: geocode failed', ['zip' => $zip, 'status' => $response->json('status')]);
+                if (! $response->successful() || $response->json('status') !== 'OK') {
+                    Log::warning('ZipGeocodingService: geocode failed', ['zip' => $zip, 'status' => $response->json('status')]);
+                    return null;
+                }
+
+                $location = $response->json('results.0.geometry.location');
+
+                return $location ? ['lat' => $location['lat'], 'lng' => $location['lng']] : null;
+            } catch (\Throwable $e) {
+                Log::warning('ZipGeocodingService: network timeout/exception', ['zip' => $zip, 'error' => $e->getMessage()]);
                 return null;
             }
-
-            $location = $response->json('results.0.geometry.location');
-
-            return $location ? ['lat' => $location['lat'], 'lng' => $location['lng']] : null;
         });
     }
 

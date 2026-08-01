@@ -37,6 +37,7 @@ class User extends Authenticatable
         'onboardingCompleted',
         'stripe_customer_id',
         'last_login_at',
+        'is_marketplace_admin',
     ];
 
     /**
@@ -65,6 +66,7 @@ class User extends Authenticatable
 
             'is_privacy_accepted' => 'boolean',
             'onboardingCompleted' => 'boolean',
+            'is_marketplace_admin' => 'boolean',
         ];
     }
 
