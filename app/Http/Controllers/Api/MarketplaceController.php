@@ -5,7 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\SlateRequest;
 use App\Http\Resources\ProviderSlateResource;
-use App\Models\LifeStage;
+use App\Models\MarketplaceLifeStage;
 use App\Models\Metro;
 use App\Models\ProviderCategory;
 use App\Services\MarketplaceSlateService;
@@ -48,7 +48,7 @@ class MarketplaceController extends Controller
         }
 
         if (isset($data['life_stage'])) {
-            $lifeStage = LifeStage::where('slug', $data['life_stage'])->first();
+            $lifeStage = MarketplaceLifeStage::where('slug', $data['life_stage'])->first();
 
             $eligible = $lifeStage && $lifeStage->categories()->where('provider_categories.id', $category->id)->exists();
 
