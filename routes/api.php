@@ -276,6 +276,10 @@ Route::prefix('v1')->group(function () {
         Route::get('/waitlist/list', [WaitlistController::class, 'getWaitlist']);
 
         // OPK
+        Route::get('/get-opk', [OpkLogController::class, 'getOpkUiData']);
+        Route::get('/get-opk-data', [OpkLogController::class, 'getStoredOpkData']);
+        Route::post('/store-opk-data', [OpkLogController::class, 'storeOpkUiData']);
+        Route::get('/opk-history', [OpkLogController::class, 'getOpkDataHistory']);
         Route::get('/cycle-engine/opk/testing-window', [OpkLogController::class, 'testingWindow']);
         Route::post('/cycle-engine/opk/log', [OpkLogController::class, 'store']);
         Route::get('/cycle-engine/opk/today-status', [OpkLogController::class, 'todayStatus']);
