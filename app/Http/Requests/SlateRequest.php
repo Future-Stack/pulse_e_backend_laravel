@@ -22,7 +22,7 @@ class SlateRequest extends FormRequest
             'category' => ['required', 'string', 'exists:provider_categories,slug'],
             'zip' => ['required_without:metro_id', 'nullable', 'digits:5'],
             'metro_id' => ['required_without:zip', 'nullable', 'integer', 'exists:metros,id'],
-            'life_stage' => ['nullable', 'string', 'exists:life_stages,slug'],
+            'life_stage' => ['nullable', 'string', 'exists:marketplace_life_stages,slug'],
             'limit' => ['nullable', 'integer', 'min:1', 'max:5'],
         ];
     }

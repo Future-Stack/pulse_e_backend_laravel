@@ -73,8 +73,8 @@ class ProviderTaxonomySeeder extends Seeder
             'beauty-radiance' => ['dermatology', 'plastic-reconstructive-surgery', 'medical-spa', 'esthetician-skincare-studio', 'registered-dietitian'],
             'cycle-fertility' => ['obgyn', 'reproductive-endocrinology-infertility', 'fertility-clinic', 'acupuncturist-fertility', 'genetic-counselor'],
             'athlete' => ['sports-medicine-physician', 'physical-therapist-sports', 'orthopedics', 'chiropractor-sports', 'sports-dietitian', 'performance-recovery-studio'],
-            'perimenopause-menopause-vitality' => ['menopause-specialist', 'obgyn', 'endocrinology', 'hrt-hormone-clinic', 'pelvic-floor-pt-meno', 'therapist-mental-health-meno'],
-            'pregnancy-postpartum' => ['obgyn', 'maternal-fetal-medicine', 'certified-nurse-midwife', 'doula', 'lactation-consultant', 'pelvic-floor-pt-postpartum', 'perinatal-mental-health'],
+            'perimenopause-menopause-vitality' => ['menopause-specialist', 'obgyn', 'endocrinology', 'hrt-hormone-clinic', 'pelvic-floor-pt', 'therapist-mental-health'],
+            'pregnancy-postpartum' => ['obgyn', 'maternal-fetal-medicine', 'certified-nurse-midwife', 'doula', 'lactation-consultant', 'pelvic-floor-pt', 'perinatal-mental-health'],
             'lifelong-thriving' => ['primary-care', 'cardiology', 'endocrinology', 'longevity-functional-medicine', 'registered-dietitian', 'therapist-mental-health', 'geriatric-medicine'],
         ];
 
@@ -139,11 +139,11 @@ class ProviderTaxonomySeeder extends Seeder
                 'nucc' => [['207RE0101X', 'Endocrinology, Diabetes & Metabolism', false]], 'places' => [[null, 'endocrinologist']]],
             ['slug' => 'hrt-hormone-clinic', 'display_name' => 'HRT / Hormone Clinic', 'vetting_tier' => 'licensed_nonmedical', 'requires_npi' => false,
                 'nucc' => [], 'places' => [[null, 'hormone replacement therapy clinic']]],
-            ['slug' => 'pelvic-floor-pt-meno', 'display_name' => 'Pelvic-Floor Physical Therapist', 'vetting_tier' => 'licensed_nonmedical', 'requires_npi' => true,
-                'nucc' => [['225100000X', 'Physical Therapist, Pelvic Health', false]], 'places' => [[null, 'pelvic floor physical therapy']]],
-            ['slug' => 'therapist-mental-health-meno', 'display_name' => 'Therapist / Mental Health', 'vetting_tier' => 'medical', 'requires_npi' => true,
+            ['slug' => 'pelvic-floor-pt', 'display_name' => 'Pelvic-Floor Physical Therapist', 'vetting_tier' => 'licensed_nonmedical', 'requires_npi' => true,
+                'nucc' => [['225100000X', 'Physical Therapist, Pelvic Health', false]], 'places' => [[null, 'pelvic floor physical therapy'], [null, 'pelvic floor physical therapy postpartum']]],
+            ['slug' => 'therapist-mental-health', 'display_name' => 'Therapist / Mental Health', 'vetting_tier' => 'medical', 'requires_npi' => true,
                 'nucc' => [['103T00000X', 'Psychologist', false], ['101YM0800X', 'Counselor, Mental Health', false]],
-                'places' => [[null, 'therapist menopause'], [null, "women's therapist"]]],
+                'places' => [[null, 'therapist'], [null, 'therapist menopause'], [null, "women's therapist"]]],
 
             // 5. Pregnancy & Postpartum
             ['slug' => 'maternal-fetal-medicine', 'display_name' => 'Maternal-Fetal Medicine', 'vetting_tier' => 'medical', 'requires_npi' => true,
@@ -154,8 +154,6 @@ class ProviderTaxonomySeeder extends Seeder
                 'nucc' => [['374J00000X', 'Doula', false]], 'places' => [[null, 'doula']]],
             ['slug' => 'lactation-consultant', 'display_name' => 'Lactation Consultant (IBCLC)', 'vetting_tier' => 'licensed_nonmedical', 'requires_npi' => false,
                 'nucc' => [['174N00000X', 'Lactation Consultant, IBCLC', false]], 'places' => [[null, 'lactation consultant']]],
-            ['slug' => 'pelvic-floor-pt-postpartum', 'display_name' => 'Pelvic-Floor Physical Therapist (postpartum)', 'vetting_tier' => 'licensed_nonmedical', 'requires_npi' => true,
-                'nucc' => [['225100000X', 'Physical Therapist, Pelvic Health', false]], 'places' => [[null, 'pelvic floor physical therapy postpartum']]],
             ['slug' => 'perinatal-mental-health', 'display_name' => 'Perinatal Mental Health', 'vetting_tier' => 'medical', 'requires_npi' => true,
                 'nucc' => [['2084P0800X', 'Psychiatry & Neurology, Perinatal Mental Health', false], ['103T00000X', 'Psychologist (PMH-C)', false]],
                 'places' => [[null, 'postpartum therapist']]],
@@ -167,8 +165,6 @@ class ProviderTaxonomySeeder extends Seeder
                 'nucc' => [['207RC0000X', 'Cardiovascular Disease', false]], 'places' => [[null, 'cardiologist']]],
             ['slug' => 'longevity-functional-medicine', 'display_name' => 'Longevity / Functional Medicine', 'vetting_tier' => 'licensed_nonmedical', 'requires_npi' => false,
                 'nucc' => [], 'places' => [[null, 'longevity clinic'], [null, 'functional medicine']]],
-            ['slug' => 'therapist-mental-health', 'display_name' => 'Therapist / Mental Health', 'vetting_tier' => 'medical', 'requires_npi' => true,
-                'nucc' => [['103T00000X', 'Psychologist', false], ['101YM0800X', 'Counselor, Mental Health', false]], 'places' => [[null, 'therapist']]],
             ['slug' => 'geriatric-medicine', 'display_name' => 'Geriatric Medicine', 'vetting_tier' => 'medical', 'requires_npi' => true,
                 'nucc' => [['207QG0300X', 'Family Medicine, Geriatric', false], ['207RG0300X', 'Internal Medicine, Geriatric', false]], 'places' => [[null, 'geriatric doctor']]],
         ];

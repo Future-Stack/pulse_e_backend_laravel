@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class PlaceDetailsCache extends Model
 {
+    protected $table = 'place_details_cache';
     protected $primaryKey = 'provider_id';
     public $incrementing = false;
     public $timestamps = false;
