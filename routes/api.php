@@ -297,6 +297,7 @@ Route::prefix('v1')->group(function () {
         //BBT
         Route::post('/bbt/logs', [BbtController::class, 'logBbtData']);
         Route::get('/bbt-logs', [BbtController::class, 'fetchLog']);
+        Route::get('/bbt-database-logs', [BbtController::class, 'fetchBbtLogs']);
     });
 
     //Fetch-BBT-Logs
