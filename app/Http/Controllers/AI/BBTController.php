@@ -13,50 +13,32 @@ class BBTController extends Controller
     {
         try {
             $validated = $request->validate([
-                'date' => 'required|date',
                 'temperature_f' => 'required|numeric',
-                'time' => 'required|string',
                 'flags' => 'nullable|array',
             ]);
 
-              $response['data'] = Http::post(env('AI_SERVICE_URL') . '/api/v1/cycle-engine/bbt/log', [
-                'date' => $validated['date'],
+            $userId = auth()->id();
+
+            $response = Http::post(env('AI_SERVICE_URL') . '/api/v1/cycle-engine/bbt/ui?user_id=' . $userId, [
                 'temperature_f' => $validated['temperature_f'],
-                'time' => $validated['time'],
                 'flags' => $validated['flags'] ?? [],
             ]);
 
-            $log = $response['data']['log'];
+//            $log = $response['data']['log'];
 
-            $bbtLog = BbtLog::create([
-                'cycleID'   => $response['data']['reconciliation']['cycle_id'], // adjust if cycle_id is numeric FK
-                'user_id'    => $response['data']['reconciliation']['user_id'],
-                'log_date'   => $log['date'],
-                'temperature'=> $log['temperature_f'],
-                'unit'       => 'F',
-                'logged_at'  => $log['logged_at_time'], // "08:01" string maps to TIME column
-                'illness'    => in_array('illness', $log['flags']),
-                'poor_sleep' => in_array('poor_sleep', $log['flags']),
-                'alcohol'    => in_array('alcohol', $log['flags']),
-                'late_wakeup'=> in_array('late_wakeup', $log['flags']),
-                'travel'     => in_array('travel', $log['flags']),
-                'is_excluded'=> false,
-                'notes'      => null,
-            ]);
-
-            if ($response['data']->successful()) {
+            if ($response) {
                 return response()->json([
                     'success' => true,
                     'message' => 'BBT data logged successfully.',
-                    'data' => $response['data']->json(),
+                    'data' => $response->json(),
                 ], 200);
             }
 
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to log BBT data.',
-                'error' => $response['data']->body(),
-            ], $response['data']->status());
+                'error' => 'Error logging BBT data.',
+            ]);
 
         } catch (\Exception $e) {
             \Log::error('BBT log failed: ' . $e->getMessage());
@@ -70,22 +52,38 @@ class BBTController extends Controller
     public function fetchLog(Request $request)
     {
         try {
-            $logs = BbtLog::orderBy('log_date')->get();
+            $userId = auth()->id();
 
-            // Group by date using Laravel Collection
-            $grouped = $logs->groupBy('log_date');
+            $response = Http::get(
+                'https://female-mood-analyzer.onrender.com/api/v1/cycle-engine/bbt/ui',
+                [
+                    'user_id' => $userId
+                ]
+            );
 
-            return response()->json([
-                'success' => true,
-                'data' => $grouped,
-            ]);
-        }
-        catch (\Exception $e) {
-            \Log::error('BBT log failed: ' . $e->getMessage());
+            if ($response->successful()) {
+                return response()->json([
+                    'success' => true,
+                    'data' => $response->json(),
+                ], 200);
+            }
+
             return response()->json([
                 'success' => false,
-                'message' => $e->getMessage(),
-            ]);
+                'message' => 'API returned error',
+                'data' => $response->json(),
+            ], $response->status());
+
+        } catch (\Exception $e) {
+            \Log::error('Cycle Engine API failed: ' . $e->getMessage());
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to fetch data',
+                'error' => $e->getMessage(),
+            ], 500);
         }
     }
+
+
 }

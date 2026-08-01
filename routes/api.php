@@ -269,8 +269,7 @@ Route::prefix('v1')->group(function () {
         Route::get('/chat/sessions', [ChatController::class, 'getUserSessions']);
         Route::get('/chat/response/{sessionId}', [ChatController::class, 'getLatestMessages']);
 
-        //BBT
-        Route::post('/bbt/logs', [BbtController::class, 'logBbtData']);
+
 
         //Waitlist
         Route::get('/waitlist/list', [WaitlistController::class, 'getWaitlist']);
@@ -295,11 +294,13 @@ Route::prefix('v1')->group(function () {
         Route::post('/blog-update/{slug}', [BlogController::class, 'update']); // Update blog
         Route::delete('/blog-delete/{slug}', [BlogController::class, 'destroy']); // Delete blog
 
-
+        //BBT
+        Route::post('/bbt/logs', [BbtController::class, 'logBbtData']);
+        Route::get('/bbt-logs', [BbtController::class, 'fetchLog']);
     });
 
     //Fetch-BBT-Logs
-    Route::get('/bbt-logs', [BbtController::class, 'fetchLog']);
+
 
     Route::get('/blog-categories', [BlogCategoryController::class, 'index']);
     Route::get('/blog-categories/{slug}', [BlogCategoryController::class, 'show']); // Show single category
