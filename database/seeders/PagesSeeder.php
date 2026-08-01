@@ -21,9 +21,9 @@ class PagesSeeder extends Seeder
                 'content' => [
                     'heading' => 'Terms of Service',
                     'paragraphs' => [
-                        'By using Fight the Number, you agree to our Terms of Service. Fight the Number provides health education and tracking tools. It is not a medical device, does not provide medical advice, and is not a substitute for professional healthcare. Use of the app is at your own discretion.',
-                        'Fight the Number is a health tracking and wellness app. It is NOT a substitute for professional medical advice, diagnosis, or treatment. Always consult with qualified healthcare providers regarding your health concerns.',
-                        'All content, features, and functionality of the Services, including but not limited to text, graphics, logos, icons, images, audio clips, video clips, data compilations, and software, are owned by Fight the Number LLC or its licensors and are protected by United States and international copyright, trademark, patent, trade secret, and other intellectual property laws.',
+                        'By using Neumera, you agree to our Terms of Service. Neumera provides health education and tracking tools. It is not a medical device, does not provide medical advice, and is not a substitute for professional healthcare. Use of the app is at your own discretion.',
+                        'Neumera is a health tracking and wellness app. It is NOT a substitute for professional medical advice, diagnosis, or treatment. Always consult with qualified healthcare providers regarding your health concerns.',
+                        'All content, features, and functionality of the Services, including but not limited to text, graphics, logos, icons, images, audio clips, video clips, data compilations, and software, are owned by Neumera LLC or its licensors and are protected by United States and international copyright, trademark, patent, trade secret, and other intellectual property laws.',
                         'You retain ownership of your personal data and content you submit. By using the Services, you grant us a limited license to use, store, and process your data as described in our Privacy Policy.',
                     ],
                 ],
@@ -39,9 +39,9 @@ class PagesSeeder extends Seeder
                 'content' => [
                     'heading' => 'Privacy Policy',
                     'paragraphs' => [
-                        'Fight The Number collects health data you choose to input. We do not sell your personal health data. You can request a full data export or deletion at any time under Privacy Settings.',
-                        'Fight The Number is a general wellness platform. It is not a medical device and does not provide medical advice, diagnosis, or treatment. "Numera," our AI coach, generates generalized wellness guidance and pattern-based insights. All outputs may be inaccurate or incomplete and should not be relied upon for urgent, emergency, or clinical decisions. If you have a medical concern, contact a licensed healthcare professional.',
-                        'Fight the Number LLC operates the Fight the Number mobile application and website. We are committed to protecting your privacy.',
+                        'Neumera collects health data you choose to input. We do not sell your personal health data. You can request a full data export or deletion at any time under Privacy Settings.',
+                        'Neumera is a general wellness platform. It is not a medical device and does not provide medical advice, diagnosis, or treatment. "Neumera," our AI coach, generates generalized wellness guidance and pattern-based insights. All outputs may be inaccurate or incomplete and should not be relied upon for urgent, emergency, or clinical decisions. If you have a medical concern, contact a licensed healthcare professional.',
+                        'Neumera LLC operates the Neumera mobile application and website. We are committed to protecting your privacy.',
                     ],
                     'sections' => [
                         [
@@ -86,7 +86,7 @@ class PagesSeeder extends Seeder
                     'heading' => 'Disclaimer',
                     'sub_heading' => '🔴 Fertility awareness, not birth control',
                     'paragraphs' => [
-                        'Fight the Number is not a contraceptive and has not been cleared or approved by the U.S. FDA as a method of contraception. Cycle predictions, fertile window estimates, and ovulation predictions are educational estimates only. They may be inaccurate and cannot tell you which days are safe to avoid pregnancy. Do not use Neumera to prevent pregnancy. Consult a healthcare provider for contraceptive needs.',
+                        'Neumera is not a contraceptive and has not been cleared or approved by the U.S. FDA as a method of contraception. Cycle predictions, fertile window estimates, and ovulation predictions are educational estimates only. They may be inaccurate and cannot tell you which days are safe to avoid pregnancy. Do not use Neumera to prevent pregnancy. Consult a healthcare provider for contraceptive needs.',
                     ],
                 ],
                 'status' => true,

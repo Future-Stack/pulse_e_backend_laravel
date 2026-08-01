@@ -19,12 +19,42 @@ class BBTController extends Controller
 
             $userId = auth()->id();
 
-            $response = Http::post(env('AI_SERVICE_URL') . '/api/v1/cycle-engine/bbt/ui?user_id=' . $userId, [
+            $response = Http::post(
+                env('AI_SERVICE_URL') . '/api/v1/cycle-engine/bbt/ui?user_id=' . $userId, [
                 'temperature_f' => $validated['temperature_f'],
                 'flags' => $validated['flags'] ?? [],
             ]);
 
-//            $log = $response['data']['log'];
+            $data = $response->json();
+
+            if ($response->successful()) {
+                foreach ($data['bbt_chart']['points'] as $point) {
+                    BbtLog::updateOrCreate(
+                        [
+                            'log_date' => $point['date'],
+                        ],
+                        [
+                            'user_id'     => $userId,
+                            'temperature' => $point['temperature_f'],
+                            'unit'        => 'F',
+                            'logged_at'   => now(),
+                            'is_excluded' => $point['is_excluded'] ?? false,
+                            'illness'     => in_array('illness', $point['flags'] ?? []),
+                            'poor_sleep'  => in_array('poor_sleep', $point['flags'] ?? []),
+                            'alcohol'     => in_array('alcohol', $point['flags'] ?? []),
+                            'late_wakeup' => in_array('late_wakeup', $point['flags'] ?? []),
+                            'travel'      => in_array('travel', $point['flags'] ?? []),
+                            'notes'       => null,
+
+                            'coverline_value'    => $data['bbt_chart']['coverline_value'] ?? null,
+                            'ovulation_confirmed'=> ($data['coverline_algorithm']['summary']['coverline'] !== '—'),
+                            'cycle_day'          => $point['day'] ?? null,
+                            'phase'              => $data['coverline_algorithm']['summary']['phase'] ?? null,
+                        ]
+                    );
+                }
+            }
+
 
             if ($response) {
                 return response()->json([
@@ -55,11 +85,11 @@ class BBTController extends Controller
             $userId = auth()->id();
 
             $response = Http::get(
-                'https://female-mood-analyzer.onrender.com/api/v1/cycle-engine/bbt/ui',
+                env('AI_SERVICE_URL') .'/api/v1/cycle-engine/bbt/ui',
                 [
                     'user_id' => $userId
-                ]
-            );
+                ]);
+
 
             if ($response->successful()) {
                 return response()->json([
@@ -81,6 +111,32 @@ class BBTController extends Controller
                 'success' => false,
                 'message' => 'Failed to fetch data',
                 'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    public function fetchBbtLogs(Request $request)
+    {
+        try {
+            // Fetch all logs for the authenticated user
+            $logs = BbtLog::where('user_id', auth()->id())
+                ->orderBy('log_date')
+                ->get();
+
+            // Group logs by date
+            $grouped = $logs->groupBy('log_date');
+
+            return response()->json([
+                'success' => true,
+                'data'    => $grouped,
+            ], 200);
+
+        } catch (\Exception $e) {
+            \Log::error('Fetching BBT logs failed: ' . $e->getMessage());
+
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
             ], 500);
         }
     }
