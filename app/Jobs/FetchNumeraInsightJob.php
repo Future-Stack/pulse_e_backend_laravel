@@ -2,158 +2,224 @@
 
 namespace App\Jobs;
 
-
 use App\Models\NumeraInsight;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
-
 class FetchNumeraInsightJob implements ShouldQueue
 {
-
     use Queueable;
-
 
     public int $tries = 3;
 
     public int $timeout = 600;
 
-
     protected int $insightId;
-
-
 
     public function __construct(int $insightId)
     {
         $this->insightId = $insightId;
     }
 
-
-
-
-    public function handle():void
+    public function handle(): void
     {
+        /*
+        |--------------------------------------------------------------------------
+        | Find Numera Insight
+        |--------------------------------------------------------------------------
+        */
 
         $insight = NumeraInsight::find($this->insightId);
 
+        if (! $insight) {
 
-
-        if(!$insight){
-
-            Log::error('Numera insight not found');
-
-            return;
-
-        }
-
-
-
-        try{
-
-
-            // pending -> processing
-
-            $insight->update([
-                'status'=>'processing'
+            Log::error('Numera Insight not found.', [
+                'insight_id' => $this->insightId,
             ]);
 
+            return;
+        }
 
+        /*
+        |--------------------------------------------------------------------------
+        | Get User ID
+        |--------------------------------------------------------------------------
+        */
+
+        $userId = $insight->user_id;
+
+        try {
+
+            /*
+            |--------------------------------------------------------------------------
+            | pending -> processing
+            |--------------------------------------------------------------------------
+            */
+
+            $insight->update([
+                'status' => 'processing',
+            ]);
+
+            /*
+            |--------------------------------------------------------------------------
+            | AI API URL
+            |--------------------------------------------------------------------------
+            */
 
             $url = config('services.ai.base_url')
-                .'/api/numera-insight';
+                . '/api/numera-insight';
 
+            /*
+            |--------------------------------------------------------------------------
+            | Call AI API
+            |--------------------------------------------------------------------------
+            |
+            | user_id is required as query parameter.
+            |
+            */
 
+            Log::info('Calling Numera Insight AI API.', [
+                'url' => $url,
+                'user_id' => $userId,
+                'insight_id' => $insight->id,
+            ]);
 
-            $response = Http::retry(3,2000)
+            $response = Http::retry(3, 2000)
                 ->withoutVerifying()
                 ->acceptJson()
                 ->timeout(300)
-                ->get($url);
+                ->get($url, [
 
+                    'user_id' => $userId,
 
+                ]);
 
-            if(!$response->successful()){
+            /*
+            |--------------------------------------------------------------------------
+            | Log Response
+            |--------------------------------------------------------------------------
+            */
 
+            Log::info('Numera Insight AI Response.', [
+                'status' => $response->status(),
+                'user_id' => $userId,
+                'body' => $response->body(),
+            ]);
+
+            /*
+            |--------------------------------------------------------------------------
+            | Validate Response
+            |--------------------------------------------------------------------------
+            */
+
+            if (! $response->successful()) {
 
                 throw new \Exception(
-                    "AI Error ".$response->body()
+                    'AI API Error: '
+                    . $response->status()
+                    . ' '
+                    . $response->body()
                 );
-
             }
 
+            $data = $response->json();
 
+            /*
+            |--------------------------------------------------------------------------
+            | Validate Numera Insight
+            |--------------------------------------------------------------------------
+            */
 
-
-            $data=$response->json();
-
-
-
-            if(!isset($data['numera_insight'])){
+            if (! isset($data['numera_insight'])) {
 
                 throw new \Exception(
-                    'numera_insight missing'
+                    'numera_insight key missing from AI response.'
                 );
-
             }
 
+            $result = $data['numera_insight'];
 
-
-            $result=$data['numera_insight'];
-
-
+            /*
+            |--------------------------------------------------------------------------
+            | Save AI Result
+            |--------------------------------------------------------------------------
+            */
 
             $insight->update([
 
+                'title' =>
+                    $result['title'] ?? null,
 
-                'title'=>$result['title'] ?? null,
+                'tag' =>
+                    $result['tag'] ?? null,
 
-                'tag'=>$result['tag'] ?? null,
+                'eyebrow' =>
+                    $result['eyebrow'] ?? null,
 
-                'eyebrow'=>$result['eyebrow'] ?? null,
+                'headline' =>
+                    $result['headline'] ?? null,
 
-                'headline'=>$result['headline'] ?? null,
+                'description' =>
+                    $result['description'] ?? null,
 
-                'description'=>$result['description'] ?? null,
+                'cycle_day' =>
+                    $result['cycle_day'] ?? null,
 
-                'cycle_day'=>$result['cycle_day'] ?? null,
+                'theme' =>
+                    $result['theme'] ?? null,
 
-                'theme'=>$result['theme'] ?? null,
+                'priority' =>
+                    $result['priority'] ?? null,
 
-                'priority'=>$result['priority'] ?? null,
-
-
-                'status'=>'completed'
-
+                'status' =>
+                    'completed',
             ]);
 
+            /*
+            |--------------------------------------------------------------------------
+            | Success Log
+            |--------------------------------------------------------------------------
+            */
 
-
-
-        }catch(\Throwable $e){
-
-
-            Log::error('Numera Insight Failed',[
-
-                'id'=>$this->insightId,
-
-                'message'=>$e->getMessage()
-
+            Log::info('Numera Insight completed successfully.', [
+                'insight_id' => $insight->id,
+                'user_id' => $userId,
             ]);
 
+        } catch (\Throwable $e) {
 
+            /*
+            |--------------------------------------------------------------------------
+            | Failed
+            |--------------------------------------------------------------------------
+            */
+
+            Log::error('Numera Insight Job Failed.', [
+
+                'insight_id' =>
+                    $this->insightId,
+
+                'user_id' =>
+                    $userId,
+
+                'message' =>
+                    $e->getMessage(),
+
+                'file' =>
+                    $e->getFile(),
+
+                'line' =>
+                    $e->getLine(),
+            ]);
 
             $insight->update([
-                'status'=>'failed'
+                'status' => 'failed',
             ]);
-
 
             throw $e;
-
         }
-
-
     }
-
 }
+

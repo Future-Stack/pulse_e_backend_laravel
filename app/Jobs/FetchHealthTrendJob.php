@@ -20,7 +20,6 @@ class FetchHealthTrendJob implements ShouldQueue
 
     protected string $period;
 
-
     public function __construct(
         int $healthTrendId,
         string $period = '30d'
@@ -29,12 +28,15 @@ class FetchHealthTrendJob implements ShouldQueue
         $this->period = $period;
     }
 
-
-
     public function handle(): void
     {
-        $healthTrend = HealthTrend::find($this->healthTrendId);
+        /*
+        |--------------------------------------------------------------------------
+        | Find Health Trend
+        |--------------------------------------------------------------------------
+        */
 
+        $healthTrend = HealthTrend::find($this->healthTrendId);
 
         if (! $healthTrend) {
 
@@ -45,47 +47,80 @@ class FetchHealthTrendJob implements ShouldQueue
             return;
         }
 
+        /*
+        |--------------------------------------------------------------------------
+        | Get User ID
+        |--------------------------------------------------------------------------
+        */
 
+        $userId = $healthTrend->user_id;
 
         try {
 
-            // pending -> processing
+            /*
+            |--------------------------------------------------------------------------
+            | pending -> processing
+            |--------------------------------------------------------------------------
+            */
+
             $healthTrend->update([
                 'status' => 'processing',
             ]);
 
-
+            /*
+            |--------------------------------------------------------------------------
+            | AI API URL
+            |--------------------------------------------------------------------------
+            */
 
             $url = config('services.ai.base_url')
                 . '/api/health-trends';
 
-
+            /*
+            |--------------------------------------------------------------------------
+            | Call Health Trend AI API
+            |--------------------------------------------------------------------------
+            |
+            | user_id is required by the AI API.
+            |
+            */
 
             Log::info('Calling Health Trend AI API', [
                 'url' => $url,
+                'user_id' => $userId,
                 'period' => $this->period,
                 'health_trend_id' => $healthTrend->id,
-                'user_id' => $healthTrend->user_id,
             ]);
-
-
 
             $response = Http::retry(3, 2000)
                 ->withoutVerifying()
                 ->acceptJson()
                 ->timeout(300)
                 ->get($url, [
+
+                    'user_id' => $userId,
+
                     'period' => $this->period,
+
                 ]);
 
-
+            /*
+            |--------------------------------------------------------------------------
+            | Log AI Response
+            |--------------------------------------------------------------------------
+            */
 
             Log::info('Health Trend AI Response', [
                 'status' => $response->status(),
+                'user_id' => $userId,
                 'body' => $response->body(),
             ]);
 
-
+            /*
+            |--------------------------------------------------------------------------
+            | Validate AI Response
+            |--------------------------------------------------------------------------
+            */
 
             if (! $response->successful()) {
 
@@ -94,11 +129,13 @@ class FetchHealthTrendJob implements ShouldQueue
                 );
             }
 
-
-
             $data = $response->json();
 
-
+            /*
+            |--------------------------------------------------------------------------
+            | Validate Health Trends Data
+            |--------------------------------------------------------------------------
+            */
 
             if (! isset($data['health_trends'])) {
 
@@ -107,11 +144,13 @@ class FetchHealthTrendJob implements ShouldQueue
                 );
             }
 
-
-
             $trend = $data['health_trends'];
 
-
+            /*
+            |--------------------------------------------------------------------------
+            | Save AI Response
+            |--------------------------------------------------------------------------
+            */
 
             $healthTrend->update([
 
@@ -119,12 +158,17 @@ class FetchHealthTrendJob implements ShouldQueue
 
                 'period' => $this->period,
 
-                'range_options' => collect($trend['range_options'] ?? [])
+                'range_options' => collect(
+                    $trend['range_options'] ?? []
+                )
                     ->map(function ($item) {
 
                         return [
-                            'label' => $item['label'],
-                            'selected' => $item['label'] === $this->period,
+                            'label' => $item['label'] ?? null,
+
+                            'selected' =>
+                                ($item['label'] ?? null)
+                                === $this->period,
                         ];
 
                     })
@@ -143,20 +187,33 @@ class FetchHealthTrendJob implements ShouldQueue
                 'status' => 'completed',
             ]);
 
-
+            /*
+            |--------------------------------------------------------------------------
+            | Success Log
+            |--------------------------------------------------------------------------
+            */
 
             Log::info('Health Trend generated successfully.', [
                 'health_trend_id' => $healthTrend->id,
+                'user_id' => $userId,
+                'period' => $this->period,
             ]);
-
-
 
         } catch (\Throwable $e) {
 
+            /*
+            |--------------------------------------------------------------------------
+            | Failed
+            |--------------------------------------------------------------------------
+            */
 
             Log::error('Health Trend Job Failed.', [
 
                 'health_trend_id' => $this->healthTrendId,
+
+                'user_id' => $userId,
+
+                'period' => $this->period,
 
                 'message' => $e->getMessage(),
 
@@ -166,15 +223,12 @@ class FetchHealthTrendJob implements ShouldQueue
 
             ]);
 
-
-
             $healthTrend->update([
                 'status' => 'failed',
             ]);
-
-
 
             throw $e;
         }
     }
 }
+
