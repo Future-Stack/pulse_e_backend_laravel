@@ -40,7 +40,9 @@ return new class extends Migration
 
             // Foreign key & Indexes
             $table->foreign('metro_id')->references('id')->on('metros')->nullOnDelete();
-            $table->spatialIndex('location');
+            if (DB::getDriverName() !== 'sqlite') {
+                $table->spatialIndex('location');
+            }
             $table->index('status');
         });
     }
