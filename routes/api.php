@@ -79,7 +79,7 @@ Route::prefix('v1')->group(function () {
     Route::get('pages', [PageController::class, 'index']);
     Route::get('pages/{page_id}', [PageController::class, 'show']);
 
-
+Route::get('lab-reports/{labReport}', [LabReportController::class, 'show']);
     Route::middleware('auth:sanctum')->group(function () {
 
         //user health log
@@ -87,7 +87,8 @@ Route::prefix('v1')->group(function () {
         Route::get('/health-log/today', [HealthLogController::class, 'today']);
 
 
-        Route::apiResource('lab-reports', LabReportController::class);
+        Route::apiResource('lab-reports', LabReportController::class)
+        ->except(['show']);
 
         // Get AI Analysis
         Route::get(
