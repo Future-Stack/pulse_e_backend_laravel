@@ -3,8 +3,8 @@
 namespace App\Http\Controllers\AI;
 
 use App\Http\Controllers\Controller;
-use App\Models\AwarenessSnapshot;
 use App\Models\MenstrualCycle;
+use App\Models\NewAwarenessSnapshot;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
@@ -54,7 +54,7 @@ class AwarenessController extends Controller
 
             /*
             |--------------------------------------------------------------------------
-            | AI URL
+            | AI API URL
             |--------------------------------------------------------------------------
             */
 
@@ -101,17 +101,28 @@ class AwarenessController extends Controller
                 ], $response->status());
             }
 
+            /*
+            |--------------------------------------------------------------------------
+            | Decode AI Response
+            |--------------------------------------------------------------------------
+            */
+
             $result = $response->json();
 
             /*
             |--------------------------------------------------------------------------
-            | Get Cycle Awareness
+            | Get cycle_awareness
             |--------------------------------------------------------------------------
             */
 
             $awareness = $result['cycle_awareness'] ?? null;
 
-            if (! $awareness) {
+            if (! is_array($awareness)) {
+
+                Log::error('Invalid Cycle Awareness AI Response', [
+                    'user_id' => $user->id,
+                    'response' => $result,
+                ]);
 
                 return response()->json([
                     'success' => false,
@@ -121,41 +132,38 @@ class AwarenessController extends Controller
 
             /*
             |--------------------------------------------------------------------------
-            | Get Nested Data
+            | Extract AI Data
             |--------------------------------------------------------------------------
+            |
+            | These are saved exactly as received from AI.
+            |
             */
 
-            $cycleContext = $awareness['cycle_context'] ?? [];
-            $currentPhase = $awareness['current_phase'] ?? [];
-            $lutealPhase = $awareness['luteal_phase'] ?? [];
-            $hormoneLevels = $awareness['hormone_levels'] ?? [];
-            $whatToKnow = $awareness['what_to_know'] ?? [];
-            $fourPhaseCycle = $awareness['four_phase_cycle'] ?? [];
+            $title = $awareness['title'] ?? null;
+
+            $cycleContext = $awareness['cycle_context'] ?? null;
+
+            $currentPhase = $awareness['current_phase'] ?? null;
+
+            $lutealPhase = $awareness['luteal_phase'] ?? null;
+
+            $hormoneLevels = $awareness['hormone_levels'] ?? null;
+
+            $whatToKnow = $awareness['what_to_know'] ?? null;
+
+            $fourPhaseCycle = $awareness['four_phase_cycle'] ?? null;
 
             /*
             |--------------------------------------------------------------------------
             | Save AI Response
             |--------------------------------------------------------------------------
-            |
-            | IMPORTANT:
-            |
-            | Do NOT update menstrual_cycles.current_phase.
-            |
-            | AI returns:
-            |
-            | "Follicular Phase"
-            |
-            | But menstrual_cycles.current_phase is using another
-            | database format/enum.
-            |
-            | So we only save the AI response into AwarenessSnapshot.
-            |
             */
 
             DB::transaction(function () use (
                 $user,
                 $cycle,
                 $awareness,
+                $title,
                 $cycleContext,
                 $currentPhase,
                 $lutealPhase,
@@ -165,7 +173,7 @@ class AwarenessController extends Controller
                 $result
             ) {
 
-                AwarenessSnapshot::updateOrCreate(
+                NewAwarenessSnapshot::updateOrCreate(
                     [
                         'user_id' => $user->id,
                         'cycle_id' => $cycle->id,
@@ -174,47 +182,83 @@ class AwarenessController extends Controller
 
                         /*
                         |--------------------------------------------------------------------------
-                        | Cycle Context
+                        | Title
                         |--------------------------------------------------------------------------
                         */
 
-                        'phase' => $cycleContext['phase'] ?? null,
+                        'title' => $title,
 
-                        'day_range' => $currentPhase['day_range'] ?? null,
+                        /*
+                        |--------------------------------------------------------------------------
+                        | Cycle Context
+                        |--------------------------------------------------------------------------
+                        |
+                        | Example:
+                        |
+                        | {
+                        |   "cycle_day": 2,
+                        |   "phase": "Menstrual phase",
+                        |   "average_cycle_length": "~28d (est.)"
+                        | }
+                        |
+                        */
 
-                        'current_cycle_day' =>
-                            $cycleContext['cycle_day'] ?? null,
+                        'cycle_context' => $cycleContext,
 
                         /*
                         |--------------------------------------------------------------------------
                         | Current Phase
                         |--------------------------------------------------------------------------
                         |
-                        | Save exactly what AI sends:
-                        |
-                        | "Follicular Phase"
+                        | Save complete object exactly as AI sends it.
                         |
                         */
 
-                        'current_phase' =>
-                            $currentPhase['phase'] ?? null,
-
-                        'dominant_hormone_note' =>
-                            $currentPhase['summary'] ?? null,
+                        'current_phase' => $currentPhase,
 
                         /*
                         |--------------------------------------------------------------------------
-                        | AI Data
+                        | Luteal Phase
                         |--------------------------------------------------------------------------
                         */
 
                         'luteal_phase' => $lutealPhase,
 
+                        /*
+                        |--------------------------------------------------------------------------
+                        | Hormone Levels
+                        |--------------------------------------------------------------------------
+                        */
+
                         'hormone_levels' => $hormoneLevels,
+
+                        /*
+                        |--------------------------------------------------------------------------
+                        | What To Know
+                        |--------------------------------------------------------------------------
+                        */
 
                         'what_to_know' => $whatToKnow,
 
+                        /*
+                        |--------------------------------------------------------------------------
+                        | Four Phase Cycle
+                        |--------------------------------------------------------------------------
+                        */
+
                         'four_phase_cycle' => $fourPhaseCycle,
+
+                        /*
+                        |--------------------------------------------------------------------------
+                        | Complete cycle_awareness Response
+                        |--------------------------------------------------------------------------
+                        |
+                        | This keeps the complete AI response so no AI data
+                        | is lost even if the AI adds new fields later.
+                        |
+                        */
+
+                        'ai_response' => $awareness,
 
                         /*
                         |--------------------------------------------------------------------------
@@ -222,7 +266,8 @@ class AwarenessController extends Controller
                         |--------------------------------------------------------------------------
                         */
 
-                        'ai_generated' => true,
+                        'ai_generated' =>
+                            $result['fetched'] ?? true,
 
                         'ai_cached' =>
                             $result['fetched'] ?? false,
@@ -236,22 +281,33 @@ class AwarenessController extends Controller
             |--------------------------------------------------------------------------
             */
 
-            $snapshot = AwarenessSnapshot::where('user_id', $user->id)
+            $snapshot = NewAwarenessSnapshot::where('user_id', $user->id)
                 ->where('cycle_id', $cycle->id)
                 ->first();
-
-            /*
-            |--------------------------------------------------------------------------
-            | Response
-            |--------------------------------------------------------------------------
-            */
 
             return response()->json([
                 'success' => true,
                 'message' => 'Cycle awareness data synced successfully.',
-                'data' => $snapshot,
-            ]);
+                'data' => [
+                    'id' => $snapshot->id,
+                    'user_id' => $snapshot->user_id,
+                    'cycle_id' => $snapshot->cycle_id,
 
+                    'title' => $snapshot->title,
+                    'cycle_context' => $snapshot->cycle_context,
+                    'current_phase' => $snapshot->current_phase,
+                    'luteal_phase' => $snapshot->luteal_phase,
+                    'hormone_levels' => $snapshot->hormone_levels,
+                    'what_to_know' => $snapshot->what_to_know,
+                    'four_phase_cycle' => $snapshot->four_phase_cycle,
+
+                    'ai_generated' => $snapshot->ai_generated,
+                    'ai_cached' => $snapshot->ai_cached,
+
+                    'created_at' => $snapshot->created_at,
+                    'updated_at' => $snapshot->updated_at,
+                ],
+            ]);
         } catch (\Throwable $e) {
 
             Log::error('Cycle Awareness Sync Failed', [
@@ -270,3 +326,4 @@ class AwarenessController extends Controller
         }
     }
 }
+
