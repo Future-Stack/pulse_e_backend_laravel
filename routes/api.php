@@ -45,6 +45,7 @@ use App\Http\Controllers\AI\AvoidingPregnancyController;
 use App\Http\Controllers\AI\OpkLogController;
 use App\Http\Controllers\AI\TryingToConceiveController;
 use App\Http\Controllers\AI\AwarenessController;
+use App\Http\Controllers\AI\CycleCalendarInputController;
 
 
 Route::prefix('v1')->group(function () {
@@ -80,7 +81,19 @@ Route::prefix('v1')->group(function () {
     Route::get('pages/{page_id}', [PageController::class, 'show']);
 
 Route::get('lab-reports/{labReport}', [LabReportController::class, 'show']);
+
+
+Route::get(
+    '/cycle-calendar-inputs/{user_id}',
+    [CycleCalendarInputController::class, 'show']
+);
+
     Route::middleware('auth:sanctum')->group(function () {
+
+    Route::post(
+    '/cycle-calendar-inputs',
+    [CycleCalendarInputController::class, 'store']
+);
 
         //user health log
         Route::apiResource('health-logs', HealthLogController::class);
