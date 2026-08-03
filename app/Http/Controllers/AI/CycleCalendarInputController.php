@@ -4,8 +4,8 @@ namespace App\Http\Controllers\AI;
 
 use App\Http\Controllers\Controller;
 use App\Models\CycleCalendarInput;
-use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 
 class CycleCalendarInputController extends Controller
 {
@@ -17,12 +17,14 @@ class CycleCalendarInputController extends Controller
         $validated = $request->validate([
             'start_date' => ['required', 'date'],
             'end_date' => ['nullable', 'date', 'after_or_equal:start_date'],
+            'is_day_n' => ['required', 'boolean'],
         ]);
 
         $cycleCalendarInput = CycleCalendarInput::create([
             'user_id' => $request->user()->id,
             'start_date' => $validated['start_date'],
             'end_date' => $validated['end_date'] ?? null,
+            'is_day_n' => $validated['is_day_n'],
         ]);
 
         return response()->json([
