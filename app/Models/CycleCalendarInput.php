@@ -11,11 +11,13 @@ class CycleCalendarInput extends Model
         'user_id',
         'start_date',
         'end_date',
+        'is_day_n',
     ];
 
     protected $casts = [
         'start_date' => 'date',
         'end_date' => 'date',
+        'is_day_n' => 'boolean',
     ];
 
     public function user(): BelongsTo
