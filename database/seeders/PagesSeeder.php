@@ -41,7 +41,7 @@ class PagesSeeder extends Seeder
                     'paragraphs' => [
                         'Neumera collects health data you choose to input. We do not sell your personal health data. You can request a full data export or deletion at any time under Privacy Settings.',
                         'Neumera is a general wellness platform. It is not a medical device and does not provide medical advice, diagnosis, or treatment. "Neumera," our AI coach, generates generalized wellness guidance and pattern-based insights. All outputs may be inaccurate or incomplete and should not be relied upon for urgent, emergency, or clinical decisions. If you have a medical concern, contact a licensed healthcare professional.',
-                        'Neumera LLC operates the Neumera mobile application and website. We are committed to protecting your privacy.',
+                        'Fight the Number LLC operates the Neumera mobile application and website. We are committed to protecting your privacy.',
                     ],
                     'sections' => [
                         [
