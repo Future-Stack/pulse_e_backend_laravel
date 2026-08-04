@@ -90,7 +90,7 @@ class WaitlistController extends Controller
 //                    'message' => 'Waitlist entry successfully confirmed.',
 //                ]);
 
-                return redirect()->to('https://www.fightthenumber.com/waitlist/confirm/' . $exist->confirmation_token);
+                return redirect()->to('https://www.fightthenumber.com/waitlist/confirm');
             }
 
             return response()->json([
