@@ -44,6 +44,11 @@ return new class extends Migration
 
             $table->index('log_date');
             $table->index('is_excluded');
+
+            $table->decimal('coverline_value', 5, 2)->nullable();
+            $table->boolean('ovulation_confirmed')->default(false);
+            $table->integer('cycle_day')->nullable();
+            $table->string('phase')->nullable();
         });
     }
 

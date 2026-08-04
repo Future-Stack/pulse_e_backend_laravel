@@ -13,50 +13,62 @@ class BBTController extends Controller
     {
         try {
             $validated = $request->validate([
-                'date' => 'required|date',
                 'temperature_f' => 'required|numeric',
-                'time' => 'required|string',
                 'flags' => 'nullable|array',
             ]);
 
-              $response['data'] = Http::post(env('AI_SERVICE_URL') . '/api/v1/cycle-engine/bbt/log', [
-                'date' => $validated['date'],
+            $userId = auth()->id();
+
+            $response = Http::post(
+                env('AI_SERVICE_URL') . '/api/v1/cycle-engine/bbt/ui?user_id=' . $userId, [
                 'temperature_f' => $validated['temperature_f'],
-                'time' => $validated['time'],
                 'flags' => $validated['flags'] ?? [],
             ]);
 
-            $log = $response['data']['log'];
+            $data = $response->json();
 
-            $bbtLog = BbtLog::create([
-                'cycleID'   => $response['data']['reconciliation']['cycle_id'], // adjust if cycle_id is numeric FK
-                'user_id'    => $response['data']['reconciliation']['user_id'],
-                'log_date'   => $log['date'],
-                'temperature'=> $log['temperature_f'],
-                'unit'       => 'F',
-                'logged_at'  => $log['logged_at_time'], // "08:01" string maps to TIME column
-                'illness'    => in_array('illness', $log['flags']),
-                'poor_sleep' => in_array('poor_sleep', $log['flags']),
-                'alcohol'    => in_array('alcohol', $log['flags']),
-                'late_wakeup'=> in_array('late_wakeup', $log['flags']),
-                'travel'     => in_array('travel', $log['flags']),
-                'is_excluded'=> false,
-                'notes'      => null,
-            ]);
+            if ($response->successful()) {
+                foreach ($data['bbt_chart']['points'] as $point) {
+                    BbtLog::updateOrCreate(
+                        [
+                            'log_date' => $point['date'],
+                        ],
+                        [
+                            'user_id'     => $userId,
+                            'temperature' => $point['temperature_f'],
+                            'unit'        => 'F',
+                            'logged_at'   => now(),
+                            'is_excluded' => $point['is_excluded'] ?? false,
+                            'illness'     => in_array('illness', $point['flags'] ?? []),
+                            'poor_sleep'  => in_array('poor_sleep', $point['flags'] ?? []),
+                            'alcohol'     => in_array('alcohol', $point['flags'] ?? []),
+                            'late_wakeup' => in_array('late_wakeup', $point['flags'] ?? []),
+                            'travel'      => in_array('travel', $point['flags'] ?? []),
+                            'notes'       => null,
 
-            if ($response['data']->successful()) {
+                            'coverline_value'    => $data['bbt_chart']['coverline_value'] ?? null,
+                            'ovulation_confirmed'=> ($data['coverline_algorithm']['summary']['coverline'] !== '—'),
+                            'cycle_day'          => $point['day'] ?? null,
+                            'phase'              => $data['coverline_algorithm']['summary']['phase'] ?? null,
+                        ]
+                    );
+                }
+            }
+
+
+            if ($response) {
                 return response()->json([
                     'success' => true,
                     'message' => 'BBT data logged successfully.',
-                    'data' => $response['data']->json(),
+                    'data' => $response->json(),
                 ], 200);
             }
 
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to log BBT data.',
-                'error' => $response['data']->body(),
-            ], $response['data']->status());
+                'error' => 'Error logging BBT data.',
+            ]);
 
         } catch (\Exception $e) {
             \Log::error('BBT log failed: ' . $e->getMessage());
@@ -70,22 +82,64 @@ class BBTController extends Controller
     public function fetchLog(Request $request)
     {
         try {
-            $logs = BbtLog::orderBy('log_date')->get();
+            $userId = auth()->id();
 
-            // Group by date using Laravel Collection
+            $response = Http::get(
+                env('AI_SERVICE_URL') .'/api/v1/cycle-engine/bbt/ui',
+                [
+                    'user_id' => $userId
+                ]);
+
+
+            if ($response->successful()) {
+                return response()->json([
+                    'success' => true,
+                    'data' => $response->json(),
+                ], 200);
+            }
+
+            return response()->json([
+                'success' => false,
+                'message' => 'API returned error',
+                'data' => $response->json(),
+            ], $response->status());
+
+        } catch (\Exception $e) {
+            \Log::error('Cycle Engine API failed: ' . $e->getMessage());
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to fetch data',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    public function fetchBbtLogs(Request $request)
+    {
+        try {
+            // Fetch all logs for the authenticated user
+            $logs = BbtLog::where('user_id', auth()->id())
+                ->orderBy('log_date')
+                ->get();
+
+            // Group logs by date
             $grouped = $logs->groupBy('log_date');
 
             return response()->json([
                 'success' => true,
-                'data' => $grouped,
-            ]);
-        }
-        catch (\Exception $e) {
-            \Log::error('BBT log failed: ' . $e->getMessage());
+                'data'    => $grouped,
+            ], 200);
+
+        } catch (\Exception $e) {
+            \Log::error('Fetching BBT logs failed: ' . $e->getMessage());
+
             return response()->json([
                 'success' => false,
                 'message' => $e->getMessage(),
-            ]);
+            ], 500);
         }
     }
+
+
 }

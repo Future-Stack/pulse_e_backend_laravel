@@ -18,7 +18,7 @@ class LifeJourneySeeder extends Seeder
             [
                 'icon' => 'beauty.png',
                 'title' => 'Beauty & Radiance',
-                'subtitle' => 'Connect inner health with visible outcomes',
+                'subtitle' => 'Skin, hair, confidence - the entry wedge.',
                 'description' => 'Recent sleep disruption may be contributing to increased skin redness. A consistent 10pm bedtime could restore your glow within 5-7 days.',
                 'features' => [
                     'Skin Health Tracking',
@@ -30,8 +30,8 @@ class LifeJourneySeeder extends Seeder
             ],
             [
                 'icon' => 'tracking.png',
-                'title' => 'Cycle Tracking',
-                'subtitle' => 'Build hormonal baseline & fertility awareness',
+                'title' => 'Cycle & Fertility',
+                'subtitle' => 'Cycle, ovulation, conception planning.',
                 'description' => "You're in your Ovulatory Phase (Day 14). Peak fertility window opens in the next 24-48 hours. Estrogen is peaking — expect elevated energy and confidence.",
                 'features' => [
                     'Cycle Tracking',
@@ -43,8 +43,8 @@ class LifeJourneySeeder extends Seeder
             ],
             [
                 'icon' => 'athlete.png',
-                'title' => 'Athlete Performance',
-                'subtitle' => 'Optimize training around female physiology',
+                'title' => 'Athlete',
+                'subtitle' => 'Training, recovery, performance by hormone phase.',
                 'description' => 'Recovery metrics suggest reducing training intensity today. Your HRV indicates moderate nervous system fatigue — a light session will serve you better.',
                 'features' => [
                     'Training Load Monitoring',
@@ -55,36 +55,9 @@ class LifeJourneySeeder extends Seeder
                 ]
             ],
             [
-                'icon' => 'pregnancy.png',
-                'title' => 'Pregnancy',
-                'subtitle' => 'Support maternal wellness throughout',
-                'description' => 'Week 24 — your baby is the size of a corn cob! Focus on sleep positioning (left side preferred) and stay well hydrated.',
-                'features' => [
-                    'Week Tracking',
-                    'Symptom Monitoring',
-                    'Health Checkpoints',
-                    'Sleep Tracking',
-                    'Nutrition Reminders'
-                ]
-            ],
-            [
-                'icon' => 'postpartum.png',
-                'title' => 'Postpartum Recovery',
-                'subtitle' => 'Support recovery after childbirth',
-                'description' => 'Energy levels are improving week-over-week. The fatigue you\'re still feeling is largely from sleep fragmentation — hormones are still recalibrating. Expect a significant improvement around week 8-10. Book your 6-week checkup if you haven\'t yet.',
-                'features' => [
-                    'Recovery Tracking',
-                    'Sleep Disturbance Monitoring',
-                    'Energy Monitoring',
-                    'Sleep Monitoring',
-                    'Mood Check-ins',
-                    'Wellness Milestones'
-                ]
-            ],
-            [
                 'icon' => 'menopause.png',
-                'title' => 'Perimenopause / Menopause',
-                'subtitle' => 'Navigate hormonal transition with clarity',
+                'title' => 'Peri / Menopause & Vitality',
+                'subtitle' => 'Symptom navigation and long-term vitality.',
                 'description' => 'Hot flash frequency is down 20% this week — a positive trend. Evening flashes correlate strongly with high-stress days. A consistent 9pm wind-down routine could reduce your overnight flash count within 5-7 days.',
                 'features' => [
                     'Hot Flash Tracking',
@@ -95,9 +68,22 @@ class LifeJourneySeeder extends Seeder
                 ]
             ],
             [
+                'icon' => 'pregnancy.png',
+                'title' => 'Pregnancy & Postpartum',
+                'subtitle' => 'Prenatal through recovery, supported.',
+                'description' => 'Week 24 — your baby is the size of a corn cob! Focus on sleep positioning (left side preferred) and stay well hydrated.',
+                'features' => [
+                    'Week Tracking',
+                    'Symptom Monitoring',
+                    'Health Checkpoints',
+                    'Sleep Tracking',
+                    'Nutrition Reminders'
+                ]
+            ],
+            [
                 'icon' => 'lifelong.png',
                 'title' => 'Lifelong Thriving',
-                'subtitle' => 'Support long-term health optimization',
+                'subtitle' => 'Prevention and healthspan for the long run.',
                 'description' => 'Your long-term vitality score has improved 8 points over 6 weeks — sustained sleep quality is the primary driver. Consistent HRV improvement (+12ms) signals cardiovascular adaptation. Your bone density scan is overdue — the preventive window is now.',
                 'features' => [
                     'Healthy Aging Insights',
@@ -114,7 +100,7 @@ class LifeJourneySeeder extends Seeder
                 ['title' => $journey['title']],
                 [
                     'icon' => $baseUrl . '/' . $journey['icon'],
-                    'subtitle' => $journey['subtitle'], 
+                    'subtitle' => $journey['subtitle'],
                     'description' => $journey['description'],
                     'status' => 1,
                 ]

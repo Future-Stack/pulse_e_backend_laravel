@@ -25,51 +25,66 @@ class ProcessLabReportAI implements ShouldQueue
     public function handle(): void
     {
         Log::info('ProcessLabReportAI Started', [
-            'report_id' => $this->reportId
+            'report_id' => $this->reportId,
         ]);
 
         $labReport = LabReport::find($this->reportId);
 
         if (!$labReport) {
             Log::error('Lab Report Not Found', [
-                'report_id' => $this->reportId
+                'report_id' => $this->reportId,
             ]);
-
             return;
         }
 
         try {
-
+            // Mark as processing
             $labReport->update([
-                'analysis_status' => 'processing'
+                'analysis_status' => 'processing',
             ]);
 
+            /*
+             * AI API expects:
+             *
+             * GET /api/summarize-pdf?report_id=10
+             *
+             * report_id must be sent as a query parameter.
+             */
+
             $url = config('services.ai.base_url') . '/api/summarize-pdf';
+
+            Log::info('Calling AI PDF Summary API', [
+                'url' => $url,
+                'report_id' => $labReport->id,
+            ]);
 
             $response = Http::retry(3, 2000)
                 ->withoutVerifying()
                 ->acceptJson()
                 ->timeout(600)
-                ->post($url, [
+                ->get($url, [
                     'report_id' => $labReport->id,
-                    'source_path' => asset('storage/' . $labReport->lab_report)
                 ]);
 
             Log::info('AI Response', [
+                'report_id' => $labReport->id,
                 'status' => $response->status(),
-                'body' => $response->body()
+                'body' => $response->body(),
             ]);
 
             if (!$response->successful()) {
                 throw new \Exception(
-                    'AI Service Error: ' . $response->status() . ' ' . $response->body()
+                    'AI Service Error: '
+                    . $response->status()
+                    . ' '
+                    . $response->body()
                 );
             }
 
             $result = $response->json();
-
             $summary = $result['summary'] ?? [];
 
+            // Save AI result
             $labReport->update([
                 'panel' => $summary['panel'] ?? null,
                 'biomarkers' => $summary['biomarkers'] ?? null,
@@ -79,20 +94,19 @@ class ProcessLabReportAI implements ShouldQueue
             ]);
 
             Log::info('AI Completed Successfully', [
-                'report_id' => $labReport->id
+                'report_id' => $labReport->id,
             ]);
 
         } catch (\Throwable $e) {
-
             Log::error('ProcessLabReportAI Failed', [
                 'report_id' => $labReport->id,
                 'message' => $e->getMessage(),
                 'line' => $e->getLine(),
-                'file' => $e->getFile()
+                'file' => $e->getFile(),
             ]);
 
             $labReport->update([
-                'analysis_status' => 'failed'
+                'analysis_status' => 'failed',
             ]);
 
             throw $e;
