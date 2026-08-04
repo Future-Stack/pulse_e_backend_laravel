@@ -35,35 +35,41 @@ class CycleSummaryController extends Controller
 
            try {
 
-    $responses = Http::pool(function ($pool) use ($baseUrl) {
+            $responses = Http::pool(function ($pool) use ($baseUrl, $user) {
 
-        return [
+            return [
 
-            $pool->timeout(120)
-                ->acceptJson()
-                ->get($baseUrl.'/summary'),
+                $pool->timeout(120)
+                    ->acceptJson()
+                    ->get($baseUrl . '/summary', [
+                        'user_id' => $user->id,
+                    ]),
 
-            $pool->timeout(120)
-                ->acceptJson()
-                ->get($baseUrl.'/signal-status'),
+                $pool->timeout(120)
+                    ->acceptJson()
+                    ->get($baseUrl . '/signal-status', [
+                        'user_id' => $user->id,
+                    ]),
 
-            $pool->timeout(120)
-                ->acceptJson()
-                ->get($baseUrl.'/discrepancy-note'),
+                $pool->timeout(120)
+                    ->acceptJson()
+                    ->get($baseUrl . '/discrepancy-note', [
+                        'user_id' => $user->id,
+                    ]),
 
-        ];
+            ];
 
-    });
+        });
 
-} catch (\Throwable $e) {
+    } catch (\Throwable $e) {
 
-    return response()->json([
-        'success' => false,
-        'message' => 'Unable to connect AI Engine.',
-        'error' => $e->getMessage(),
-    ],500);
+        return response()->json([
+            'success' => false,
+            'message' => 'Unable to connect AI Engine.',
+            'error' => $e->getMessage(),
+        ],500);
 
-}
+    }
 
 $summaryResponse = $responses[0];
 $signalResponse = $responses[1];
@@ -135,8 +141,6 @@ $discrepancy = $discrepancyResponse->json();
                 'is_completed' => false,
             ],
             [
-                'period_start_date' => now()->toDateString(),
-
                 'current_cycle_day' =>
                     $summary['cycle_summary']['current_cycle_day'],
 

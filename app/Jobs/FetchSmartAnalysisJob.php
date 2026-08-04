@@ -12,148 +12,197 @@ class FetchSmartAnalysisJob implements ShouldQueue
 {
     use Queueable;
 
-
     public int $tries = 3;
 
     public int $timeout = 600;
 
-
     protected int $smartAnalysisId;
-
 
     public function __construct(int $smartAnalysisId)
     {
         $this->smartAnalysisId = $smartAnalysisId;
     }
 
-
-
     public function handle(): void
     {
+        /*
+        |--------------------------------------------------------------------------
+        | Find Smart Analysis
+        |--------------------------------------------------------------------------
+        */
 
         $smartAnalysis = SmartAnalysis::find($this->smartAnalysisId);
 
-
         if (! $smartAnalysis) {
 
-            Log::error('SmartAnalysis not found.',[
-                'id'=>$this->smartAnalysisId
+            Log::error('SmartAnalysis not found.', [
+                'smart_analysis_id' => $this->smartAnalysisId,
             ]);
 
             return;
         }
 
+        /*
+        |--------------------------------------------------------------------------
+        | User ID
+        |--------------------------------------------------------------------------
+        */
 
+        $userId = $smartAnalysis->user_id;
 
         try {
 
-
-            // pending -> processing
+            /*
+            |--------------------------------------------------------------------------
+            | pending -> processing
+            |--------------------------------------------------------------------------
+            */
 
             $smartAnalysis->update([
-                'status'=>'processing'
+                'status' => 'processing',
             ]);
 
-
+            /*
+            |--------------------------------------------------------------------------
+            | AI API URL
+            |--------------------------------------------------------------------------
+            */
 
             $url = config('services.ai.base_url')
-                .'/api/smart-analysis';
+                . '/api/smart-analysis';
 
+            /*
+            |--------------------------------------------------------------------------
+            | Call Smart Analysis AI API
+            |--------------------------------------------------------------------------
+            |
+            | AI API requires user_id as query parameter.
+            |
+            */
 
-
-            Log::info('Calling Smart Analysis AI API.',[
-                'url'=>$url,
-                'user_id'=>$smartAnalysis->user_id,
-                'id'=>$smartAnalysis->id
+            Log::info('Calling Smart Analysis AI API.', [
+                'url' => $url,
+                'user_id' => $userId,
+                'smart_analysis_id' => $smartAnalysis->id,
             ]);
 
-
-
-            $response = Http::retry(3,2000)
+            $response = Http::retry(3, 2000)
                 ->withoutVerifying()
                 ->acceptJson()
                 ->timeout(300)
-                ->get($url);
+                ->get($url, [
 
+                    'user_id' => $userId,
 
+                ]);
 
-            Log::info('Smart Analysis Response.',[
-                'status'=>$response->status(),
-                'body'=>$response->body()
+            /*
+            |--------------------------------------------------------------------------
+            | Log Response
+            |--------------------------------------------------------------------------
+            */
+
+            Log::info('Smart Analysis Response.', [
+                'status' => $response->status(),
+                'user_id' => $userId,
+                'body' => $response->body(),
             ]);
 
+            /*
+            |--------------------------------------------------------------------------
+            | Validate Response
+            |--------------------------------------------------------------------------
+            */
 
-
-            if(! $response->successful()){
+            if (! $response->successful()) {
 
                 throw new \Exception(
                     'AI API Error: '
-                    .$response->status()
-                    .' '
-                    .$response->body()
+                    . $response->status()
+                    . ' '
+                    . $response->body()
                 );
             }
 
-
-
             $data = $response->json();
 
+            /*
+            |--------------------------------------------------------------------------
+            | Validate Smart Analysis Data
+            |--------------------------------------------------------------------------
+            */
 
-
-            if(!isset($data['smart_analysis'])){
+            if (! isset($data['smart_analysis'])) {
 
                 throw new \Exception(
                     'smart_analysis key missing.'
                 );
             }
 
-
-
             $analysis = $data['smart_analysis'];
 
-
+            /*
+            |--------------------------------------------------------------------------
+            | Save AI Result
+            |--------------------------------------------------------------------------
+            */
 
             $smartAnalysis->update([
 
-                'title'=>$analysis['title'] ?? null,
+                'title' =>
+                    $analysis['title'] ?? null,
 
-                'alerts'=>$analysis['alerts'] ?? [],
+                'alerts' =>
+                    $analysis['alerts'] ?? [],
 
-                'status'=>'completed'
+                'status' =>
+                    'completed',
 
             ]);
 
+            /*
+            |--------------------------------------------------------------------------
+            | Success Log
+            |--------------------------------------------------------------------------
+            */
 
-
-            Log::info(
-                'Smart Analysis completed.',
-                [
-                    'smart_analysis_id'=>$smartAnalysis->id
-                ]
-            );
-
-
-
-        }catch(\Throwable $e){
-
-
-            Log::error(
-                'Smart Analysis failed.',
-                [
-                    'smart_analysis_id'=>$this->smartAnalysisId,
-                    'message'=>$e->getMessage(),
-                ]
-            );
-
-
-
-            $smartAnalysis->update([
-                'status'=>'failed'
+            Log::info('Smart Analysis completed.', [
+                'smart_analysis_id' => $smartAnalysis->id,
+                'user_id' => $userId,
             ]);
 
+        } catch (\Throwable $e) {
 
+            /*
+            |--------------------------------------------------------------------------
+            | Failed
+            |--------------------------------------------------------------------------
+            */
+
+            Log::error('Smart Analysis failed.', [
+
+                'smart_analysis_id' =>
+                    $this->smartAnalysisId,
+
+                'user_id' =>
+                    $userId,
+
+                'message' =>
+                    $e->getMessage(),
+
+                'file' =>
+                    $e->getFile(),
+
+                'line' =>
+                    $e->getLine(),
+            ]);
+
+            $smartAnalysis->update([
+                'status' => 'failed',
+            ]);
 
             throw $e;
         }
     }
 }
+

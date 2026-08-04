@@ -45,6 +45,7 @@ use App\Http\Controllers\AI\AvoidingPregnancyController;
 use App\Http\Controllers\AI\OpkLogController;
 use App\Http\Controllers\AI\TryingToConceiveController;
 use App\Http\Controllers\AI\AwarenessController;
+use App\Http\Controllers\AI\CycleCalendarInputController;
 
 
 Route::prefix('v1')->group(function () {
@@ -79,15 +80,28 @@ Route::prefix('v1')->group(function () {
     Route::get('pages', [PageController::class, 'index']);
     Route::get('pages/{page_id}', [PageController::class, 'show']);
 
+Route::get('lab-reports/{labReport}', [LabReportController::class, 'show']);
+
+
+Route::get(
+    '/cycle-calendar-inputs/{user_id}',
+    [CycleCalendarInputController::class, 'show']
+);
 
     Route::middleware('auth:sanctum')->group(function () {
+
+    Route::post(
+    '/cycle-calendar-inputs',
+    [CycleCalendarInputController::class, 'store']
+);
 
         //user health log
         Route::apiResource('health-logs', HealthLogController::class);
         Route::get('/health-log/today', [HealthLogController::class, 'today']);
 
 
-        Route::apiResource('lab-reports', LabReportController::class);
+        Route::apiResource('lab-reports', LabReportController::class)
+        ->except(['show']);
 
         // Get AI Analysis
         Route::get(
@@ -96,7 +110,7 @@ Route::prefix('v1')->group(function () {
         );
 
         //Cycle part
-//summary 1st page
+//summary new 1st page
   Route::get('/cycle-engine/engine/sync', [CycleSummaryController::class, 'sync']);
 
         Route::get('/cycle-engine/engine/sync-summary', [CycleSummaryController::class, 'sync']);
@@ -269,8 +283,7 @@ Route::prefix('v1')->group(function () {
         Route::get('/chat/sessions', [ChatController::class, 'getUserSessions']);
         Route::get('/chat/response/{sessionId}', [ChatController::class, 'getLatestMessages']);
 
-        //BBT
-        Route::post('/bbt/logs', [BbtController::class, 'logBbtData']);
+
 
         //Waitlist
         Route::get('/waitlist/list', [WaitlistController::class, 'getWaitlist']);
@@ -299,11 +312,14 @@ Route::prefix('v1')->group(function () {
         Route::post('/blog-update/{slug}', [BlogController::class, 'update']); // Update blog
         Route::delete('/blog-delete/{slug}', [BlogController::class, 'destroy']); // Delete blog
 
-
+        //BBT
+        Route::post('/bbt/logs', [BbtController::class, 'logBbtData']);
+        Route::get('/bbt-logs', [BbtController::class, 'fetchLog']);
+        Route::get('/bbt-database-logs', [BbtController::class, 'fetchBbtLogs']);
     });
 
     //Fetch-BBT-Logs
-    Route::get('/bbt-logs', [BbtController::class, 'fetchLog']);
+
 
     Route::get('/blog-categories', [BlogCategoryController::class, 'index']);
     Route::get('/blog-categories/{slug}', [BlogCategoryController::class, 'show']); // Show single category
