@@ -12,11 +12,14 @@ use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Http\Client\RequestException;
 use Carbon\Carbon;
 
 class OpkLogController extends Controller
 {
-   
+    
     public function getOpkUiData()
     {
         $userId = auth()->id(); 
@@ -28,19 +31,38 @@ class OpkLogController extends Controller
             ], 401);
         }
 
-        $response = Http::get('https://ai.fightthenumber.com/api/v1/cycle-engine/opk/ui', [
-            'user_id' => $userId
-        ]);
+        try {
+            $response = Http::timeout(60)
+                ->connectTimeout(15)
+                ->get('https://ai.fightthenumber.com/api/v1/cycle-engine/opk/ui', [
+                    'user_id' => $userId
+                ]);
 
-        if ($response->successful()) {
-            return $response->json();
+            if ($response->successful()) {
+                return $response->json();
+            }
+
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to fetch data from OPK API',
+                'api_status' => $response->status()
+            ], $response->status());
+
+        } catch (ConnectionException $e) {
+            Log::error("OPK API Connection Timeout (getOpkUiData): " . $e->getMessage());
+            
+            return response()->json([
+                'status' => 'error',
+                'message' => 'The AI server took too long to respond. Please try again later.'
+            ], 504); // 504 Gateway Timeout
+        } catch (\Exception $e) {
+            Log::error("OPK API Error (getOpkUiData): " . $e->getMessage());
+            
+            return response()->json([
+                'status' => 'error',
+                'message' => 'An unexpected error occurred while connecting to the AI service.'
+            ], 500);
         }
-
-        return response()->json([
-            'status' => 'error',
-            'message' => 'Failed to fetch data from OPK API',
-            'api_status' => $response->status()
-        ], $response->status());
     }
 
     public function getStoredOpkData(Request $request)
@@ -60,7 +82,7 @@ class OpkLogController extends Controller
             return response()->json([
                 'status' => 'error',
                 'message' => 'No OPK data found for this user.'
-            ], 404); // Standard HTTP 404 Not Found
+            ], 404);
         }
 
         return response()->json([
@@ -79,33 +101,58 @@ class OpkLogController extends Controller
         }
 
         $cardsData = $request->input('cards', []);
-        $response = Http::withHeaders([
-            'Accept' => 'application/json',
-            'Content-Type' => 'application/json',
-        ])->post("https://ai.fightthenumber.com/api/v1/cycle-engine/opk/ui?user_id={$userId}", [
-            'cards' => $cardsData
-        ]);
 
-        if ($response->successful()) {
-            $apiData = $response->json();
+        try {
+            $response = Http::timeout(60)
+                ->connectTimeout(15)
+                ->retry(2, 2000, function ($exception) {
+                    return $exception instanceof ConnectionException;
+                })
+                ->withHeaders([
+                    'Accept' => 'application/json',
+                    'Content-Type' => 'application/json',
+                ])
+                ->post("https://ai.fightthenumber.com/api/v1/cycle-engine/opk/ui?user_id={$userId}", [
+                    'cards' => $cardsData
+                ]);
 
-            $opkRecord = OpkData::create([
-                'user_id'       => $userId,
-                'response_data' => $apiData,
-            ]);
+            if ($response->successful()) {
+                $apiData = $response->json();
+
+                $opkRecord = OpkData::create([
+                    'user_id'       => $userId,
+                    'response_data' => $apiData,
+                ]);
+
+                return response()->json([
+                    'status'  => 'success',
+                    'message' => 'API response stored successfully!',
+                    'data'    => $opkRecord
+                ], 200);
+            }
 
             return response()->json([
-                'status'  => 'success',
-                'message' => 'API response stored successfully!',
-                'data'    => $opkRecord
-            ], 200);
-        }
+                'status'  => 'error',
+                'message' => 'Failed to fetch data from API',
+                'error'   => $response->json()
+            ], $response->status());
 
-        return response()->json([
-            'status'  => 'error',
-            'message' => 'Failed to fetch data from API',
-            'error'   => $response->json()
-        ], $response->status());
+        } catch (ConnectionException $e) {
+            Log::error("OPK API Connection Timeout (storeOpkUiData): " . $e->getMessage());
+
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'Connection timed out while reaching the AI service. Please try again.'
+            ], 504);
+
+        } catch (\Exception $e) {
+            Log::error("OPK API Error (storeOpkUiData): " . $e->getMessage());
+
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'Something went wrong while processing your request.'
+            ], 500);
+        }
     }
 
     public function getOpkDataHistory(Request $request)
@@ -159,7 +206,6 @@ class OpkLogController extends Controller
             ], 200);
         }
 
-        // Response Structure
         return response()->json([
             'status'  => 'success',
             'message' => 'OPK history data retrieved successfully!',
