@@ -28,7 +28,7 @@ class OpkLogController extends Controller
             ], 401);
         }
 
-        $response = Http::get('https://female-mood-analyzer.onrender.com/api/v1/cycle-engine/opk/ui', [
+        $response = Http::get('https://ai.fightthenumber.com/api/v1/cycle-engine/opk/ui', [
             'user_id' => $userId
         ]);
 
@@ -82,7 +82,7 @@ class OpkLogController extends Controller
         $response = Http::withHeaders([
             'Accept' => 'application/json',
             'Content-Type' => 'application/json',
-        ])->post("https://female-mood-analyzer.onrender.com/api/v1/cycle-engine/opk/ui?user_id={$userId}", [
+        ])->post("https://ai.fightthenumber.com/api/v1/cycle-engine/opk/ui?user_id={$userId}", [
             'cards' => $cardsData
         ]);
 
