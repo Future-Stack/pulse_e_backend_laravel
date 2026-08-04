@@ -14,19 +14,18 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Http\Client\ConnectionException;
-use Illuminate\Http\Client\RequestException;
 use Carbon\Carbon;
 
 class OpkLogController extends Controller
 {
     
-    public function getOpkUiData()
+    public function getOpkUiData(): JsonResponse
     {
         $userId = auth()->id(); 
 
         if (!$userId) {
             return response()->json([
-                'status' => 'error',
+                'status'  => 'error',
                 'message' => 'Unauthenticated user.'
             ], 401);
         }
@@ -39,39 +38,46 @@ class OpkLogController extends Controller
                 ]);
 
             if ($response->successful()) {
-                return $response->json();
+                return response()->json($response->json(), 200);
             }
 
             return response()->json([
-                'status' => 'error',
-                'message' => 'Failed to fetch data from OPK API',
-                'api_status' => $response->status()
+                'status'     => 'error',
+                'message'    => 'Failed to fetch data from OPK API',
+                'api_status' => $response->status(),
+                'error'      => $response->json()
             ], $response->status());
 
         } catch (ConnectionException $e) {
             Log::error("OPK API Connection Timeout (getOpkUiData): " . $e->getMessage());
-            
+
             return response()->json([
-                'status' => 'error',
+                'status'  => 'error',
                 'message' => 'The AI server took too long to respond. Please try again later.'
-            ], 504); // 504 Gateway Timeout
-        } catch (\Exception $e) {
-            Log::error("OPK API Error (getOpkUiData): " . $e->getMessage());
-            
+            ], 504);
+
+        } catch (\Throwable $e) {
+            Log::error("OPK API Error (getOpkUiData): " . $e->getMessage(), [
+                'file' => $e->getFile(),
+                'line' => $e->getLine()
+            ]);
+
             return response()->json([
-                'status' => 'error',
-                'message' => 'An unexpected error occurred while connecting to the AI service.'
+                'status'      => 'error',
+                'message'     => 'Something went wrong while processing your request.',
+                'debug_error' => config('app.debug') ? $e->getMessage() : null
             ], 500);
         }
     }
 
-    public function getStoredOpkData(Request $request)
+    
+    public function getStoredOpkData(Request $request): JsonResponse
     {
         $userId = auth()->id() ?? $request->query('user_id');
 
         if (!$userId) {
             return response()->json([
-                'status' => 'error',
+                'status'  => 'error',
                 'message' => 'User ID is required'
             ], 400);
         }
@@ -80,7 +86,7 @@ class OpkLogController extends Controller
 
         if (!$opkRecord) {
             return response()->json([
-                'status' => 'error',
+                'status'  => 'error',
                 'message' => 'No OPK data found for this user.'
             ], 404);
         }
@@ -92,7 +98,8 @@ class OpkLogController extends Controller
         ], 200);
     }
 
-    public function storeOpkUiData(Request $request)
+    
+    public function storeOpkUiData(Request $request): JsonResponse
     {
         $userId = auth()->id() ?? $request->query('user_id');
 
@@ -109,7 +116,7 @@ class OpkLogController extends Controller
                     return $exception instanceof ConnectionException;
                 })
                 ->withHeaders([
-                    'Accept' => 'application/json',
+                    'Accept'       => 'application/json',
                     'Content-Type' => 'application/json',
                 ])
                 ->post("https://ai.fightthenumber.com/api/v1/cycle-engine/opk/ui?user_id={$userId}", [
@@ -121,7 +128,7 @@ class OpkLogController extends Controller
 
                 $opkRecord = OpkData::create([
                     'user_id'       => $userId,
-                    'response_data' => $apiData,
+                    'response_data' => is_string($apiData) ? json_decode($apiData, true) : $apiData,
                 ]);
 
                 return response()->json([
@@ -145,34 +152,40 @@ class OpkLogController extends Controller
                 'message' => 'Connection timed out while reaching the AI service. Please try again.'
             ], 504);
 
-        } catch (\Exception $e) {
-            Log::error("OPK API Error (storeOpkUiData): " . $e->getMessage());
+        } catch (\Throwable $e) {
+            Log::error("OPK API Error (storeOpkUiData): " . $e->getMessage(), [
+                'file' => $e->getFile(),
+                'line' => $e->getLine()
+            ]);
 
             return response()->json([
-                'status'  => 'error',
-                'message' => 'Something went wrong while processing your request.'
+                'status'      => 'error',
+                'message'     => 'Something went wrong while processing your request.',
+                'debug_error' => config('app.debug') ? $e->getMessage() : null,
+                'line'        => config('app.debug') ? $e->getLine() : null
             ], 500);
         }
     }
 
-    public function getOpkDataHistory(Request $request)
+    
+    public function getOpkDataHistory(Request $request): JsonResponse
     {
         $userId = auth()->id() ?? $request->query('user_id');
 
         if (!$userId) {
             return response()->json([
-                'status' => 'error',
+                'status'  => 'error',
                 'message' => 'User ID is required'
             ], 400);
         }
 
         $query = OpkData::where('user_id', $userId);
 
-        if ($request->has('date') && !empty($request->date)) {
+        if ($request->filled('date')) {
             $query->whereDate('created_at', $request->date);
         }
 
-        if ($request->has('filter')) {
+        if ($request->filled('filter')) {
             switch ($request->filter) {
                 case 'today':
                     $query->whereDate('created_at', Carbon::today());
@@ -189,9 +202,6 @@ class OpkLogController extends Controller
                 case 'last_3_months':
                     $query->where('created_at', '>=', Carbon::now()->subDays(90));
                     break;
-
-                default:
-                    break;
             }
         }
 
@@ -199,10 +209,10 @@ class OpkLogController extends Controller
 
         if ($opkRecords->isEmpty()) {
             return response()->json([
-                'status' => 'success',
+                'status'  => 'success',
                 'message' => 'No OPK data found for the selected timeframe.',
-                'count' => 0,
-                'data' => []
+                'count'   => 0,
+                'data'    => []
             ], 200);
         }
 
