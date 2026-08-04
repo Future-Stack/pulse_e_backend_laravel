@@ -41,6 +41,8 @@ class ChatController extends Controller
                 'session_id' => $sessionId,
                 'user_id' => $userId,
             ]);
+        } else {
+            $chatSession->touch();
         }
 
         $userChatMessage = ChatMessage::create([
@@ -64,6 +66,7 @@ class ChatController extends Controller
         $userId = Auth::id();
 
         $sessions = ChatSession::where('user_id', $userId)
+            ->with(['latestMessage'])
             ->latest('updated_at')
             ->get();
 
@@ -81,11 +84,27 @@ class ChatController extends Controller
             return response()->json(['message' => 'session_id is required'], 400);
         }
 
+        $userId = Auth::id();
+
+        $sessionExists = ChatSession::where('session_id', $sessionId)
+            ->where('user_id', $userId)
+            ->exists();
+
+        if (!$sessionExists) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Unauthorized or session not found.'
+            ], 403);
+        }
+
         $messages = ChatMessage::where('session_id', $sessionId)
-            ->where('user_id', Auth::id())
-            ->latest()
+            ->where('user_id', $userId)
+            ->oldest() // 'created_at' asc
             ->get();
 
-        return response()->json($messages);
+        return response()->json([
+            'status' => 'success',
+            'messages' => $messages
+        ], 200);
     }
 }
