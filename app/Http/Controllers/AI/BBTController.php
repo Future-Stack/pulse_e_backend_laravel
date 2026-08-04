@@ -19,8 +19,7 @@ class BBTController extends Controller
 
             $userId = auth()->id();
 
-            $response = Http::post(
-                env('AI_SERVICE_URL') . '/api/v1/cycle-engine/bbt/ui?user_id=' . $userId, [
+            $response = Http::post('https://ai.fightthenumber.com/api/v1/cycle-engine/bbt/ui?user_id=' . $userId, [
                 'temperature_f' => $validated['temperature_f'],
                 'flags' => $validated['flags'] ?? [],
             ]);
@@ -84,8 +83,7 @@ class BBTController extends Controller
         try {
             $userId = auth()->id();
 
-            $response = Http::get(
-                env('AI_SERVICE_URL') .'/api/v1/cycle-engine/bbt/ui',
+            $response = Http::get('https://ai.fightthenumber.com/api/v1/cycle-engine/bbt/ui',
                 [
                     'user_id' => $userId
                 ]);
