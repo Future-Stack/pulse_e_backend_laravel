@@ -27,7 +27,7 @@ class ProcessMoodAnalysis implements ShouldQueue
 
     public function handle(): void
     {
-        $aiUrl = config('services.ai.mood_analyzer_url', 'https://female-mood-analyzer.onrender.com/api/chat/response');
+        $aiUrl = config('services.ai.mood_analyzer_url', 'https://ai.fightthenumber.com/api/chat/response');
 
         try {
             $aiResponse = Http::connectTimeout(10)
