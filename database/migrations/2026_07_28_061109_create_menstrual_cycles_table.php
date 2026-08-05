@@ -22,7 +22,7 @@ return new class extends Migration
             | Cycle Dates
             |--------------------------------------------------------------------------
             */
-            $table->date('period_start_date');
+           $table->date('period_start_date')->nullable();
             $table->date('period_end_date')->nullable();
 
             /*

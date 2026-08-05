@@ -119,11 +119,20 @@ Route::get(
         Route::get('engine/discrepancy-note-sync', [CycleSummaryController::class, 'syncDiscrepancyNote']);
 
         //calender
-        Route::get('/calendar/month-sync', [CalendarController::class, 'syncMonth']);
-        Route::post('/calendar/confirm-day', [CalendarController::class, 'confirmDay']);
+        // Route::get('/calendar/month-sync', [CalendarController::class, 'syncMonth']);
+        // Route::post('/calendar/confirm-day', [CalendarController::class, 'confirmDay']);
 
 
-        Route::get('/calendar/next-period-sync', [CalendarController::class, 'syncNextPeriod']);
+        // Route::get('/calendar/next-period-sync', [CalendarController::class, 'syncNextPeriod']);
+         Route::get(
+        '/cycle-calendar/month',
+        [CalendarController::class, 'syncMonth']
+    );
+
+    Route::get(
+        '/cycle-calendar/next-period',
+        [CalendarController::class, 'syncNextPeriod']
+    );
 
         Route::get('/avoiding-pregnancy/consent-status', [AvoidingPregnancyController::class, 'consentStatus']);
 
