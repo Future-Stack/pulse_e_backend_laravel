@@ -16,7 +16,7 @@ class CycleStatistic extends Model
         'average_period_length',
         'cycle_variance_days',
         'last_period_date',
-        'next_predicted_period',
+        'predicted_next_period',
         'reliability_level',
     ];
 
@@ -24,7 +24,7 @@ class CycleStatistic extends Model
     {
         return [
             'last_period_date' => 'date',
-            'next_predicted_period' => 'date',
+            'predicted_next_period' => 'date',
         ];
     }
 

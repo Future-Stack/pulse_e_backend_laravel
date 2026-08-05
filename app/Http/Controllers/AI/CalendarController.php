@@ -114,16 +114,12 @@ class CalendarController extends Controller
     |--------------------------------------------------------------------------
     */
 
-    $cycle = \App\Models\MenstrualCycle::where('user_id', $user->id)
-        ->where('is_completed', false)
-        ->latest('id')
-        ->first();
+    if (!empty($result['predicted_date'])) {
 
-    if ($cycle && !empty($result['predicted_date'])) {
-
-        $cycle->update([
-            'predicted_next_period_date' => $result['predicted_date'],
-        ]);
+        \App\Models\CycleStatistic::updateOrCreate(
+            ['user_id' => $user->id],
+            ['predicted_next_period' => $result['predicted_date']]
+        );
     }
 
     return response()->json([
