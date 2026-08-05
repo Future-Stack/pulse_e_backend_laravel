@@ -496,5 +496,81 @@ class CycleSummaryController extends Controller
             ],
         ]);
     }
+
+    public function syncSignalStatus()
+    {
+        $user = auth()->user();
+
+        if (! $user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthenticated.',
+            ], 401);
+        }
+
+        $baseUrl = rtrim(config('services.ai.base_url', 'https://ai.fightthenumber.com'), '/') . '/api/v1/cycle-engine/engine/signal-status';
+
+        try {
+            $response = Http::timeout(120)
+                ->acceptJson()
+                ->get($baseUrl, [
+                    'user_id' => $user->id,
+                ]);
+
+            if ($response->successful()) {
+                return response()->json($response->json());
+            }
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Unable to fetch signal status from AI Engine.',
+                'error' => $response->json() ?? $response->body(),
+            ], $response->status());
+        } catch (\Throwable $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unable to connect to AI Engine.',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    public function syncDiscrepancyNote()
+    {
+        $user = auth()->user();
+
+        if (! $user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthenticated.',
+            ], 401);
+        }
+
+        $baseUrl = rtrim(config('services.ai.base_url', 'https://ai.fightthenumber.com'), '/') . '/api/v1/cycle-engine/engine/discrepancy-note';
+
+        try {
+            $response = Http::timeout(120)
+                ->acceptJson()
+                ->get($baseUrl, [
+                    'user_id' => $user->id,
+                ]);
+
+            if ($response->successful()) {
+                return response()->json($response->json());
+            }
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Unable to fetch discrepancy note from AI Engine.',
+                'error' => $response->json() ?? $response->body(),
+            ], $response->status());
+        } catch (\Throwable $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unable to connect to AI Engine.',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
 }
 
