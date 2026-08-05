@@ -50,7 +50,7 @@ return [
     ],
 
     'ai' => [
-    'base_url' => env('AI_SERVICE_URL', 'https://female-mood-analyzer.onrender.com'),
+    'base_url' => env('AI_SERVICE_URL', 'https://ai.fightthenumber.com'),
 ],
 
     'azure' => [
