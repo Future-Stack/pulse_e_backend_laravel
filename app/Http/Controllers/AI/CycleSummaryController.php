@@ -15,6 +15,12 @@ class CycleSummaryController extends Controller
 {
     public function sync()
     {
+        /*
+        |--------------------------------------------------------------------------
+        | 1. Authenticated User
+        |--------------------------------------------------------------------------
+        */
+
         $user = auth()->user();
 
         if (! $user) {
@@ -26,7 +32,7 @@ class CycleSummaryController extends Controller
 
         /*
         |--------------------------------------------------------------------------
-        | Get Latest Calendar Input
+        | 2. Get Latest Calendar Input
         |--------------------------------------------------------------------------
         */
 
@@ -36,16 +42,15 @@ class CycleSummaryController extends Controller
 
         /*
         |--------------------------------------------------------------------------
-        | AI Engine Base URL
+        | 3. AI Engine URL
         |--------------------------------------------------------------------------
         */
 
-        $baseUrl = config('services.ai.base_url')
-            . '/api/v1/cycle-engine/engine';
+        $baseUrl = 'https://ai.fightthenumber.com/api/v1/cycle-engine/engine';
 
         /*
         |--------------------------------------------------------------------------
-        | Fetch AI Engine Data
+        | 4. Fetch AI Engine Data
         |--------------------------------------------------------------------------
         */
 
@@ -55,7 +60,7 @@ class CycleSummaryController extends Controller
 
                 return [
 
-                    // Cycle Summary
+                    // Summary
                     $pool->timeout(120)
                         ->acceptJson()
                         ->get($baseUrl . '/summary', [
@@ -69,7 +74,7 @@ class CycleSummaryController extends Controller
                             'user_id' => $user->id,
                         ]),
 
-                    // Discrepancy Note
+                    // Discrepancy
                     $pool->timeout(120)
                         ->acceptJson()
                         ->get($baseUrl . '/discrepancy-note', [
@@ -87,13 +92,19 @@ class CycleSummaryController extends Controller
             ], 500);
         }
 
+        /*
+        |--------------------------------------------------------------------------
+        | 5. Get Responses
+        |--------------------------------------------------------------------------
+        */
+
         $summaryResponse = $responses[0];
         $signalResponse = $responses[1];
         $discrepancyResponse = $responses[2];
 
         /*
         |--------------------------------------------------------------------------
-        | Validate AI Responses
+        | 6. Validate AI Responses
         |--------------------------------------------------------------------------
         */
 
@@ -102,16 +113,32 @@ class CycleSummaryController extends Controller
             ! $signalResponse->successful() ||
             ! $discrepancyResponse->successful()
         ) {
+
             return response()->json([
                 'success' => false,
                 'message' => 'Unable to fetch AI Engine data.',
                 'errors' => [
-                    'summary' => $summaryResponse->body(),
-                    'signal_status' => $signalResponse->body(),
-                    'discrepancy' => $discrepancyResponse->body(),
+                    'summary' => [
+                        'status' => $summaryResponse->status(),
+                        'body' => $summaryResponse->body(),
+                    ],
+                    'signal_status' => [
+                        'status' => $signalResponse->status(),
+                        'body' => $signalResponse->body(),
+                    ],
+                    'discrepancy' => [
+                        'status' => $discrepancyResponse->status(),
+                        'body' => $discrepancyResponse->body(),
+                    ],
                 ],
             ], 500);
         }
+
+        /*
+        |--------------------------------------------------------------------------
+        | 7. Decode Responses
+        |--------------------------------------------------------------------------
+        */
 
         $summary = $summaryResponse->json();
         $signal = $signalResponse->json();
@@ -119,8 +146,76 @@ class CycleSummaryController extends Controller
 
         /*
         |--------------------------------------------------------------------------
-        | Save Data
+        | 8. Handle Empty Cycle Data
         |--------------------------------------------------------------------------
+        |
+        | AI may return:
+        |
+        | {
+        |     "status": "empty",
+        |     "message": "No cycle data yet"
+        | }
+        |
+        | In this case we must NOT try to save avg_cycle_length = null
+        | into cycle_statistics because that column is NOT NULL.
+        |
+        */
+
+        if (($summary['status'] ?? null) === 'empty') {
+
+            return response()->json([
+                'success' => true,
+                'message' => 'No cycle data available yet.',
+                'data' => [
+                    'summary' => $summary,
+                    'signal_status' => $signal,
+                    'discrepancy' => $discrepancy,
+                ],
+            ]);
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | 9. Validate Required Summary Data
+        |--------------------------------------------------------------------------
+        */
+
+        if (
+            ! isset($summary['cycle_summary']) ||
+            ! isset($summary['reliability'])
+        ) {
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Invalid response received from AI Engine.',
+                'data' => $summary,
+            ], 500);
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | 10. Get Required Values
+        |--------------------------------------------------------------------------
+        */
+
+        $averageCycleLength =
+            $summary['cycle_summary']['avg_cycle_length'] ?? null;
+
+        $cycleVarianceDays =
+            $summary['cycle_summary']['cycle_variance_days'] ?? null;
+
+        $reliabilityLevel =
+            $summary['reliability']['level'] ?? null;
+
+        /*
+        |--------------------------------------------------------------------------
+        | 11. Prevent NULL average_cycle_length
+        |--------------------------------------------------------------------------
+        |
+        | Your database does not allow average_cycle_length to be NULL.
+        |
+        | If AI does not provide it, don't update that column.
+        |
         */
 
         try {
@@ -130,37 +225,49 @@ class CycleSummaryController extends Controller
                 $calendarInput,
                 $summary,
                 $signal,
-                $discrepancy
+                $discrepancy,
+                $averageCycleLength,
+                $cycleVarianceDays,
+                $reliabilityLevel
             ) {
 
                 /*
                 |--------------------------------------------------------------------------
-                | 1. Cycle Statistics
+                | 12. Cycle Statistics
                 |--------------------------------------------------------------------------
                 */
 
-                CycleStatistic::updateOrCreate(
-                    [
-                        'user_id' => $user->id,
-                    ],
-                    [
-                        'completed_cycles' =>
-                            $summary['reliability']['completed_cycles'] ?? 0,
+                $cycleStatistic = CycleStatistic::firstOrNew([
+                    'user_id' => $user->id,
+                ]);
 
-                        'average_cycle_length' =>
-                            $summary['cycle_summary']['avg_cycle_length'] ?? null,
+                $cycleStatistic->completed_cycles =
+                    $summary['reliability']['completed_cycles'] ?? 0;
 
-                        'cycle_variance_days' =>
-                            $summary['cycle_summary']['cycle_variance_days'] ?? null,
+                /*
+                | Only update average_cycle_length when AI provides a value.
+                */
 
-                        'reliability_level' =>
-                            $summary['reliability']['level'] ?? null,
-                    ]
-                );
+                if ($averageCycleLength !== null) {
+                    $cycleStatistic->average_cycle_length =
+                        $averageCycleLength;
+                }
+
+                /*
+                | cycle_variance_days can be nullable
+                */
+
+                $cycleStatistic->cycle_variance_days =
+                    $cycleVarianceDays;
+
+                $cycleStatistic->reliability_level =
+                    $reliabilityLevel;
+
+                $cycleStatistic->save();
 
                 /*
                 |--------------------------------------------------------------------------
-                | 2. Current Active Cycle
+                | 13. Current Active Cycle
                 |--------------------------------------------------------------------------
                 */
 
@@ -170,9 +277,6 @@ class CycleSummaryController extends Controller
                         'is_completed' => false,
                     ],
                     [
-                        /*
-                         * Calendar input না থাকলে NULL হবে
-                         */
                         'period_start_date' =>
                             $calendarInput?->start_date,
 
@@ -198,7 +302,7 @@ class CycleSummaryController extends Controller
 
                 /*
                 |--------------------------------------------------------------------------
-                | 3. Process Signal Status
+                | 14. Process Signal Status
                 |--------------------------------------------------------------------------
                 */
 
@@ -211,31 +315,36 @@ class CycleSummaryController extends Controller
 
                 foreach ($signal['signals'] ?? [] as $item) {
 
-                    $statusMessages[] = $item['status_text'] ?? '';
+                    $statusMessages[] =
+                        $item['status_text'] ?? '';
 
                     switch ($item['signal'] ?? null) {
 
                         case 'Calendar':
-                            $calendar = (bool) ($item['logged_today'] ?? false);
+                            $calendar =
+                                (bool) ($item['logged_today'] ?? false);
                             break;
 
                         case 'BBT':
-                            $bbt = (bool) ($item['logged_today'] ?? false);
+                            $bbt =
+                                (bool) ($item['logged_today'] ?? false);
                             break;
 
                         case 'OPK / LH':
-                            $opk = (bool) ($item['logged_today'] ?? false);
+                            $opk =
+                                (bool) ($item['logged_today'] ?? false);
                             break;
 
                         case 'Mucus':
-                            $mucus = (bool) ($item['logged_today'] ?? false);
+                            $mucus =
+                                (bool) ($item['logged_today'] ?? false);
                             break;
                     }
                 }
 
                 /*
                 |--------------------------------------------------------------------------
-                | 4. Calculate Signal Strength
+                | 15. Calculate Signal Strength
                 |--------------------------------------------------------------------------
                 */
 
@@ -261,7 +370,7 @@ class CycleSummaryController extends Controller
 
                 /*
                 |--------------------------------------------------------------------------
-                | 5. Save Signal History
+                | 16. Save Signal History
                 |--------------------------------------------------------------------------
                 */
 
@@ -284,7 +393,8 @@ class CycleSummaryController extends Controller
 
                         'signal_strength' => $strength,
 
-                        'signals' => $signal['signals'] ?? [],
+                        'signals' =>
+                            $signal['signals'] ?? [],
 
                         'ai_generated' =>
                             $signal['ai_generated'] ?? false,
@@ -305,7 +415,7 @@ class CycleSummaryController extends Controller
 
                 /*
                 |--------------------------------------------------------------------------
-                | 6. Save Ovulation Reconciliation
+                | 17. Save Ovulation Reconciliation
                 |--------------------------------------------------------------------------
                 */
 
@@ -316,28 +426,36 @@ class CycleSummaryController extends Controller
                     ],
                     [
                         'calendar_predicted_day' =>
-                            $summary['reconciliation']['calendar_predicted_day'] ?? null,
+                            $summary['reconciliation']['calendar_predicted_day']
+                            ?? null,
 
                         'bbt_confirmed_day' =>
-                            $summary['reconciliation']['bbt_confirmed_day'] ?? null,
+                            $summary['reconciliation']['bbt_confirmed_day']
+                            ?? null,
 
                         'lh_surge_day' =>
-                            $summary['reconciliation']['lh_surge_day'] ?? null,
+                            $summary['reconciliation']['lh_surge_day']
+                            ?? null,
 
                         'mucus_peak_day' =>
-                            $summary['fertile_window']['mucus_peak_day'] ?? null,
+                            $summary['fertile_window']['mucus_peak_day']
+                            ?? null,
 
                         'final_confirmed_day' =>
-                            $summary['reconciliation']['final_confirmed_day'] ?? null,
+                            $summary['reconciliation']['final_confirmed_day']
+                            ?? null,
 
                         'final_source' =>
-                            $summary['reconciliation']['final_source'] ?? null,
+                            $summary['reconciliation']['final_source']
+                            ?? null,
 
                         'offset_days' =>
-                            $summary['reconciliation']['offset_days'] ?? null,
+                            $summary['reconciliation']['offset_days']
+                            ?? null,
 
                         'luteal_phase_length' =>
-                            $summary['reconciliation']['luteal_phase_length'] ?? null,
+                            $summary['reconciliation']['luteal_phase_length']
+                            ?? null,
 
                         'has_discrepancy' =>
                             $discrepancy['active'] ?? false,
@@ -364,7 +482,7 @@ class CycleSummaryController extends Controller
 
         /*
         |--------------------------------------------------------------------------
-        | Final Response
+        | 18. Final Response
         |--------------------------------------------------------------------------
         */
 
@@ -379,3 +497,4 @@ class CycleSummaryController extends Controller
         ]);
     }
 }
+
