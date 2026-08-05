@@ -298,6 +298,7 @@ Route::get(
         Route::get('/waitlist/list', [WaitlistController::class, 'getWaitlist']);
 
         // OPK
+        Route::get('/cycle-engine/opk/ui', [OpkLogController::class, 'getOpkUiData']);
         Route::get('/get-opk', [OpkLogController::class, 'getOpkUiData']);
         Route::get('/get-opk-data', [OpkLogController::class, 'getStoredOpkData']);
         Route::post('/store-opk-data', [OpkLogController::class, 'storeOpkUiData']);
