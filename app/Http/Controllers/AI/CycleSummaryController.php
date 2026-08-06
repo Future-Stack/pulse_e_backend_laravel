@@ -46,7 +46,7 @@ class CycleSummaryController extends Controller
         |--------------------------------------------------------------------------
         */
 
-        $baseUrl = 'https://ai.fightthenumber.com/api/v1/cycle-engine/engine';
+        $baseUrl = rtrim(config('services.ai.base_url', 'https://ai.fightthenumber.com'), '/') . '/api/v1/cycle-engine/engine';
 
         /*
         |--------------------------------------------------------------------------
@@ -204,8 +204,8 @@ class CycleSummaryController extends Controller
         $cycleVarianceDays =
             $summary['cycle_summary']['cycle_variance_days'] ?? null;
 
-        $reliabilityLevel =
-            $summary['reliability']['level'] ?? null;
+        $rawReliability = strtolower((string) ($summary['reliability']['level'] ?? ''));
+        $reliabilityLevel = in_array($rawReliability, ['low', 'medium', 'high']) ? $rawReliability : 'low';
 
         /*
         |--------------------------------------------------------------------------
@@ -258,7 +258,7 @@ class CycleSummaryController extends Controller
                 */
 
                 $cycleStatistic->cycle_variance_days =
-                    $cycleVarianceDays;
+                    (int) ($cycleVarianceDays ?? 0);
 
                 $cycleStatistic->reliability_level =
                     $reliabilityLevel;
@@ -271,6 +271,14 @@ class CycleSummaryController extends Controller
                 |--------------------------------------------------------------------------
                 */
 
+                $rawPhase = strtolower((string) ($summary['cycle_summary']['current_phase'] ?? ''));
+                $currentPhase = in_array($rawPhase, ['menstrual', 'follicular', 'ovulatory', 'luteal']) ? $rawPhase : null;
+
+                $rawSource = strtolower((string) ($summary['fertile_window']['peak_source'] ?? ''));
+                $predictionSource = in_array($rawSource, ['calendar', 'bbt', 'opk', 'mucus', 'combined']) ? $rawSource : 'calendar';
+
+                $existingCycle = MenstrualCycle::where('user_id', $user->id)->where('is_completed', false)->first();
+
                 $cycle = MenstrualCycle::updateOrCreate(
                     [
                         'user_id' => $user->id,
@@ -278,13 +286,12 @@ class CycleSummaryController extends Controller
                     ],
                     [
                         'period_start_date' =>
-                            $calendarInput?->start_date,
+                            $calendarInput?->start_date ?? $existingCycle?->period_start_date ?? today()->toDateString(),
 
                         'current_cycle_day' =>
                             $summary['cycle_summary']['current_cycle_day'] ?? null,
 
-                        'current_phase' =>
-                            $summary['cycle_summary']['current_phase'] ?? null,
+                        'current_phase' => $currentPhase,
 
                         'fertile_start_day' =>
                             $summary['fertile_window']['start_day'] ?? null,
@@ -295,8 +302,7 @@ class CycleSummaryController extends Controller
                         'predicted_peak_day' =>
                             $summary['fertile_window']['peak_day'] ?? null,
 
-                        'prediction_source' =>
-                            $summary['fertile_window']['peak_source'] ?? null,
+                        'prediction_source' => $predictionSource,
                     ]
                 );
 
@@ -419,43 +425,43 @@ class CycleSummaryController extends Controller
                 |--------------------------------------------------------------------------
                 */
 
-                OvulationReconciliation::updateOrCreate(
-                    [
-                        'user_id' => $user->id,
-                        'cycle_id' => $cycle->id,
-                    ],
-                    [
-                        'calendar_predicted_day' =>
-                            $summary['reconciliation']['calendar_predicted_day']
-                            ?? null,
+                        $finalSource = in_array(strtolower((string) ($summary['reconciliation']['final_source'] ?? '')), ['calendar', 'bbt', 'opk', 'mucus', 'combined'])
+                            ? strtolower((string) $summary['reconciliation']['final_source'])
+                            : null;
 
-                        'bbt_confirmed_day' =>
-                            $summary['reconciliation']['bbt_confirmed_day']
-                            ?? null,
+                        OvulationReconciliation::updateOrCreate(
+                            [
+                                'user_id' => $user->id,
+                                'cycle_id' => $cycle->id,
+                            ],
+                            [
+                                'calendar_predicted_day' =>
+                                    $summary['reconciliation']['calendar_predicted_day']
+                                    ?? null,
 
-                        'lh_surge_day' =>
-                            $summary['reconciliation']['lh_surge_day']
-                            ?? null,
+                                'bbt_confirmed_day' =>
+                                    $summary['reconciliation']['bbt_confirmed_day']
+                                    ?? null,
 
-                        'mucus_peak_day' =>
-                            $summary['fertile_window']['mucus_peak_day']
-                            ?? null,
+                                'lh_surge_day' =>
+                                    $summary['reconciliation']['lh_surge_day']
+                                    ?? null,
 
-                        'final_confirmed_day' =>
-                            $summary['reconciliation']['final_confirmed_day']
-                            ?? null,
+                                'mucus_peak_day' =>
+                                    $summary['fertile_window']['mucus_peak_day']
+                                    ?? null,
 
-                        'final_source' =>
-                            $summary['reconciliation']['final_source']
-                            ?? null,
+                                'final_confirmed_day' =>
+                                    $summary['reconciliation']['final_confirmed_day']
+                                    ?? null,
+
+                                'final_source' => $finalSource,
 
                         'offset_days' =>
-                            $summary['reconciliation']['offset_days']
-                            ?? null,
+                            (int) ($summary['reconciliation']['offset_days'] ?? 0),
 
                         'luteal_phase_length' =>
-                            $summary['reconciliation']['luteal_phase_length']
-                            ?? null,
+                            (int) ($summary['reconciliation']['luteal_phase_length'] ?? 14),
 
                         'has_discrepancy' =>
                             $discrepancy['active'] ?? false,
