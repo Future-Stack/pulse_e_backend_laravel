@@ -84,10 +84,14 @@ class BBTController extends Controller
 //            $userId = auth()->id();
             $userId = $request->user_id;
 
-            $response = Http::timeout(90)->get('https://ai.fightthenumber.com/api/v1/cycle-engine/bbt/ui',
-                [
-                    'user_id' => $userId
-                ]);
+//            $response = Http::timeout(90)->get('https://ai.fightthenumber.com/api/v1/cycle-engine/bbt/ui',
+//                [
+//                    'user_id' => $userId
+//                ]);
+
+            $response = Http::timeout(90)->get(
+                'https://ai.fightthenumber.com/api/v1/cycle-engine/bbt/ui?user_id=' . $userId
+            );
 
 
             if ($response->successful()) {
