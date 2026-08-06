@@ -57,6 +57,13 @@ Route::prefix('v1')->group(function () {
         ]);
     });
 
+    Route::get('/clear', function () {
+        Artisan::call('optimize:clear');
+        return response()->json([
+            'success' => true,
+            'message' => 'Application cache cleared successfully!',
+        ]);
+    });
 
     // ----------------------------
     // Public Routes
