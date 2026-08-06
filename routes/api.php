@@ -111,6 +111,7 @@ Route::get(
 
         //Cycle part
 //summary new 1st page
+Route::get('/ai-summary', [CycleSummaryController::class, 'aiSummary']);
   Route::get('/cycle-engine/engine/sync', [CycleSummaryController::class, 'sync']);
 
         Route::get('/cycle-engine/engine/sync-summary', [CycleSummaryController::class, 'sync']);
