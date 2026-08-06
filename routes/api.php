@@ -325,13 +325,13 @@ Route::get('/ai-summary', [CycleSummaryController::class, 'aiSummary']);
 
         //BBT
         Route::post('/bbt/logs', [BbtController::class, 'logBbtData']);
-
+        Route::get('/bbt-logs', [BbtController::class, 'fetchLog']);
         Route::get('/bbt-database-logs', [BbtController::class, 'fetchBbtLogs']);
     });
 
     //Fetch-BBT-Logs
 
-    Route::get('/bbt-logs', [BbtController::class, 'fetchLog']);
+
     Route::get('/blog-categories', [BlogCategoryController::class, 'index']);
     Route::get('/blog-categories/{slug}', [BlogCategoryController::class, 'show']); // Show single category
 
