@@ -19,9 +19,9 @@ use Carbon\Carbon;
 class OpkLogController extends Controller
 {
     
-    public function getOpkUiData(): JsonResponse
+    public function getOpkUiData(Request $request): JsonResponse
     {
-        $userId = auth()->id(); 
+        $userId = auth()->id() ?? $request->query('user_id'); 
 
         if (!$userId) {
             return response()->json([
@@ -30,10 +30,12 @@ class OpkLogController extends Controller
             ], 401);
         }
 
+        $baseUrl = rtrim(config('services.ai.base_url', 'https://ai.fightthenumber.com'), '/');
+
         try {
             $response = Http::timeout(60)
                 ->connectTimeout(15)
-                ->get('https://ai.fightthenumber.com/api/v1/cycle-engine/opk/ui', [
+                ->get("{$baseUrl}/api/v1/cycle-engine/opk/ui", [
                     'user_id' => $userId
                 ]);
 
@@ -229,5 +231,143 @@ class OpkLogController extends Controller
                 ];
             })
         ], 200);
+    }
+
+    public function store(Request $request): JsonResponse
+    {
+        $userId = auth()->id() ?? $request->input('user_id');
+
+        if (!$userId) {
+            return response()->json(['message' => 'Unauthenticated user.'], 401);
+        }
+
+        $logDate = $request->input('log_date', now()->toDateString());
+        $result = $request->input('result', 'positive');
+
+        $cycle = MenstrualCycle::where('user_id', $userId)
+            ->where('is_completed', false)
+            ->latest('period_start_date')
+            ->first();
+
+        if ($cycle) {
+            OpkLog::updateOrCreate(
+                [
+                    'cycle_id' => $cycle->id,
+                    'log_date' => $logDate,
+                ],
+                [
+                    'result' => $result,
+                    'lh_value' => $request->input('lh_value'),
+                    'outside_window' => $request->input('outside_window', false),
+                    'affects_prediction' => $request->input('affects_prediction', true),
+                    'note' => $request->input('note'),
+                ]
+            );
+        }
+
+        $baseUrl = rtrim(config('services.ai.base_url', 'https://ai.fightthenumber.com'), '/');
+
+        try {
+            $response = Http::timeout(60)
+                ->connectTimeout(15)
+                ->post("{$baseUrl}/api/v1/cycle-engine/opk/log", array_merge($request->all(), [
+                    'user_id'  => $userId,
+                    'log_date' => $logDate,
+                    'result'   => $result,
+                ]));
+
+            if ($response->successful()) {
+                return response()->json($response->json(), 200);
+            }
+
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'Failed to log OPK test to AI engine',
+                'error'   => $response->json()
+            ], $response->status());
+
+        } catch (\Throwable $e) {
+            Log::error("OPK API Error (store): " . $e->getMessage());
+
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'Something went wrong while processing your request.',
+                'error'   => config('app.debug') ? $e->getMessage() : null
+            ], 500);
+        }
+    }
+
+    public function testingWindow(Request $request): JsonResponse
+    {
+        $userId = auth()->id() ?? $request->query('user_id');
+
+        if (!$userId) {
+            return response()->json(['message' => 'Unauthenticated user.'], 401);
+        }
+
+        $baseUrl = rtrim(config('services.ai.base_url', 'https://ai.fightthenumber.com'), '/');
+
+        try {
+            $response = Http::timeout(60)
+                ->connectTimeout(15)
+                ->get("{$baseUrl}/api/v1/cycle-engine/opk/testing-window", [
+                    'user_id' => $userId
+                ]);
+
+            if ($response->successful()) {
+                return response()->json($response->json(), 200);
+            }
+
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'Failed to fetch testing window from AI service',
+                'error'   => $response->json()
+            ], $response->status());
+        } catch (\Throwable $e) {
+            Log::error("OPK API Error (testingWindow): " . $e->getMessage());
+
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'Something went wrong while fetching testing window.',
+                'error'   => config('app.debug') ? $e->getMessage() : null
+            ], 500);
+        }
+    }
+
+    public function todayStatus(Request $request): JsonResponse
+    {
+        $userId = auth()->id() ?? $request->query('user_id');
+
+        if (!$userId) {
+            return response()->json(['message' => 'Unauthenticated user.'], 401);
+        }
+
+        $baseUrl = rtrim(config('services.ai.base_url', 'https://ai.fightthenumber.com'), '/');
+
+        try {
+            $response = Http::timeout(60)
+                ->connectTimeout(15)
+                ->get("{$baseUrl}/api/v1/cycle-engine/opk/today-status", [
+                    'user_id' => $userId
+                ]);
+
+            if ($response->successful()) {
+                return response()->json($response->json(), 200);
+            }
+
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'Failed to fetch today status from AI service',
+                'error'   => $response->json()
+            ], $response->status());
+        } catch (\Throwable $e) {
+            Log::error("OPK API Error (todayStatus): " . $e->getMessage());
+
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'Something went wrong while fetching today status.',
+                'error'   => config('app.debug') ? $e->getMessage() : null
+            ], 500);
+        }
     }
 }
