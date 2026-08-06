@@ -81,7 +81,8 @@ class BBTController extends Controller
     public function fetchLog(Request $request)
     {
         try {
-            $userId = auth()->id();
+//            $userId = auth()->id();
+            $userId = $request->user_id;
 
             $response = Http::timeout(90)->get('https://ai.fightthenumber.com/api/v1/cycle-engine/bbt/ui',
                 [
