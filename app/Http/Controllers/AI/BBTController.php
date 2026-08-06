@@ -18,8 +18,9 @@ class BBTController extends Controller
             ]);
 
             $userId = auth()->id();
+            $baseUrl = rtrim(config('services.ai.base_url', 'https://ai.fightthenumber.com'), '/');
 
-            $response = Http::timeout(90)->post('https://ai.fightthenumber.com/api/v1/cycle-engine/bbt/ui?user_id=' . $userId, [
+            $response = Http::timeout(90)->post("{$baseUrl}/api/v1/cycle-engine/bbt/ui?user_id=" . $userId, [
                 'temperature_f' => $validated['temperature_f'],
                 'flags' => $validated['flags'] ?? [],
             ]);
@@ -30,6 +31,7 @@ class BBTController extends Controller
                 foreach ($data['bbt_chart']['points'] as $point) {
                     BbtLog::updateOrCreate(
                         [
+                            'user_id'  => $userId,
                             'log_date' => $point['date'],
                         ],
                         [
@@ -81,17 +83,13 @@ class BBTController extends Controller
     public function fetchLog(Request $request)
     {
         try {
-//            $userId = auth()->id();
-            $userId = $request->user_id;
+            $userId = auth()->id();
+            $baseUrl = rtrim(config('services.ai.base_url', 'https://ai.fightthenumber.com'), '/');
 
-//            $response = Http::timeout(90)->get('https://ai.fightthenumber.com/api/v1/cycle-engine/bbt/ui',
-//                [
-//                    'user_id' => $userId
-//                ]);
-
-            $response = Http::timeout(90)->get(
-                'https://ai.fightthenumber.com/api/v1/cycle-engine/bbt/ui?user_id=' . $userId
-            );
+            $response = Http::timeout(90)->get("{$baseUrl}/api/v1/cycle-engine/bbt/ui",
+                [
+                    'user_id' => $userId
+                ]);
 
 
             if ($response->successful()) {
