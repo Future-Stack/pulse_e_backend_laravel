@@ -20,10 +20,12 @@ class CycleCalendarInputController extends Controller
             'is_day_n' => ['required', 'boolean'],
         ]);
 
+        $endDate = !empty($validated['end_date']) && $validated['end_date'] !== '0000-00-00' ? $validated['end_date'] : null;
+
         $cycleCalendarInput = CycleCalendarInput::create([
             'user_id' => $request->user()->id,
             'start_date' => $validated['start_date'],
-            'end_date' => $validated['end_date'] ?? null,
+            'end_date' => $endDate,
             'is_day_n' => $validated['is_day_n'],
         ]);
 
