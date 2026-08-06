@@ -578,5 +578,43 @@ class CycleSummaryController extends Controller
             ], 500);
         }
     }
+
+
+
+    public function aiSummary()
+{
+    $user = auth()->user();
+
+    if (! $user) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Unauthenticated.',
+        ], 401);
+    }
+
+    $url = 'https://ai.fightthenumber.com/api/v1/cycle-engine/engine/summary';
+
+    try {
+
+        $response = Http::timeout(120)
+            ->acceptJson()
+            ->get($url, [
+                'user_id' => $user->id,
+            ]);
+
+        return response()->json([
+            'success' => $response->successful(),
+            'data' => $response->json(),
+        ], $response->status());
+
+    } catch (\Throwable $e) {
+
+        return response()->json([
+            'success' => false,
+            'message' => 'Unable to connect AI Engine.',
+            'error' => $e->getMessage(),
+        ], 500);
+    }
+}
 }
 
