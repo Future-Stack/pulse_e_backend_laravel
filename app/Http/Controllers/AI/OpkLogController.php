@@ -111,6 +111,8 @@ class OpkLogController extends Controller
 
         $cardsData = $request->input('cards', []);
 
+        $baseUrl = rtrim(config('services.ai.base_url', 'https://ai.fightthenumber.com'), '/');
+
         try {
             $response = Http::timeout(60)
                 ->connectTimeout(15)
@@ -121,7 +123,7 @@ class OpkLogController extends Controller
                     'Accept'       => 'application/json',
                     'Content-Type' => 'application/json',
                 ])
-                ->post("https://ai.fightthenumber.com/api/v1/cycle-engine/opk/ui?user_id={$userId}", [
+                ->post("{$baseUrl}/api/v1/cycle-engine/opk/ui?user_id={$userId}", [
                     'cards' => $cardsData
                 ]);
 
@@ -249,21 +251,32 @@ class OpkLogController extends Controller
             ->latest('period_start_date')
             ->first();
 
-        if ($cycle) {
-            OpkLog::updateOrCreate(
+        if (!$cycle) {
+            $cycle = MenstrualCycle::firstOrCreate(
                 [
-                    'cycle_id' => $cycle->id,
-                    'log_date' => $logDate,
+                    'user_id' => $userId,
+                    'is_completed' => false,
                 ],
                 [
-                    'result' => $result,
-                    'lh_value' => $request->input('lh_value'),
-                    'outside_window' => $request->input('outside_window', false),
-                    'affects_prediction' => $request->input('affects_prediction', true),
-                    'note' => $request->input('note'),
+                    'period_start_date' => $logDate,
+                    'prediction_source' => 'opk',
                 ]
             );
         }
+
+        OpkLog::updateOrCreate(
+            [
+                'cycle_id' => $cycle->id,
+                'log_date' => $logDate,
+            ],
+            [
+                'result' => $result,
+                'lh_value' => $request->input('lh_value'),
+                'outside_window' => $request->input('outside_window', false),
+                'affects_prediction' => $request->input('affects_prediction', true),
+                'note' => $request->input('note'),
+            ]
+        );
 
         $baseUrl = rtrim(config('services.ai.base_url', 'https://ai.fightthenumber.com'), '/');
 
