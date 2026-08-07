@@ -27,7 +27,19 @@ class CycleCalendarInput extends Model
                 if (!$value || $value === '0000-00-00' || $value === '0000-00-00 00:00:00') {
                     return null;
                 }
-                return $value;
+                return \Carbon\Carbon::parse($value);
+            }
+        );
+    }
+
+    protected function startDate(): \Illuminate\Database\Eloquent\Casts\Attribute
+    {
+        return \Illuminate\Database\Eloquent\Casts\Attribute::make(
+            get: function ($value) {
+                if (!$value || $value === '0000-00-00' || $value === '0000-00-00 00:00:00') {
+                    return null;
+                }
+                return \Carbon\Carbon::parse($value);
             }
         );
     }
