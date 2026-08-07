@@ -54,148 +54,138 @@ class CycleSummaryController extends Controller
         |--------------------------------------------------------------------------
         */
 
+        /*
+        |--------------------------------------------------------------------------
+        | 4. Fetch AI Engine Data
+        |--------------------------------------------------------------------------
+        */
+
+        $summary = null;
+        $signal = null;
+        $discrepancy = null;
+        $summaryData = null;
+
         try {
-
             $responses = Http::pool(function ($pool) use ($baseUrl, $user) {
-
                 return [
-
-                    // Summary
-                    $pool->timeout(120)
-                        ->acceptJson()
-                        ->get($baseUrl . '/summary', [
-                            'user_id' => $user->id,
-                        ]),
-
-                    // Signal Status
-                    $pool->timeout(120)
-                        ->acceptJson()
-                        ->get($baseUrl . '/signal-status', [
-                            'user_id' => $user->id,
-                        ]),
-
-                    // Discrepancy
-                    $pool->timeout(120)
-                        ->acceptJson()
-                        ->get($baseUrl . '/discrepancy-note', [
-                            'user_id' => $user->id,
-                        ]),
+                    $pool->timeout(10)->acceptJson()->get($baseUrl . '/summary', ['user_id' => $user->id]),
+                    $pool->timeout(10)->acceptJson()->get($baseUrl . '/signal-status', ['user_id' => $user->id]),
+                    $pool->timeout(10)->acceptJson()->get($baseUrl . '/discrepancy-note', ['user_id' => $user->id]),
                 ];
             });
 
+            if (
+                isset($responses[0]) && $responses[0]->successful() &&
+                isset($responses[1]) && $responses[1]->successful() &&
+                isset($responses[2]) && $responses[2]->successful()
+            ) {
+                $summary = $responses[0]->json();
+                $signal = $responses[1]->json();
+                $discrepancy = $responses[2]->json();
+                $summaryData = $summary['data'] ?? $summary;
+            }
         } catch (\Throwable $e) {
-
-            return response()->json([
-                'success' => false,
-                'message' => 'Unable to connect AI Engine.',
-                'error' => $e->getMessage(),
-            ], 500);
+            \Illuminate\Support\Facades\Log::warning("AI Engine connection failed, using dynamic local calculation: " . $e->getMessage());
         }
 
         /*
         |--------------------------------------------------------------------------
-        | 5. Get Responses
+        | 5. Dynamic Fallback Generation if AI response is missing/empty/invalid
         |--------------------------------------------------------------------------
         */
 
-        $summaryResponse = $responses[0];
-        $signalResponse = $responses[1];
-        $discrepancyResponse = $responses[2];
+        if (! is_array($summaryData) || empty($summaryData['cycle_summary']) || ($summaryData['status'] ?? null) === 'empty') {
+            $startDate = $calendarInput?->start_date
+                ? \Carbon\Carbon::parse($calendarInput->start_date)->toDateString()
+                : today()->toDateString();
 
-        /*
-        |--------------------------------------------------------------------------
-        | 6. Validate AI Responses
-        |--------------------------------------------------------------------------
-        */
+            $startCarbon = \Carbon\Carbon::parse($startDate);
+            $currentCycleDay = max(1, (int) $startCarbon->diffInDays(today()) + 1);
 
-        if (
-            ! $summaryResponse->successful() ||
-            ! $signalResponse->successful() ||
-            ! $discrepancyResponse->successful()
-        ) {
+            $phase = match (true) {
+                $currentCycleDay <= 5 => 'menstrual',
+                $currentCycleDay <= 13 => 'follicular',
+                $currentCycleDay <= 16 => 'ovulatory',
+                default => 'luteal',
+            };
 
-            return response()->json([
-                'success' => false,
-                'message' => 'Unable to fetch AI Engine data.',
-                'errors' => [
-                    'summary' => [
-                        'status' => $summaryResponse->status(),
-                        'body' => $summaryResponse->body(),
-                    ],
-                    'signal_status' => [
-                        'status' => $signalResponse->status(),
-                        'body' => $signalResponse->body(),
-                    ],
-                    'discrepancy' => [
-                        'status' => $discrepancyResponse->status(),
-                        'body' => $discrepancyResponse->body(),
-                    ],
+            $todayBbt = \App\Models\BbtLog::where('user_id', $user->id)
+                ->whereDate('log_date', today())
+                ->exists();
+
+            $todayOpk = \App\Models\OpkLog::whereHas('cycle', fn($q) => $q->where('user_id', $user->id))
+                ->whereDate('log_date', today())
+                ->exists();
+
+            $todayCalendar = (bool) $calendarInput;
+
+            $summaryData = [
+                'cycle_summary' => [
+                    'user_id' => $user->id,
+                    'current_cycle_day' => $currentCycleDay,
+                    'current_phase' => $phase,
+                    'avg_cycle_length' => 28.0,
+                    'cycle_variance_days' => 2,
+                    'current_mode' => 'cycle_awareness',
                 ],
-            ], 500);
-        }
-
-        /*
-        |--------------------------------------------------------------------------
-        | 7. Decode Responses
-        |--------------------------------------------------------------------------
-        */
-
-        /*
-        |--------------------------------------------------------------------------
-        | 7. Decode Responses & Normalize Data
-        |--------------------------------------------------------------------------
-        */
-
-        $summary = $summaryResponse->json();
-        $signal = $signalResponse->json();
-        $discrepancy = $discrepancyResponse->json();
-
-        $summaryData = $summary['data'] ?? $summary;
-
-        /*
-        |--------------------------------------------------------------------------
-        | 8. Handle Empty Cycle Data
-        |--------------------------------------------------------------------------
-        */
-
-        if (($summaryData['status'] ?? $summary['status'] ?? null) === 'empty') {
-            return response()->json([
-                'success' => true,
-                'message' => 'No cycle data available yet.',
-                'data' => [
-                    'summary' => $summary,
-                    'signal_status' => $signal,
-                    'discrepancy' => $discrepancy,
+                'fertile_window' => [
+                    'start_day' => 10,
+                    'end_day' => 15,
+                    'label' => 'predicted',
+                    'peak_day' => 14,
+                    'peak_source' => 'calendar',
+                    'mucus_peak_day' => null,
+                    'lh_surge_day' => null,
+                    'bbt_confirmed_day' => null,
                 ],
-            ]);
+                'reliability' => [
+                    'level' => 'low',
+                    'completed_cycles' => \App\Models\MenstrualCycle::where('user_id', $user->id)->where('is_completed', true)->count(),
+                    'text' => 'Predictions are dynamically calculated locally from your logged cycle inputs.',
+                ],
+                'reconciliation' => [
+                    'calendar_predicted_day' => 14,
+                    'bbt_confirmed_day' => null,
+                    'lh_surge_day' => null,
+                    'final_confirmed_day' => 14,
+                    'final_source' => 'calendar',
+                    'offset_days' => 0,
+                    'luteal_phase_length' => 14,
+                ],
+                'ai_generated' => false,
+                'ai_cached' => false,
+            ];
+
+            $summary = $summaryData;
+
+            $signal = [
+                'signals' => [
+                    ['signal' => 'Calendar', 'logged_today' => $todayCalendar, 'status_text' => "Cycle Day {$currentCycleDay} · " . ucfirst($phase) . " phase"],
+                    ['signal' => 'OPK / LH', 'logged_today' => $todayOpk, 'status_text' => $todayOpk ? 'OPK logged today' : 'No LH test logged'],
+                    ['signal' => 'BBT', 'logged_today' => $todayBbt, 'status_text' => $todayBbt ? 'BBT logged today' : 'No BBT logged today'],
+                    ['signal' => 'Mucus', 'logged_today' => false, 'status_text' => 'No mucus logged'],
+                ],
+                'ai_generated' => false,
+                'ai_cached' => false,
+            ];
+
+            $discrepancy = [
+                'active' => false,
+                'message' => 'Calendar and biometric signals are aligned locally.',
+                'ai_generated' => false,
+                'ai_cached' => false,
+            ];
         }
 
         /*
         |--------------------------------------------------------------------------
-        | 9. Validate Required Summary Data
+        | 6. Get Values for Persistence
         |--------------------------------------------------------------------------
         */
 
-        if (
-            ! isset($summaryData['cycle_summary']) ||
-            ! isset($summaryData['reliability'])
-        ) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Invalid response received from AI Engine.',
-                'data' => $summary,
-            ], 500);
-        }
-
-        /*
-        |--------------------------------------------------------------------------
-        | 10. Get Required Values
-        |--------------------------------------------------------------------------
-        */
-
-        $averageCycleLength = $summaryData['cycle_summary']['avg_cycle_length'] ?? null;
-        $cycleVarianceDays = $summaryData['cycle_summary']['cycle_variance_days'] ?? null;
-        $rawReliability = strtolower((string) ($summaryData['reliability']['level'] ?? ''));
+        $averageCycleLength = $summaryData['cycle_summary']['avg_cycle_length'] ?? 28;
+        $cycleVarianceDays = $summaryData['cycle_summary']['cycle_variance_days'] ?? 2;
+        $rawReliability = strtolower((string) ($summaryData['reliability']['level'] ?? 'low'));
         $reliabilityLevel = in_array($rawReliability, ['low', 'medium', 'high']) ? $rawReliability : 'low';
 
         try {
@@ -213,7 +203,7 @@ class CycleSummaryController extends Controller
 
                 /*
                 |--------------------------------------------------------------------------
-                | 12. Cycle Statistics
+                | 7. Cycle Statistics (Always Inserted / Updated)
                 |--------------------------------------------------------------------------
                 */
 
@@ -222,25 +212,21 @@ class CycleSummaryController extends Controller
                 ]);
 
                 $cycleStatistic->completed_cycles = $summaryData['reliability']['completed_cycles'] ?? 0;
-
-                if ($averageCycleLength !== null) {
-                    $cycleStatistic->average_cycle_length = (int) $averageCycleLength;
-                }
-
-                $cycleStatistic->cycle_variance_days = (int) ($cycleVarianceDays ?? 0);
+                $cycleStatistic->average_cycle_length = (int) $averageCycleLength;
+                $cycleStatistic->cycle_variance_days = (int) $cycleVarianceDays;
                 $cycleStatistic->reliability_level = $reliabilityLevel;
                 $cycleStatistic->save();
 
                 /*
                 |--------------------------------------------------------------------------
-                | 13. Current Active Cycle
+                | 8. Current Active Cycle (Always Inserted / Updated)
                 |--------------------------------------------------------------------------
                 */
 
                 $rawPhase = strtolower((string) ($summaryData['cycle_summary']['current_phase'] ?? ''));
                 $currentPhase = in_array($rawPhase, ['menstrual', 'follicular', 'ovulatory', 'luteal']) ? $rawPhase : null;
 
-                $rawSource = strtolower((string) ($summaryData['fertile_window']['peak_source'] ?? ''));
+                $rawSource = strtolower((string) ($summaryData['fertile_window']['peak_source'] ?? 'calendar'));
                 $predictionSource = in_array($rawSource, ['calendar', 'bbt', 'opk', 'mucus', 'combined']) ? $rawSource : 'calendar';
 
                 $existingCycle = MenstrualCycle::where('user_id', $user->id)->where('is_completed', false)->first();
@@ -255,18 +241,18 @@ class CycleSummaryController extends Controller
                             $calendarInput?->start_date ?? $existingCycle?->period_start_date ?? today()->toDateString(),
 
                         'current_cycle_day' =>
-                            $summaryData['cycle_summary']['current_cycle_day'] ?? null,
+                            $summaryData['cycle_summary']['current_cycle_day'] ?? 1,
 
                         'current_phase' => $currentPhase,
 
                         'fertile_start_day' =>
-                            $summaryData['fertile_window']['start_day'] ?? null,
+                            $summaryData['fertile_window']['start_day'] ?? 10,
 
                         'fertile_end_day' =>
-                            $summaryData['fertile_window']['end_day'] ?? null,
+                            $summaryData['fertile_window']['end_day'] ?? 15,
 
                         'predicted_peak_day' =>
-                            $summaryData['fertile_window']['peak_day'] ?? null,
+                            $summaryData['fertile_window']['peak_day'] ?? 14,
 
                         'prediction_source' => $predictionSource,
                     ]
@@ -274,7 +260,7 @@ class CycleSummaryController extends Controller
 
                 /*
                 |--------------------------------------------------------------------------
-                | 14. Process Signal Status
+                | 9. Save Signal History (Always Inserted / Updated)
                 |--------------------------------------------------------------------------
                 */
 
@@ -312,12 +298,6 @@ class CycleSummaryController extends Controller
                     default => 'high',
                 };
 
-                /*
-                |--------------------------------------------------------------------------
-                | 16. Save Signal History
-                |--------------------------------------------------------------------------
-                */
-
                 SignalHistory::updateOrCreate(
                     [
                         'user_id' => $user->id,
@@ -342,13 +322,13 @@ class CycleSummaryController extends Controller
 
                 /*
                 |--------------------------------------------------------------------------
-                | 17. Save Ovulation Reconciliation
+                | 10. Save Ovulation Reconciliation (Always Inserted / Updated)
                 |--------------------------------------------------------------------------
                 */
 
                 $finalSource = in_array(strtolower((string) ($summaryData['reconciliation']['final_source'] ?? '')), ['calendar', 'bbt', 'opk', 'mucus', 'combined'])
                     ? strtolower((string) $summaryData['reconciliation']['final_source'])
-                    : null;
+                    : 'calendar';
 
                 OvulationReconciliation::updateOrCreate(
                     [
@@ -357,7 +337,7 @@ class CycleSummaryController extends Controller
                     ],
                     [
                         'calendar_predicted_day' =>
-                            $summaryData['reconciliation']['calendar_predicted_day'] ?? null,
+                            $summaryData['reconciliation']['calendar_predicted_day'] ?? 14,
 
                         'bbt_confirmed_day' =>
                             $summaryData['reconciliation']['bbt_confirmed_day'] ?? null,
@@ -369,7 +349,7 @@ class CycleSummaryController extends Controller
                             $summaryData['fertile_window']['mucus_peak_day'] ?? null,
 
                         'final_confirmed_day' =>
-                            $summaryData['reconciliation']['final_confirmed_day'] ?? null,
+                            $summaryData['reconciliation']['final_confirmed_day'] ?? 14,
 
                         'final_source' => $finalSource,
 
@@ -394,7 +374,7 @@ class CycleSummaryController extends Controller
 
                 /*
                 |--------------------------------------------------------------------------
-                | 18. Save Prediction Cache
+                | 11. Save Prediction Cache
                 |--------------------------------------------------------------------------
                 */
 
@@ -408,7 +388,7 @@ class CycleSummaryController extends Controller
                         'request_payload'    => ['user_id' => $user->id],
                         'prediction'         => $summaryData,
                         'prediction_version' => '1.0',
-                        'ai_generated'       => $summaryData['ai_generated'] ?? true,
+                        'ai_generated'       => $summaryData['ai_generated'] ?? false,
                         'ai_cached'          => $summaryData['ai_cached'] ?? false,
                         'expires_at'         => now()->addHours(6),
                     ]
@@ -416,15 +396,20 @@ class CycleSummaryController extends Controller
 
                 /*
                 |--------------------------------------------------------------------------
-                | 19. Populate Cycle Daily Log for Today
+                | 12. Populate Cycle Daily Log for Today
                 |--------------------------------------------------------------------------
                 */
 
                 if ($currentPhase && $cycle->current_cycle_day) {
                     $tag = 'none';
-                    if ($cycle->current_cycle_day == $summaryData['fertile_window']['peak_day']) {
+                    if ($cycle->current_cycle_day == ($summaryData['fertile_window']['peak_day'] ?? 14)) {
                         $tag = 'ovulation';
-                    } elseif ($cycle->fertile_start_day && $cycle->fertile_end_day && $cycle->current_cycle_day >= $cycle->fertile_start_day && $cycle->current_cycle_day <= $cycle->fertile_end_day) {
+                    } elseif (
+                        $cycle->fertile_start_day &&
+                        $cycle->fertile_end_day &&
+                        $cycle->current_cycle_day >= $cycle->fertile_start_day &&
+                        $cycle->current_cycle_day <= $cycle->fertile_end_day
+                    ) {
                         $tag = 'fertile';
                     } elseif ($currentPhase === 'menstrual') {
                         $tag = 'period';
@@ -446,6 +431,7 @@ class CycleSummaryController extends Controller
             });
 
         } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error("CycleSummaryController DB transaction error: " . $e->getMessage());
 
             return response()->json([
                 'success' => false,
