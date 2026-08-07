@@ -63,6 +63,8 @@ class BBTController extends Controller
             }
 
             $points = $data['bbt_chart']['points'] ?? [];
+            $hasCoverlineCol = \Illuminate\Support\Facades\Schema::hasColumn('bbt_logs', 'coverline_value');
+
             if (! empty($points) && is_array($points)) {
                 foreach ($points as $point) {
                     $coverlineVal = $data['bbt_chart']['coverline_value'] ?? null;
@@ -70,52 +72,59 @@ class BBTController extends Controller
                     $ovulationConfirmed = ($coverlineAlgStr !== '—');
                     $phase = $data['coverline_algorithm']['summary']['phase'] ?? null;
 
+                    $logData = [
+                        'user_id'     => $userId,
+                        'cycle_id'    => $cycle->id,
+                        'temperature' => $point['temperature_f'] ?? $tempF,
+                        'unit'        => 'F',
+                        'logged_at'   => now(),
+                        'is_excluded' => $point['is_excluded'] ?? false,
+                        'illness'     => in_array('illness', $point['flags'] ?? []),
+                        'poor_sleep'  => in_array('poor_sleep', $point['flags'] ?? []),
+                        'alcohol'     => in_array('alcohol', $point['flags'] ?? []),
+                        'late_wakeup' => in_array('late_wakeup', $point['flags'] ?? []),
+                        'travel'      => in_array('travel', $point['flags'] ?? []),
+                        'notes'       => $request->input('notes'),
+                    ];
+
+                    if ($hasCoverlineCol) {
+                        $logData['coverline_value']     = $coverlineVal;
+                        $logData['ovulation_confirmed'] = $ovulationConfirmed;
+                        $logData['cycle_day']           = $point['day'] ?? null;
+                        $logData['phase']               = $phase;
+                    }
+
                     BbtLog::updateOrCreate(
                         [
                             'user_id'  => $userId,
                             'cycle_id' => $cycle->id,
                             'log_date' => $point['date'] ?? $logDate,
                         ],
-                        [
-                            'user_id'             => $userId,
-                            'cycle_id'            => $cycle->id,
-                            'temperature'         => $point['temperature_f'] ?? $tempF,
-                            'unit'                => 'F',
-                            'logged_at'           => now(),
-                            'is_excluded'         => $point['is_excluded'] ?? false,
-                            'illness'             => in_array('illness', $point['flags'] ?? []),
-                            'poor_sleep'          => in_array('poor_sleep', $point['flags'] ?? []),
-                            'alcohol'             => in_array('alcohol', $point['flags'] ?? []),
-                            'late_wakeup'         => in_array('late_wakeup', $point['flags'] ?? []),
-                            'travel'              => in_array('travel', $point['flags'] ?? []),
-                            'notes'               => $request->input('notes'),
-                            'coverline_value'     => $coverlineVal,
-                            'ovulation_confirmed' => $ovulationConfirmed,
-                            'cycle_day'           => $point['day'] ?? null,
-                            'phase'               => $phase,
-                        ]
+                        $logData
                     );
                 }
             } else {
+                $logData = [
+                    'user_id'     => $userId,
+                    'cycle_id'    => $cycle->id,
+                    'temperature' => $tempF,
+                    'unit'        => 'F',
+                    'logged_at'   => now(),
+                    'illness'     => in_array('illness', $flags),
+                    'poor_sleep'  => in_array('poor_sleep', $flags),
+                    'alcohol'     => in_array('alcohol', $flags),
+                    'late_wakeup' => in_array('late_wakeup', $flags),
+                    'travel'      => in_array('travel', $flags),
+                    'notes'       => $request->input('notes'),
+                ];
+
                 BbtLog::updateOrCreate(
                     [
                         'user_id'  => $userId,
                         'cycle_id' => $cycle->id,
                         'log_date' => $logDate,
                     ],
-                    [
-                        'user_id'     => $userId,
-                        'cycle_id'    => $cycle->id,
-                        'temperature' => $tempF,
-                        'unit'        => 'F',
-                        'logged_at'   => now(),
-                        'illness'     => in_array('illness', $flags),
-                        'poor_sleep'  => in_array('poor_sleep', $flags),
-                        'alcohol'     => in_array('alcohol', $flags),
-                        'late_wakeup' => in_array('late_wakeup', $flags),
-                        'travel'      => in_array('travel', $flags),
-                        'notes'       => $request->input('notes'),
-                    ]
+                    $logData
                 );
             }
 
