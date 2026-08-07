@@ -103,22 +103,52 @@ class OpkLogController extends Controller
     
     public function storeOpkUiData(Request $request): JsonResponse
     {
-        $userId = auth()->id() ?? $request->query('user_id');
+        $userId = auth()->id() ?? $request->input('user_id') ?? $request->query('user_id');
 
         if (!$userId) {
             return response()->json(['message' => 'Unauthenticated user.'], 401);
         }
 
         $cardsData = $request->input('cards', []);
+        $logDate = $request->input('log_date', today()->toDateString());
+        $result = $request->input('result', 'positive');
+
+        // 1. ALWAYS Save OpkLog to DB first
+        $cycle = MenstrualCycle::where('user_id', $userId)
+            ->where('is_completed', false)
+            ->latest('period_start_date')
+            ->first();
+
+        if (!$cycle) {
+            $cycle = MenstrualCycle::create([
+                'user_id' => $userId,
+                'period_start_date' => $logDate,
+                'is_completed' => false,
+                'prediction_source' => 'opk',
+            ]);
+        }
+
+        $opkLog = OpkLog::updateOrCreate(
+            [
+                'cycle_id' => $cycle->id,
+                'log_date' => $logDate,
+            ],
+            [
+                'result' => $result,
+                'lh_value' => $request->input('lh_value'),
+                'outside_window' => $request->input('outside_window', false),
+                'affects_prediction' => $request->input('affects_prediction', true),
+                'note' => $request->input('note'),
+            ]
+        );
 
         $baseUrl = rtrim(config('services.ai.base_url', 'https://ai.fightthenumber.com'), '/');
+        $apiData = null;
 
+        // 2. Call AI Engine for OPK UI (Graceful Fallback)
         try {
-            $response = Http::timeout(60)
-                ->connectTimeout(15)
-                ->retry(2, 2000, function ($exception) {
-                    return $exception instanceof ConnectionException;
-                })
+            $response = Http::timeout(10)
+                ->connectTimeout(5)
                 ->withHeaders([
                     'Accept'       => 'application/json',
                     'Content-Type' => 'application/json',
@@ -129,46 +159,29 @@ class OpkLogController extends Controller
 
             if ($response->successful()) {
                 $apiData = $response->json();
-
-                $opkRecord = OpkData::create([
-                    'user_id'       => $userId,
-                    'response_data' => is_string($apiData) ? json_decode($apiData, true) : $apiData,
-                ]);
-
-                return response()->json([
-                    'status'  => 'success',
-                    'message' => 'API response stored successfully!',
-                    'data'    => $opkRecord
-                ], 200);
             }
-
-            return response()->json([
-                'status'  => 'error',
-                'message' => 'Failed to fetch data from API',
-                'error'   => $response->json()
-            ], $response->status());
-
-        } catch (ConnectionException $e) {
-            Log::error("OPK API Connection Timeout (storeOpkUiData): " . $e->getMessage());
-
-            return response()->json([
-                'status'  => 'error',
-                'message' => 'Connection timed out while reaching the AI service. Please try again.'
-            ], 504);
-
         } catch (\Throwable $e) {
-            Log::error("OPK API Error (storeOpkUiData): " . $e->getMessage(), [
-                'file' => $e->getFile(),
-                'line' => $e->getLine()
-            ]);
-
-            return response()->json([
-                'status'      => 'error',
-                'message'     => 'Something went wrong while processing your request.',
-                'debug_error' => config('app.debug') ? $e->getMessage() : null,
-                'line'        => config('app.debug') ? $e->getLine() : null
-            ], 500);
+            Log::warning("OPK AI service call warning: " . $e->getMessage());
         }
+
+        // 3. Auto-trigger cycle summary sync (updates SignalHistory & OvulationReconciliation)
+        try {
+            app(\App\Http\Controllers\AI\CycleSummaryController::class)->sync();
+        } catch (\Throwable $e) {
+            Log::warning("OPK auto-sync warning: " . $e->getMessage());
+        }
+
+        $opkRecord = OpkData::create([
+            'user_id'       => $userId,
+            'response_data' => is_string($apiData) ? json_decode($apiData, true) : ($apiData ?? ['status' => 'logged']),
+        ]);
+
+        return response()->json([
+            'status'  => 'success',
+            'message' => 'OPK data stored successfully!',
+            'opk_log' => $opkLog,
+            'data'    => $opkRecord
+        ], 200);
     }
 
     
