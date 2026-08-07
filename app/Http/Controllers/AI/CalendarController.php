@@ -24,7 +24,7 @@ class CalendarController extends Controller
         ], 401);
     }
 
-    $url = config('services.ai.base_url')
+    $url = rtrim(config('services.ai.base_url', 'https://ai.fightthenumber.com'), '/')
         . '/api/v1/cycle-engine/calendar/month';
 
     try {
@@ -76,8 +76,8 @@ class CalendarController extends Controller
         ], 401);
     }
 
-    $url = config('services.ai.base_url')
-        .'/api/v1/cycle-engine/calendar/next-period';
+    $url = rtrim(config('services.ai.base_url', 'https://ai.fightthenumber.com'), '/')
+        . '/api/v1/cycle-engine/calendar/next-period';
 
     try {
 

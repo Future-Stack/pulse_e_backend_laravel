@@ -281,23 +281,39 @@ class OpkLogController extends Controller
         $baseUrl = rtrim(config('services.ai.base_url', 'https://ai.fightthenumber.com'), '/');
 
         try {
+            // AI Engine expects OPK UI endpoint with user_id
             $response = Http::timeout(60)
                 ->connectTimeout(15)
-                ->post("{$baseUrl}/api/v1/cycle-engine/opk/log", array_merge($request->all(), [
-                    'user_id'  => $userId,
+                ->post("{$baseUrl}/api/v1/cycle-engine/opk/ui?user_id={$userId}", array_merge($request->all(), [
+                    'cards'    => $request->input('cards', []),
                     'log_date' => $logDate,
                     'result'   => $result,
                 ]));
 
-            if ($response->successful()) {
-                return response()->json($response->json(), 200);
+            // Fallback GET to fetch latest OPK UI structure if POST returns empty or specific format
+            $aiData = $response->successful() ? $response->json() : null;
+            if (!$aiData) {
+                $getRes = Http::timeout(30)->get("{$baseUrl}/api/v1/cycle-engine/opk/ui", ['user_id' => $userId]);
+                if ($getRes->successful()) {
+                    $aiData = $getRes->json();
+                }
             }
 
-            return response()->json([
-                'status'  => 'error',
-                'message' => 'Failed to log OPK test to AI engine',
-                'error'   => $response->json()
-            ], $response->status());
+            // Auto-trigger cycle summary sync so SignalHistory, MenstrualCycle and OvulationReconciliation refresh
+            try {
+                app(\App\Http\Controllers\AI\CycleSummaryController::class)->sync();
+            } catch (\Throwable $e) {
+                Log::warning("OPK auto-sync warning: " . $e->getMessage());
+            }
+
+            $responseData = array_merge(is_array($aiData) ? $aiData : [], [
+                'status'  => 'success',
+                'message' => 'OPK test logged successfully.',
+                'opk_log' => OpkLog::where('cycle_id', $cycle->id)->where('log_date', $logDate)->first(),
+                'ai_data' => $aiData,
+            ]);
+
+            return response()->json($responseData, 200);
 
         } catch (\Throwable $e) {
             Log::error("OPK API Error (store): " . $e->getMessage());
