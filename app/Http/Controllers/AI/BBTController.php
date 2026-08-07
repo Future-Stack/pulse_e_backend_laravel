@@ -13,63 +13,124 @@ class BBTController extends Controller
     {
         try {
             $validated = $request->validate([
-                'temperature_f' => 'required|numeric',
-                'flags' => 'nullable|array',
+                'temperature_f' => 'required_without:temperature|numeric',
+                'temperature'   => 'required_without:temperature_f|numeric',
+                'log_date'      => 'nullable|date',
+                'flags'         => 'nullable|array',
             ]);
 
-            $userId = auth()->id();
+            $userId = auth()->id() ?? $request->input('user_id');
+            if (!$userId) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Unauthenticated.',
+                ], 401);
+            }
+
+            $tempF = $validated['temperature_f'] ?? $validated['temperature'];
+            $logDate = $validated['log_date'] ?? now()->toDateString();
+            $flags = $validated['flags'] ?? [];
+
             $baseUrl = rtrim(config('services.ai.base_url', 'https://ai.fightthenumber.com'), '/');
 
             $response = Http::timeout(90)->post("{$baseUrl}/api/v1/cycle-engine/bbt/ui?user_id=" . $userId, [
-                'temperature_f' => $validated['temperature_f'],
-                'flags' => $validated['flags'] ?? [],
+                'temperature_f' => (float) $tempF,
+                'flags'         => $flags,
             ]);
+
+            if (! $response->successful()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Failed to log BBT data with AI Engine.',
+                    'error'   => $response->json() ?? $response->body(),
+                ], $response->status());
+            }
 
             $data = $response->json();
 
-            if ($response->successful()) {
-                foreach ($data['bbt_chart']['points'] as $point) {
+            $cycle = \App\Models\MenstrualCycle::where('user_id', $userId)
+                ->where('is_completed', false)
+                ->latest('period_start_date')
+                ->first();
+
+            if (! $cycle) {
+                $cycle = \App\Models\MenstrualCycle::create([
+                    'user_id'           => $userId,
+                    'period_start_date' => $logDate,
+                    'is_completed'      => false,
+                    'prediction_source' => 'bbt',
+                ]);
+            }
+
+            $points = $data['bbt_chart']['points'] ?? [];
+            if (! empty($points) && is_array($points)) {
+                foreach ($points as $point) {
+                    $coverlineVal = $data['bbt_chart']['coverline_value'] ?? null;
+                    $coverlineAlgStr = $data['coverline_algorithm']['summary']['coverline'] ?? '—';
+                    $ovulationConfirmed = ($coverlineAlgStr !== '—');
+                    $phase = $data['coverline_algorithm']['summary']['phase'] ?? null;
+
                     BbtLog::updateOrCreate(
                         [
                             'user_id'  => $userId,
-                            'log_date' => $point['date'],
+                            'cycle_id' => $cycle->id,
+                            'log_date' => $point['date'] ?? $logDate,
                         ],
                         [
-                            'user_id'     => $userId,
-                            'temperature' => $point['temperature_f'],
-                            'unit'        => 'F',
-                            'logged_at'   => now(),
-                            'is_excluded' => $point['is_excluded'] ?? false,
-                            'illness'     => in_array('illness', $point['flags'] ?? []),
-                            'poor_sleep'  => in_array('poor_sleep', $point['flags'] ?? []),
-                            'alcohol'     => in_array('alcohol', $point['flags'] ?? []),
-                            'late_wakeup' => in_array('late_wakeup', $point['flags'] ?? []),
-                            'travel'      => in_array('travel', $point['flags'] ?? []),
-                            'notes'       => null,
-
-                            'coverline_value'    => $data['bbt_chart']['coverline_value'] ?? null,
-                            'ovulation_confirmed'=> ($data['coverline_algorithm']['summary']['coverline'] !== '—'),
-                            'cycle_day'          => $point['day'] ?? null,
-                            'phase'              => $data['coverline_algorithm']['summary']['phase'] ?? null,
+                            'user_id'             => $userId,
+                            'cycle_id'            => $cycle->id,
+                            'temperature'         => $point['temperature_f'] ?? $tempF,
+                            'unit'                => 'F',
+                            'logged_at'           => now(),
+                            'is_excluded'         => $point['is_excluded'] ?? false,
+                            'illness'             => in_array('illness', $point['flags'] ?? []),
+                            'poor_sleep'          => in_array('poor_sleep', $point['flags'] ?? []),
+                            'alcohol'             => in_array('alcohol', $point['flags'] ?? []),
+                            'late_wakeup'         => in_array('late_wakeup', $point['flags'] ?? []),
+                            'travel'              => in_array('travel', $point['flags'] ?? []),
+                            'notes'               => $request->input('notes'),
+                            'coverline_value'     => $coverlineVal,
+                            'ovulation_confirmed' => $ovulationConfirmed,
+                            'cycle_day'           => $point['day'] ?? null,
+                            'phase'               => $phase,
                         ]
                     );
                 }
+            } else {
+                BbtLog::updateOrCreate(
+                    [
+                        'user_id'  => $userId,
+                        'cycle_id' => $cycle->id,
+                        'log_date' => $logDate,
+                    ],
+                    [
+                        'user_id'     => $userId,
+                        'cycle_id'    => $cycle->id,
+                        'temperature' => $tempF,
+                        'unit'        => 'F',
+                        'logged_at'   => now(),
+                        'illness'     => in_array('illness', $flags),
+                        'poor_sleep'  => in_array('poor_sleep', $flags),
+                        'alcohol'     => in_array('alcohol', $flags),
+                        'late_wakeup' => in_array('late_wakeup', $flags),
+                        'travel'      => in_array('travel', $flags),
+                        'notes'       => $request->input('notes'),
+                    ]
+                );
             }
 
-
-            if ($response) {
-                return response()->json([
-                    'success' => true,
-                    'message' => 'BBT data logged successfully.',
-                    'data' => $response->json(),
-                ], 200);
+            // Auto-trigger cycle summary sync to update SignalHistory & OvulationReconciliation
+            try {
+                app(\App\Http\Controllers\AI\CycleSummaryController::class)->sync();
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('BBT sync trigger warning: ' . $e->getMessage());
             }
 
             return response()->json([
-                'success' => false,
-                'message' => 'Failed to log BBT data.',
-                'error' => 'Error logging BBT data.',
-            ]);
+                'success' => true,
+                'message' => 'BBT data logged successfully.',
+                'data'    => $data,
+            ], 200);
 
         } catch (\Exception $e) {
             \Log::error('BBT log failed: ' . $e->getMessage());

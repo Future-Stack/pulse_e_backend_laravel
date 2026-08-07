@@ -120,20 +120,17 @@ Route::get('/ai-summary', [CycleSummaryController::class, 'aiSummary']);
         Route::get('engine/discrepancy-note-sync', [CycleSummaryController::class, 'syncDiscrepancyNote']);
 
         //calender
-        // Route::get('/calendar/month-sync', [CalendarController::class, 'syncMonth']);
-        // Route::post('/calendar/confirm-day', [CalendarController::class, 'confirmDay']);
+        Route::get('/calendar/month-sync', [CalendarController::class, 'syncMonth']);
+        Route::get('/calendar/next-period-sync', [CalendarController::class, 'syncNextPeriod']);
+        Route::get('/cycle-calendar/month', [CalendarController::class, 'syncMonth']);
+        Route::get('/cycle-calendar/next-period', [CalendarController::class, 'syncNextPeriod']);
 
-
-        // Route::get('/calendar/next-period-sync', [CalendarController::class, 'syncNextPeriod']);
-         Route::get(
-        '/cycle-calendar/month',
-        [CalendarController::class, 'syncMonth']
-    );
-
-    Route::get(
-        '/cycle-calendar/next-period',
-        [CalendarController::class, 'syncNextPeriod']
-    );
+        //BBT
+        Route::post('/bbt/logs', [BbtController::class, 'logBbtData']);
+        Route::post('/cycle-engine/bbt/log', [BbtController::class, 'logBbtData']);
+        Route::get('/bbt-logs', [BbtController::class, 'fetchLog']);
+        Route::get('/cycle-engine/bbt/ui', [BbtController::class, 'fetchLog']);
+        Route::get('/bbt-database-logs', [BbtController::class, 'fetchBbtLogs']);
 
         Route::get('/avoiding-pregnancy/consent-status', [AvoidingPregnancyController::class, 'consentStatus']);
 
@@ -323,15 +320,8 @@ Route::get('/ai-summary', [CycleSummaryController::class, 'aiSummary']);
         Route::post('/blog-update/{slug}', [BlogController::class, 'update']); // Update blog
         Route::delete('/blog-delete/{slug}', [BlogController::class, 'destroy']); // Delete blog
 
-        //BBT
-        Route::post('/bbt/logs', [BbtController::class, 'logBbtData']);
-
-        Route::get('/bbt-database-logs', [BbtController::class, 'fetchBbtLogs']);
     });
 
-    //Fetch-BBT-Logs
-
-    Route::get('/bbt-logs', [BbtController::class, 'fetchLog']);
     Route::get('/blog-categories', [BlogCategoryController::class, 'index']);
     Route::get('/blog-categories/{slug}', [BlogCategoryController::class, 'show']); // Show single category
 
