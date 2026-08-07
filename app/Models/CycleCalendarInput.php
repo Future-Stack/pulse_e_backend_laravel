@@ -20,6 +20,18 @@ class CycleCalendarInput extends Model
         'is_day_n' => 'boolean',
     ];
 
+    protected function endDate(): \Illuminate\Database\Eloquent\Casts\Attribute
+    {
+        return \Illuminate\Database\Eloquent\Casts\Attribute::make(
+            get: function ($value) {
+                if (!$value || $value === '0000-00-00' || $value === '0000-00-00 00:00:00') {
+                    return null;
+                }
+                return $value;
+            }
+        );
+    }
+
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
