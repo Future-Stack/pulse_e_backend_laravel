@@ -289,6 +289,14 @@ class CycleSummaryController extends Controller
                     }
                 }
 
+                // Fallback check against local DB logs for active cycle if AI didn't mark them true
+                $hasLocalBbt = \App\Models\BbtLog::where('cycle_id', $cycle->id)->exists();
+                $hasLocalOpk = \App\Models\OpkLog::where('cycle_id', $cycle->id)->exists();
+
+                $bbt = $bbt || $hasLocalBbt;
+                $opk = $opk || $hasLocalOpk;
+                $calendar = $calendar || true;
+
                 $count = collect([$calendar, $bbt, $opk, $mucus])->filter()->count();
 
                 $strength = match (true) {
@@ -326,9 +334,39 @@ class CycleSummaryController extends Controller
                 |--------------------------------------------------------------------------
                 */
 
-                $finalSource = in_array(strtolower((string) ($summaryData['reconciliation']['final_source'] ?? '')), ['calendar', 'bbt', 'opk', 'mucus', 'combined'])
-                    ? strtolower((string) $summaryData['reconciliation']['final_source'])
-                    : 'calendar';
+                $lhSurgeDay = $summaryData['reconciliation']['lh_surge_day'] ?? null;
+                if (!$lhSurgeDay) {
+                    $opkPeakLog = \App\Models\OpkLog::where('cycle_id', $cycle->id)
+                        ->whereIn('result', ['peak', 'positive'])
+                        ->orderBy('log_date')
+                        ->first();
+
+                    if ($opkPeakLog && $cycle->period_start_date) {
+                        $lhSurgeDay = max(1, (int) \Carbon\Carbon::parse($cycle->period_start_date)->diffInDays(\Carbon\Carbon::parse($opkPeakLog->log_date)) + 1);
+                    }
+                }
+
+                $bbtConfirmedDay = $summaryData['reconciliation']['bbt_confirmed_day'] ?? null;
+                if (!$bbtConfirmedDay) {
+                    $bbtConfirmedLog = \App\Models\BbtLog::where('cycle_id', $cycle->id)
+                        ->where(function($q) {
+                            $q->where('ovulation_confirmed', true)->orWhereNotNull('cycle_day');
+                        })
+                        ->orderBy('log_date')
+                        ->first();
+
+                    if ($bbtConfirmedLog) {
+                        $bbtConfirmedDay = $bbtConfirmedLog->cycle_day
+                            ?? ($cycle->period_start_date ? max(1, (int) \Carbon\Carbon::parse($cycle->period_start_date)->diffInDays(\Carbon\Carbon::parse($bbtConfirmedLog->log_date)) + 1) : null);
+                    }
+                }
+
+                $calendarPredictedDay = (int) ($summaryData['reconciliation']['calendar_predicted_day'] ?? 14);
+                $finalConfirmedDay = $lhSurgeDay ?? $bbtConfirmedDay ?? $summaryData['reconciliation']['final_confirmed_day'] ?? $calendarPredictedDay;
+
+                $finalSource = $lhSurgeDay ? 'opk' : ($bbtConfirmedDay ? 'bbt' : (in_array(strtolower((string) ($summaryData['reconciliation']['final_source'] ?? '')), ['calendar', 'bbt', 'opk', 'mucus', 'combined']) ? strtolower((string) $summaryData['reconciliation']['final_source']) : 'calendar'));
+
+                $offsetDays = (int) ($finalConfirmedDay - $calendarPredictedDay);
 
                 OvulationReconciliation::updateOrCreate(
                     [
@@ -336,38 +374,17 @@ class CycleSummaryController extends Controller
                         'cycle_id' => $cycle->id,
                     ],
                     [
-                        'calendar_predicted_day' =>
-                            $summaryData['reconciliation']['calendar_predicted_day'] ?? 14,
-
-                        'bbt_confirmed_day' =>
-                            $summaryData['reconciliation']['bbt_confirmed_day'] ?? null,
-
-                        'lh_surge_day' =>
-                            $summaryData['reconciliation']['lh_surge_day'] ?? null,
-
-                        'mucus_peak_day' =>
-                            $summaryData['fertile_window']['mucus_peak_day'] ?? null,
-
-                        'final_confirmed_day' =>
-                            $summaryData['reconciliation']['final_confirmed_day'] ?? 14,
-
+                        'calendar_predicted_day' => $calendarPredictedDay,
+                        'bbt_confirmed_day' => $bbtConfirmedDay,
+                        'lh_surge_day' => $lhSurgeDay,
+                        'mucus_peak_day' => $summaryData['fertile_window']['mucus_peak_day'] ?? null,
+                        'final_confirmed_day' => $finalConfirmedDay,
                         'final_source' => $finalSource,
-
-                        'offset_days' =>
-                            (int) ($summaryData['reconciliation']['offset_days'] ?? 0),
-
-                        'luteal_phase_length' =>
-                            (int) ($summaryData['reconciliation']['luteal_phase_length'] ?? 14),
-
-                        'has_discrepancy' =>
-                            $discrepancy['active'] ?? false,
-
-                        'discrepancy_note' =>
-                            $discrepancy['message'] ?? null,
-
-                        'is_reconciled' =>
-                            ! ($discrepancy['active'] ?? false),
-
+                        'offset_days' => $offsetDays,
+                        'luteal_phase_length' => (int) ($summaryData['reconciliation']['luteal_phase_length'] ?? 14),
+                        'has_discrepancy' => $discrepancy['active'] ?? false,
+                        'discrepancy_note' => $discrepancy['message'] ?? null,
+                        'is_reconciled' => ! ($discrepancy['active'] ?? false),
                         'reconciled_at' => now(),
                     ]
                 );
