@@ -84,16 +84,21 @@ class CycleCalendarInputController extends Controller
             ->orderByDesc('start_date')
             ->get()
             ->map(function ($input) {
-                $rawEnd = $input->getRawOriginal('end_date');
-                $endDate = ($rawEnd && $rawEnd !== '0000-00-00' && $rawEnd !== '0000-00-00 00:00:00')
-                    ? ($input->end_date ? $input->end_date->format('Y-m-d') : null)
-                    : null;
+                $formatDate = function ($dateVal) {
+                    if (! $dateVal || $dateVal === '0000-00-00' || $dateVal === '0000-00-00 00:00:00') {
+                        return null;
+                    }
+                    if ($dateVal instanceof \DateTimeInterface) {
+                        return $dateVal->format('Y-m-d');
+                    }
+                    return \Carbon\Carbon::parse($dateVal)->format('Y-m-d');
+                };
 
                 return [
                     'id' => $input->id,
                     'user_id' => $input->user_id,
-                    'start_date' => $input->start_date ? $input->start_date->format('Y-m-d') : null,
-                    'end_date' => $endDate,
+                    'start_date' => $formatDate($input->start_date),
+                    'end_date' => $formatDate($input->end_date),
                     'is_day_n' => (bool) $input->is_day_n,
                     'created_at' => $input->created_at,
                     'updated_at' => $input->updated_at,
