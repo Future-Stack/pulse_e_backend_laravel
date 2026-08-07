@@ -46,7 +46,7 @@ use App\Http\Controllers\AI\OpkLogController;
 use App\Http\Controllers\AI\TryingToConceiveController;
 use App\Http\Controllers\AI\AwarenessController;
 use App\Http\Controllers\AI\CycleCalendarInputController;
-
+use Illuminate\Support\Facades\Artisan;
 
 Route::prefix('v1')->group(function () {
     Route::get('/', function () {
@@ -82,25 +82,19 @@ Route::prefix('v1')->group(function () {
     //Apple
     Route::post('/apple', [AppleAuthController::class, 'login'])->name('api.auth.apple');
 
-// Public routes (no auth required)
-// Public Pages
-    Route::get('pages', [PageController::class, 'index']);
-    Route::get('pages/{page_id}', [PageController::class, 'show']);
+    // Public routes (no auth required)
+    // Public Pages
+        Route::get('pages', [PageController::class, 'index']);
+        Route::get('pages/{page_id}', [PageController::class, 'show']);
 
-Route::get('lab-reports/{labReport}', [LabReportController::class, 'show']);
+    Route::get('lab-reports/{labReport}', [LabReportController::class, 'show']);
 
 
-Route::get(
-    '/cycle-calendar-inputs/{user_id}',
-    [CycleCalendarInputController::class, 'show']
-);
+    Route::get('/cycle-calendar-inputs/{user_id}',[CycleCalendarInputController::class, 'show']);
 
     Route::middleware('auth:sanctum')->group(function () {
 
-    Route::post(
-    '/cycle-calendar-inputs',
-    [CycleCalendarInputController::class, 'store']
-);
+    Route::post('/cycle-calendar-inputs',[CycleCalendarInputController::class, 'store']);
 
         //user health log
         Route::apiResource('health-logs', HealthLogController::class);
@@ -116,10 +110,9 @@ Route::get(
             [LabReportAIController::class, 'show']
         );
 
-        //Cycle part
-//summary new 1st page
-Route::get('/ai-summary', [CycleSummaryController::class, 'aiSummary']);
-  Route::get('/cycle-engine/engine/sync', [CycleSummaryController::class, 'sync']);
+        //summary new 1st page
+        Route::get('/ai-summary', [CycleSummaryController::class, 'aiSummary']);
+        Route::get('/cycle-engine/engine/sync', [CycleSummaryController::class, 'sync']);
 
         Route::get('/cycle-engine/engine/sync-summary', [CycleSummaryController::class, 'sync']);
 
