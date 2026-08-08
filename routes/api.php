@@ -46,7 +46,7 @@ use App\Http\Controllers\AI\OpkLogController;
 use App\Http\Controllers\AI\TryingToConceiveController;
 use App\Http\Controllers\AI\AwarenessController;
 use App\Http\Controllers\AI\CycleCalendarInputController;
-
+use Illuminate\Support\Facades\Artisan;
 
 Route::prefix('v1')->group(function () {
     Route::get('/', function () {
@@ -82,25 +82,19 @@ Route::prefix('v1')->group(function () {
     //Apple
     Route::post('/apple', [AppleAuthController::class, 'login'])->name('api.auth.apple');
 
-// Public routes (no auth required)
-// Public Pages
-    Route::get('pages', [PageController::class, 'index']);
-    Route::get('pages/{page_id}', [PageController::class, 'show']);
+    // Public routes (no auth required)
+    // Public Pages
+        Route::get('pages', [PageController::class, 'index']);
+        Route::get('pages/{page_id}', [PageController::class, 'show']);
 
-Route::get('lab-reports/{labReport}', [LabReportController::class, 'show']);
+    Route::get('lab-reports/{labReport}', [LabReportController::class, 'show']);
 
 
-Route::get(
-    '/cycle-calendar-inputs/{user_id}',
-    [CycleCalendarInputController::class, 'show']
-);
+    Route::get('/cycle-calendar-inputs/{user_id}',[CycleCalendarInputController::class, 'show']);
 
     Route::middleware('auth:sanctum')->group(function () {
 
-    Route::post(
-    '/cycle-calendar-inputs',
-    [CycleCalendarInputController::class, 'store']
-);
+    Route::post('/cycle-calendar-inputs',[CycleCalendarInputController::class, 'store']);
 
         //user health log
         Route::apiResource('health-logs', HealthLogController::class);
@@ -116,10 +110,9 @@ Route::get(
             [LabReportAIController::class, 'show']
         );
 
-        //Cycle part
-//summary new 1st page
-Route::get('/ai-summary', [CycleSummaryController::class, 'aiSummary']);
-  Route::get('/cycle-engine/engine/sync', [CycleSummaryController::class, 'sync']);
+        //summary new 1st page
+        Route::get('/ai-summary', [CycleSummaryController::class, 'aiSummary']);
+        Route::get('/cycle-engine/engine/sync', [CycleSummaryController::class, 'sync']);
 
         Route::get('/cycle-engine/engine/sync-summary', [CycleSummaryController::class, 'sync']);
 
@@ -127,20 +120,17 @@ Route::get('/ai-summary', [CycleSummaryController::class, 'aiSummary']);
         Route::get('engine/discrepancy-note-sync', [CycleSummaryController::class, 'syncDiscrepancyNote']);
 
         //calender
-        // Route::get('/calendar/month-sync', [CalendarController::class, 'syncMonth']);
-        // Route::post('/calendar/confirm-day', [CalendarController::class, 'confirmDay']);
+        Route::get('/calendar/month-sync', [CalendarController::class, 'syncMonth']);
+        Route::get('/calendar/next-period-sync', [CalendarController::class, 'syncNextPeriod']);
+        Route::get('/cycle-calendar/month', [CalendarController::class, 'syncMonth']);
+        Route::get('/cycle-calendar/next-period', [CalendarController::class, 'syncNextPeriod']);
 
-
-        // Route::get('/calendar/next-period-sync', [CalendarController::class, 'syncNextPeriod']);
-         Route::get(
-        '/cycle-calendar/month',
-        [CalendarController::class, 'syncMonth']
-    );
-
-    Route::get(
-        '/cycle-calendar/next-period',
-        [CalendarController::class, 'syncNextPeriod']
-    );
+        //BBT
+        Route::post('/bbt/logs', [BbtController::class, 'logBbtData']);
+        Route::post('/cycle-engine/bbt/log', [BbtController::class, 'logBbtData']);
+        Route::get('/bbt-logs', [BbtController::class, 'fetchLog']);
+        Route::get('/cycle-engine/bbt/ui', [BbtController::class, 'fetchLog']);
+        Route::get('/bbt-database-logs', [BbtController::class, 'fetchBbtLogs']);
 
         Route::get('/avoiding-pregnancy/consent-status', [AvoidingPregnancyController::class, 'consentStatus']);
 
@@ -330,14 +320,7 @@ Route::get('/ai-summary', [CycleSummaryController::class, 'aiSummary']);
         Route::post('/blog-update/{slug}', [BlogController::class, 'update']); // Update blog
         Route::delete('/blog-delete/{slug}', [BlogController::class, 'destroy']); // Delete blog
 
-        //BBT
-        Route::post('/bbt/logs', [BbtController::class, 'logBbtData']);
-        Route::get('/bbt-logs', [BbtController::class, 'fetchLog']);
-        Route::get('/bbt-database-logs', [BbtController::class, 'fetchBbtLogs']);
     });
-
-    //Fetch-BBT-Logs
-
 
     Route::get('/blog-categories', [BlogCategoryController::class, 'index']);
     Route::get('/blog-categories/{slug}', [BlogCategoryController::class, 'show']); // Show single category
