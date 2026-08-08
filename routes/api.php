@@ -90,9 +90,8 @@ Route::prefix('v1')->group(function () {
     Route::get('lab-reports/{labReport}', [LabReportController::class, 'show']);
 
 
-    Route::get('/cycle-calendar-inputs/{user_id}',[CycleCalendarInputController::class, 'show']);
-
-    Route::middleware('auth:sanctum')->group(function () {
+ Route::get('/cycle-calendar-inputs/{user_id}',[CycleCalendarInputController::class, 'show']);
+Route::middleware('auth:sanctum')->group(function () {
 
     Route::post('/cycle-calendar-inputs',[CycleCalendarInputController::class, 'store']);
 
@@ -131,16 +130,13 @@ Route::prefix('v1')->group(function () {
         Route::get('/bbt-logs', [BbtController::class, 'fetchLog']);
         Route::get('/cycle-engine/bbt/ui', [BbtController::class, 'fetchLog']);
         Route::get('/bbt-database-logs', [BbtController::class, 'fetchBbtLogs']);
-        
-       Route::get('/cycle-engine/ttc/sync',[TryingToConceiveController::class, 'sync']);
-    
+        Route::get('/cycle-engine/ttc/sync',[TryingToConceiveController::class, 'sync']);
 
         Route::get('/avoiding-pregnancy/consent-status', [AvoidingPregnancyController::class, 'consentStatus']);
 
         Route::post('/avoiding-pregnancy/consent', [AvoidingPregnancyController::class, 'consent']);
 
         Route::post('/mode', [AvoidingPregnancyController::class, 'setMode']);
-
         Route::get('/ttc/surge-banner', [TryingToConceiveController::class, 'surgeBanner']);
 
         Route::get('/ttc/priority-map', [TryingToConceiveController::class, 'priorityMap']);
@@ -172,8 +168,7 @@ Route::prefix('v1')->group(function () {
         Route::post('/change-password', [AuthController::class, 'changePassword']);
         // Save Firebase device token
         Route::post('/save-fcm-token', [AuthController::class, 'saveFcmToken']);
-
-        Route::post('logout', [AuthController::class, 'logout']);
+    Route::post('logout', [AuthController::class, 'logout']);
         //Delete User(self)
         Route::post('/delete-user', [DeleteUsersController::class, 'destroy']);
         //suspend user reason
@@ -251,8 +246,7 @@ Route::prefix('v1')->group(function () {
 
         // Decline Post
         Route::post('/posts/{post}/decline', [CommunityPostController::class, 'decline']);
-
-        Route::post('/terra/widget-session', [TerraWebhookController::class, 'generateWidgetSession']);
+ Route::post('/terra/widget-session', [TerraWebhookController::class, 'generateWidgetSession']);
         Route::get('/terra/activity-data', [TerraWebhookController::class, 'getActivityData']);
         Route::get('/terra/connections', [TerraWebhookController::class, 'getConnections']);
 
@@ -328,8 +322,7 @@ Route::prefix('v1')->group(function () {
 
     Route::get('/blog-categories', [BlogCategoryController::class, 'index']);
     Route::get('/blog-categories/{slug}', [BlogCategoryController::class, 'show']); // Show single category
-
-    Route::get('/blogs', [BlogController::class, 'index']);
+ Route::get('/blogs', [BlogController::class, 'index']);
     Route::get('/blog/{slug}', [BlogController::class, 'show']); // Show single blog
 
     Route::prefix('blogs/{blogId}/comments')->group(function () {
@@ -353,4 +346,4 @@ Route::prefix('v1')->group(function () {
 
 });
 
-require __DIR__ . '/marketplace_api.php';
+require DIR . '/marketplace_api.php';
