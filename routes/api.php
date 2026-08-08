@@ -87,20 +87,20 @@ Route::prefix('v1')->group(function () {
     Route::get('pages', [PageController::class, 'index']);
     Route::get('pages/{page_id}', [PageController::class, 'show']);
 
-Route::get('lab-reports/{labReport}', [LabReportController::class, 'show']);
+    Route::get('lab-reports/{labReport}', [LabReportController::class, 'show']);
 
 
-Route::get(
-    '/cycle-calendar-inputs/{user_id}',
-    [CycleCalendarInputController::class, 'show']
-);
+    Route::get(
+        '/cycle-calendar-inputs/{user_id}',
+        [CycleCalendarInputController::class, 'show']
+    );
 
     Route::middleware('auth:sanctum')->group(function () {
 
-    Route::post(
-    '/cycle-calendar-inputs',
-    [CycleCalendarInputController::class, 'store']
-);
+        Route::post(
+            '/cycle-calendar-inputs',
+            [CycleCalendarInputController::class, 'store']
+        );
 
         //user health log
         Route::apiResource('health-logs', HealthLogController::class);
@@ -108,7 +108,7 @@ Route::get(
 
 
         Route::apiResource('lab-reports', LabReportController::class)
-        ->except(['show']);
+            ->except(['show']);
 
         // Get AI Analysis
         Route::get(
@@ -118,8 +118,8 @@ Route::get(
 
         //Cycle part
 //summary new 1st page
-Route::get('/ai-summary', [CycleSummaryController::class, 'aiSummary']);
-  Route::get('/cycle-engine/engine/sync', [CycleSummaryController::class, 'sync']);
+        Route::get('/ai-summary', [CycleSummaryController::class, 'aiSummary']);
+        Route::get('/cycle-engine/engine/sync', [CycleSummaryController::class, 'sync']);
 
         Route::get('/cycle-engine/engine/sync-summary', [CycleSummaryController::class, 'sync']);
 
@@ -132,15 +132,15 @@ Route::get('/ai-summary', [CycleSummaryController::class, 'aiSummary']);
 
 
         // Route::get('/calendar/next-period-sync', [CalendarController::class, 'syncNextPeriod']);
-         Route::get(
-        '/cycle-calendar/month',
-        [CalendarController::class, 'syncMonth']
-    );
+        Route::get(
+            '/cycle-calendar/month',
+            [CalendarController::class, 'syncMonth']
+        );
 
-    Route::get(
-        '/cycle-calendar/next-period',
-        [CalendarController::class, 'syncNextPeriod']
-    );
+        Route::get(
+            '/cycle-calendar/next-period',
+            [CalendarController::class, 'syncNextPeriod']
+        );
 
         Route::get('/avoiding-pregnancy/consent-status', [AvoidingPregnancyController::class, 'consentStatus']);
 
@@ -301,7 +301,6 @@ Route::get('/ai-summary', [CycleSummaryController::class, 'aiSummary']);
         Route::get('/chat/response/{sessionId}', [ChatController::class, 'getLatestMessages']);
 
 
-
         //Waitlist
         Route::get('/waitlist/list', [WaitlistController::class, 'getWaitlist']);
 
@@ -317,7 +316,7 @@ Route::get('/ai-summary', [CycleSummaryController::class, 'aiSummary']);
 
         //Blog
         Route::prefix('blog-categories')->group(function () {
-          // List all categories
+            // List all categories
             Route::post('/', [BlogCategoryController::class, 'store']);  // Create new category
 
             Route::put('/{slug}', [BlogCategoryController::class, 'update']); // Update category
