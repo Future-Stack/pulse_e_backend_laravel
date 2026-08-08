@@ -119,15 +119,51 @@ class TryingToConceiveController extends Controller
             }
 
             if (! $hasSuccess) {
+                Log::warning('AI Engine TTC calls failed or returned non-200 responses, applying local fallback', [
+                    'user_id' => $user->id,
+                    'cycle_id' => $cycle->id,
+                    'surge_error' => $surgeRes ? $surgeRes->json() : null,
+                    'map_error' => $mapRes ? $mapRes->json() : null,
+                    'banner_error' => $bannerRes ? $bannerRes->json() : null,
+                ]);
+
+                $prediction = TtcPrediction::where('user_id', $user->id)
+                    ->where('cycle_id', $cycle->id)
+                    ->first();
+
+                if (! $prediction) {
+                    $startDate = $cycle->period_start_date ? \Carbon\Carbon::parse($cycle->period_start_date) : today();
+                    $currentCycleDay = max(1, (int) $startDate->diffInDays(today()) + 1);
+
+                    $phase = match (true) {
+                        $currentCycleDay <= 5 => 'menstrual',
+                        $currentCycleDay <= 13 => 'follicular',
+                        $currentCycleDay <= 16 => 'ovulatory',
+                        default => 'luteal',
+                    };
+
+                    $prediction = TtcPrediction::create([
+                        'user_id' => $user->id,
+                        'cycle_id' => $cycle->id,
+                        'cycle_day' => $currentCycleDay,
+                        'surge_active' => false,
+                        'surge_message' => 'No active LH surge detected yet. Continue logging your OPK and BBT data.',
+                        'hours_remaining_estimate' => null,
+                        'lh_surge_day' => null,
+                        'priority' => ucfirst($phase),
+                        'label' => ucfirst($phase) . ' phase',
+                        'priority_message' => "You're on day {$currentCycleDay} of your cycle ({$phase} phase). Log data to track fertility signals.",
+                        'priority_ranges' => [],
+                        'ai_generated' => false,
+                        'ai_fallback' => true,
+                    ]);
+                }
+
                 return response()->json([
-                    'success' => false,
-                    'message' => 'Unable to fetch TTC data from AI services.',
-                    'errors' => [
-                        'surge' => $surgeRes ? $surgeRes->json() : null,
-                        'priority_map' => $mapRes ? $mapRes->json() : null,
-                        'priority_banner' => $bannerRes ? $bannerRes->json() : null,
-                    ],
-                ], 500);
+                    'success' => true,
+                    'message' => 'TTC predictions synced with local cycle fallback.',
+                    'data' => $prediction,
+                ]);
             }
 
             DB::transaction(function () use ($user, $cycle, $updateData) {
@@ -151,7 +187,7 @@ class TryingToConceiveController extends Controller
             ]);
 
         } catch (\Throwable $e) {
-            Log::error('TTC Sync Failed', [
+            Log::error('TTC Sync Failed Exception', [
                 'user_id' => $user->id,
                 'cycle_id' => $cycle->id,
                 'message' => $e->getMessage(),
