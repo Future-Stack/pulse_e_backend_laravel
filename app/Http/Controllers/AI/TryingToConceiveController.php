@@ -13,408 +13,181 @@ use Illuminate\Support\Facades\Log;
 class TryingToConceiveController extends Controller
 {
     /**
-     * LH Surge Banner
+     * Sync all TTC data (Surge Banner, Priority Map, Priority Banner) from AI engine.
      *
-     * AI:
-     * GET /api/v1/cycle-engine/ttc/surge-banner?user_id={user_id}
+     * GET /api/v1/ttc/sync
+     */
+    public function syncTtcData(Request $request)
+    {
+        $user = auth()->user();
+
+        if (! $user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthenticated.',
+            ], 401);
+        }
+
+        $cycle = MenstrualCycle::where('user_id', $user->id)
+            ->where('is_completed', false)
+            ->latest('id')
+            ->first();
+
+        if (! $cycle) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No active menstrual cycle found.',
+            ], 404);
+        }
+
+        try {
+            $baseUrl = rtrim(config('services.ai.base_url', 'https://ai.fightthenumber.com'), '/');
+
+            Log::info('Calling TTC AI APIs (Surge Banner, Priority Map, Priority Banner)', [
+                'user_id' => $user->id,
+                'cycle_id' => $cycle->id,
+            ]);
+
+            $responses = Http::pool(fn ($pool) => [
+                $pool->timeout(120)->acceptJson()->get("{$baseUrl}/api/v1/cycle-engine/ttc/surge-banner", ['user_id' => $user->id]),
+                $pool->timeout(120)->acceptJson()->get("{$baseUrl}/api/v1/cycle-engine/ttc/priority-map", ['user_id' => $user->id]),
+                $pool->timeout(120)->acceptJson()->get("{$baseUrl}/api/v1/cycle-engine/ttc/priority-banner", ['user_id' => $user->id]),
+            ]);
+
+            $surgeRes = $responses[0] ?? null;
+            $mapRes = $responses[1] ?? null;
+            $bannerRes = $responses[2] ?? null;
+
+            Log::info('TTC AI Responses Received', [
+                'user_id' => $user->id,
+                'surge_status' => $surgeRes ? $surgeRes->status() : null,
+                'priorityMap_status' => $mapRes ? $mapRes->status() : null,
+                'priorityBanner_status' => $bannerRes ? $bannerRes->status() : null,
+            ]);
+
+            $updateData = [];
+            $hasSuccess = false;
+
+            if ($surgeRes && $surgeRes->successful()) {
+                $hasSuccess = true;
+                $surgeData = $surgeRes->json();
+                if (isset($surgeData['cycle_day'])) {
+                    $updateData['cycle_day'] = $surgeData['cycle_day'];
+                }
+                $updateData['surge_active'] = $surgeData['active'] ?? false;
+                $updateData['surge_message'] = $surgeData['message'] ?? null;
+                $updateData['hours_remaining_estimate'] = $surgeData['hours_remaining_estimate'] ?? null;
+                $updateData['lh_surge_day'] = $surgeData['lh_surge_day'] ?? null;
+                if (isset($surgeData['ai_generated'])) {
+                    $updateData['ai_generated'] = $surgeData['ai_generated'];
+                }
+                if (isset($surgeData['ai_cached'])) {
+                    $updateData['ai_fallback'] = $surgeData['ai_cached'];
+                }
+            }
+
+            if ($mapRes && $mapRes->successful()) {
+                $hasSuccess = true;
+                $mapData = $mapRes->json();
+                if (isset($mapData['cycle_day'])) {
+                    $updateData['cycle_day'] = $mapData['cycle_day'];
+                }
+                $updateData['priority_ranges'] = $mapData['ranges'] ?? [];
+                if (isset($mapData['ai_generated'])) {
+                    $updateData['ai_generated'] = $mapData['ai_generated'];
+                }
+                if (isset($mapData['ai_cached'])) {
+                    $updateData['ai_fallback'] = $mapData['ai_cached'];
+                }
+            }
+
+            if ($bannerRes && $bannerRes->successful()) {
+                $hasSuccess = true;
+                $bannerData = $bannerRes->json();
+                if (isset($bannerData['cycle_day'])) {
+                    $updateData['cycle_day'] = $bannerData['cycle_day'];
+                }
+                $updateData['priority'] = $bannerData['priority'] ?? null;
+                $updateData['label'] = $bannerData['label'] ?? null;
+                $updateData['priority_message'] = $bannerData['message'] ?? null;
+                if (isset($bannerData['ai_generated'])) {
+                    $updateData['ai_generated'] = $bannerData['ai_generated'];
+                }
+                if (isset($bannerData['ai_cached'])) {
+                    $updateData['ai_fallback'] = $bannerData['ai_cached'];
+                }
+            }
+
+            if (! $hasSuccess) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Unable to fetch TTC data from AI services.',
+                    'errors' => [
+                        'surge' => $surgeRes ? $surgeRes->json() : null,
+                        'priority_map' => $mapRes ? $mapRes->json() : null,
+                        'priority_banner' => $bannerRes ? $bannerRes->json() : null,
+                    ],
+                ], 500);
+            }
+
+            DB::transaction(function () use ($user, $cycle, $updateData) {
+                TtcPrediction::updateOrCreate(
+                    [
+                        'user_id' => $user->id,
+                        'cycle_id' => $cycle->id,
+                    ],
+                    $updateData
+                );
+            });
+
+            $prediction = TtcPrediction::where('user_id', $user->id)
+                ->where('cycle_id', $cycle->id)
+                ->first();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'TTC data synced successfully.',
+                'data' => $prediction,
+            ]);
+
+        } catch (\Throwable $e) {
+            Log::error('TTC Sync Failed', [
+                'user_id' => $user->id,
+                'cycle_id' => $cycle->id,
+                'message' => $e->getMessage(),
+                'line' => $e->getLine(),
+                'file' => $e->getFile(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to sync TTC data.',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * LH Surge Banner
      */
     public function surgeBanner(Request $request)
     {
-        $user = auth()->user();
-
-        if (! $user) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Unauthenticated.',
-            ], 401);
-        }
-
-        $cycle = MenstrualCycle::where('user_id', $user->id)
-            ->where('is_completed', false)
-            ->latest('id')
-            ->first();
-
-        if (! $cycle) {
-            return response()->json([
-                'success' => false,
-                'message' => 'No active menstrual cycle found.',
-            ], 404);
-        }
-
-        try {
-
-            $url = rtrim(
-                config('services.ai.base_url'),
-                '/'
-            ) . '/api/v1/cycle-engine/ttc/surge-banner';
-
-            Log::info('Calling TTC Surge Banner AI API', [
-                'url' => $url,
-                'user_id' => $user->id,
-                'cycle_id' => $cycle->id,
-            ]);
-
-            /*
-            |--------------------------------------------------------------------------
-            | IMPORTANT
-            |--------------------------------------------------------------------------
-            | AI API requires user_id as QUERY PARAMETER.
-            |--------------------------------------------------------------------------
-            */
-
-            $response = Http::timeout(120)
-                ->acceptJson()
-                ->get($url, [
-                    'user_id' => $user->id,
-                ]);
-
-            Log::info('TTC Surge Banner AI Response', [
-                'status' => $response->status(),
-                'user_id' => $user->id,
-                'response' => $response->json(),
-            ]);
-
-            if (! $response->successful()) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Unable to fetch surge banner.',
-                    'error' => $response->json(),
-                ], $response->status());
-            }
-
-            $data = $response->json();
-
-            DB::transaction(function () use (
-                $user,
-                $cycle,
-                $data
-            ) {
-
-                TtcPrediction::updateOrCreate(
-                    [
-                        'user_id' => $user->id,
-                        'cycle_id' => $cycle->id,
-                    ],
-                    [
-                        'cycle_day' =>
-                            $data['cycle_day'] ?? null,
-
-                        'surge_active' =>
-                            $data['active'] ?? false,
-
-                        'surge_message' =>
-                            $data['message'] ?? null,
-
-                        'hours_remaining_estimate' =>
-                            $data['hours_remaining_estimate'] ?? null,
-
-                        'lh_surge_day' =>
-                            $data['lh_surge_day'] ?? null,
-
-                        'ai_generated' =>
-                            $data['ai_generated'] ?? false,
-
-                        /*
-                        | AI response has ai_cached,
-                        | not ai_fallback.
-                        */
-                        'ai_fallback' =>
-                            $data['ai_cached'] ?? false,
-                    ]
-                );
-            });
-
-            $prediction = TtcPrediction::where('user_id', $user->id)
-                ->where('cycle_id', $cycle->id)
-                ->first();
-
-            return response()->json([
-                'success' => true,
-                'message' => 'TTC surge banner synced successfully.',
-                'data' => $prediction,
-            ]);
-
-        } catch (\Throwable $e) {
-
-            Log::error('TTC Surge Banner Sync Failed', [
-                'user_id' => $user->id,
-                'cycle_id' => $cycle->id,
-                'message' => $e->getMessage(),
-                'line' => $e->getLine(),
-                'file' => $e->getFile(),
-            ]);
-
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to sync TTC surge banner.',
-                'error' => $e->getMessage(),
-            ], 500);
-        }
+        return $this->syncTtcData($request);
     }
-
 
     /**
      * TTC Priority Map
-     *
-     * AI:
-     * GET /api/v1/cycle-engine/ttc/priority-map?user_id={user_id}
      */
     public function priorityMap(Request $request)
     {
-        $user = auth()->user();
-
-        if (! $user) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Unauthenticated.',
-            ], 401);
-        }
-
-        $cycle = MenstrualCycle::where('user_id', $user->id)
-            ->where('is_completed', false)
-            ->latest('id')
-            ->first();
-
-        if (! $cycle) {
-            return response()->json([
-                'success' => false,
-                'message' => 'No active menstrual cycle found.',
-            ], 404);
-        }
-
-        try {
-
-            $url = rtrim(
-                config('services.ai.base_url'),
-                '/'
-            ) . '/api/v1/cycle-engine/ttc/priority-map';
-
-            Log::info('Calling TTC Priority Map AI API', [
-                'url' => $url,
-                'user_id' => $user->id,
-                'cycle_id' => $cycle->id,
-            ]);
-
-            /*
-            |--------------------------------------------------------------------------
-            | IMPORTANT
-            |--------------------------------------------------------------------------
-            | Send user_id as QUERY PARAMETER.
-            |--------------------------------------------------------------------------
-            */
-
-            $response = Http::timeout(120)
-                ->acceptJson()
-                ->get($url, [
-                    'user_id' => $user->id,
-                ]);
-
-            Log::info('TTC Priority Map AI Response', [
-                'status' => $response->status(),
-                'user_id' => $user->id,
-                'response' => $response->json(),
-            ]);
-
-            if (! $response->successful()) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Unable to fetch priority map.',
-                    'error' => $response->json(),
-                ], $response->status());
-            }
-
-            $data = $response->json();
-
-            DB::transaction(function () use (
-                $user,
-                $cycle,
-                $data
-            ) {
-
-                TtcPrediction::updateOrCreate(
-                    [
-                        'user_id' => $user->id,
-                        'cycle_id' => $cycle->id,
-                    ],
-                    [
-                        'cycle_day' =>
-                            $data['cycle_day'] ?? null,
-
-                        /*
-                        | AI response:
-                        | "ranges": [...]
-                        */
-                        'priority_ranges' =>
-                            $data['ranges'] ?? [],
-
-                        'ai_generated' =>
-                            $data['ai_generated'] ?? false,
-
-                        'ai_fallback' =>
-                            $data['ai_cached'] ?? false,
-                    ]
-                );
-            });
-
-            $prediction = TtcPrediction::where('user_id', $user->id)
-                ->where('cycle_id', $cycle->id)
-                ->first();
-
-            return response()->json([
-                'success' => true,
-                'message' => 'TTC priority map synced successfully.',
-                'data' => $prediction,
-            ]);
-
-        } catch (\Throwable $e) {
-
-            Log::error('TTC Priority Map Sync Failed', [
-                'user_id' => $user->id,
-                'cycle_id' => $cycle->id,
-                'message' => $e->getMessage(),
-                'line' => $e->getLine(),
-                'file' => $e->getFile(),
-            ]);
-
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to sync TTC priority map.',
-                'error' => $e->getMessage(),
-            ], 500);
-        }
+        return $this->syncTtcData($request);
     }
-
 
     /**
      * TTC Priority Banner
-     *
-     * AI:
-     * GET /api/v1/cycle-engine/ttc/priority-banner?user_id={user_id}
      */
     public function priorityBanner(Request $request)
     {
-        $user = auth()->user();
-
-        if (! $user) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Unauthenticated.',
-            ], 401);
-        }
-
-        $cycle = MenstrualCycle::where('user_id', $user->id)
-            ->where('is_completed', false)
-            ->latest('id')
-            ->first();
-
-        if (! $cycle) {
-            return response()->json([
-                'success' => false,
-                'message' => 'No active menstrual cycle found.',
-            ], 404);
-        }
-
-        try {
-
-            $url = rtrim(
-                config('services.ai.base_url'),
-                '/'
-            ) . '/api/v1/cycle-engine/ttc/priority-banner';
-
-            Log::info('Calling TTC Priority Banner AI API', [
-                'url' => $url,
-                'user_id' => $user->id,
-                'cycle_id' => $cycle->id,
-            ]);
-
-            /*
-            |--------------------------------------------------------------------------
-            | IMPORTANT
-            |--------------------------------------------------------------------------
-            | Send user_id as QUERY PARAMETER.
-            |--------------------------------------------------------------------------
-            */
-
-            $response = Http::timeout(120)
-                ->acceptJson()
-                ->get($url, [
-                    'user_id' => $user->id,
-                ]);
-
-            Log::info('TTC Priority Banner AI Response', [
-                'status' => $response->status(),
-                'user_id' => $user->id,
-                'response' => $response->json(),
-            ]);
-
-            if (! $response->successful()) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Unable to fetch priority banner.',
-                    'error' => $response->json(),
-                ], $response->status());
-            }
-
-            $data = $response->json();
-
-            DB::transaction(function () use (
-                $user,
-                $cycle,
-                $data
-            ) {
-
-                TtcPrediction::updateOrCreate(
-                    [
-                        'user_id' => $user->id,
-                        'cycle_id' => $cycle->id,
-                    ],
-                    [
-                        'cycle_day' =>
-                            $data['cycle_day'] ?? null,
-
-                        'priority' =>
-                            $data['priority'] ?? null,
-
-                        'label' =>
-                            $data['label'] ?? null,
-
-                        'priority_message' =>
-                            $data['message'] ?? null,
-
-                        'ai_generated' =>
-                            $data['ai_generated'] ?? false,
-
-                        'ai_fallback' =>
-                            $data['ai_cached'] ?? false,
-                    ]
-                );
-            });
-
-            $prediction = TtcPrediction::where('user_id', $user->id)
-                ->where('cycle_id', $cycle->id)
-                ->first();
-
-            return response()->json([
-                'success' => true,
-                'message' => 'TTC priority banner synced successfully.',
-                'data' => $prediction,
-            ]);
-
-        } catch (\Throwable $e) {
-
-            Log::error('TTC Priority Banner Sync Failed', [
-                'user_id' => $user->id,
-                'cycle_id' => $cycle->id,
-                'message' => $e->getMessage(),
-                'line' => $e->getLine(),
-                'file' => $e->getFile(),
-            ]);
-
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to sync TTC priority banner.',
-                'error' => $e->getMessage(),
-            ], 500);
-        }
+        return $this->syncTtcData($request);
     }
 }
