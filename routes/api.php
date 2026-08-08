@@ -131,12 +131,16 @@ Route::prefix('v1')->group(function () {
         Route::get('/bbt-logs', [BbtController::class, 'fetchLog']);
         Route::get('/cycle-engine/bbt/ui', [BbtController::class, 'fetchLog']);
         Route::get('/bbt-database-logs', [BbtController::class, 'fetchBbtLogs']);
+        
+       Route::get('/cycle-engine/ttc/sync',[TryingToConceiveController::class, 'sync']);
+    
 
         Route::get('/avoiding-pregnancy/consent-status', [AvoidingPregnancyController::class, 'consentStatus']);
 
         Route::post('/avoiding-pregnancy/consent', [AvoidingPregnancyController::class, 'consent']);
 
         Route::post('/mode', [AvoidingPregnancyController::class, 'setMode']);
+
         Route::get('/ttc/surge-banner', [TryingToConceiveController::class, 'surgeBanner']);
 
         Route::get('/ttc/priority-map', [TryingToConceiveController::class, 'priorityMap']);
