@@ -482,6 +482,5 @@ Route::get( '/cycle-calendar-inputs/{user_id}',[CycleCalendarInputController::cl
 
 });
 
-});
 
 require __DIR__ . '/marketplace_api.php';
