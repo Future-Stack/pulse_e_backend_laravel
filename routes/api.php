@@ -124,7 +124,19 @@ Route::prefix('v1')->group(function () {
             Route::get('/ai-summary', [CycleSummaryController::class, 'aiSummary']);
             Route::get('/cycle-engine/engine/sync', [CycleSummaryController::class, 'sync']);
 
+
+        //BBT
+        Route::post('/bbt/logs', [BbtController::class, 'logBbtData']);
+        Route::post('/cycle-engine/bbt/log', [BbtController::class, 'logBbtData']);
+        Route::get('/bbt-logs', [BbtController::class, 'fetchLog']);
+        Route::get('/cycle-engine/bbt/ui', [BbtController::class, 'fetchLog']);
+        Route::get('/bbt-database-logs', [BbtController::class, 'fetchBbtLogs']);
+        
+       Route::get('/cycle-engine/ttc/sync',[TryingToConceiveController::class, 'sync']);
+    
+
             Route::get('/cycle-engine/engine/sync-summary', [CycleSummaryController::class, 'sync']);
+
 
             Route::get('/engine/signal-status-sync', [CycleSummaryController::class, 'syncSignalStatus']);
             Route::get('engine/discrepancy-note-sync', [CycleSummaryController::class, 'syncDiscrepancyNote']);
@@ -134,6 +146,11 @@ Route::prefix('v1')->group(function () {
             Route::get('/calendar/next-period-sync', [CalendarController::class, 'syncNextPeriod']);
             Route::get('/cycle-calendar/month', [CalendarController::class, 'syncMonth']);
             Route::get('/cycle-calendar/next-period', [CalendarController::class, 'syncNextPeriod']);
+
+
+        Route::post('/mode', [AvoidingPregnancyController::class, 'setMode']);
+
+        Route::get('/ttc/surge-banner', [TryingToConceiveController::class, 'surgeBanner']);
 
 
             // Route::get('/calendar/next-period-sync', [CalendarController::class, 'syncNextPeriod']);
