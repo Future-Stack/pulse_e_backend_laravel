@@ -127,4 +127,32 @@ class TryingToConceiveTest extends TestCase
         $bannerRes = $this->actingAs($user, 'sanctum')->getJson('/api/v1/ttc/priority-banner');
         $bannerRes->assertStatus(200)->assertJsonPath('success', true);
     }
+
+    public function test_sync_ttc_data_uses_fallback_when_ai_service_fails(): void
+    {
+        $user = User::factory()->create();
+        $cycle = MenstrualCycle::create([
+            'user_id' => $user->id,
+            'period_start_date' => now(),
+            'is_completed' => false,
+        ]);
+
+        Http::fake([
+            '*/api/v1/cycle-engine/ttc/*' => Http::response([
+                'detail' => 'Unable to load cycle calendar inputs for user ' . $user->id,
+            ], 500),
+        ]);
+
+        $response = $this->actingAs($user, 'sanctum')->getJson('/api/v1/ttc/sync');
+
+        $response->assertStatus(200)
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.ai_fallback', true);
+
+        $this->assertDatabaseHas('ttc_predictions', [
+            'user_id' => $user->id,
+            'cycle_id' => $cycle->id,
+            'ai_fallback' => true,
+        ]);
+    }
 }
