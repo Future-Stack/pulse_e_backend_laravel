@@ -3,6 +3,9 @@
 namespace App\Http\Controllers\AI;
 
 use App\Http\Controllers\Controller;
+use App\Models\CycleCalendarInput;
+use App\Models\MenstrualCycle;
+use App\Models\CycleStatistic;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -49,41 +52,59 @@ class CalendarController extends Controller
                 'response' => $response->json(),
             ]);
 
-        } catch (\Throwable $e) {
-            Log::error('AI Calendar Month API Connection Error', [
-                'user_id' => $userId,
-                'message' => $e->getMessage(),
-                'file' => $e->getFile(),
-                'line' => $e->getLine(),
-            ]);
+            if ($response->successful()) {
+                return response()->json([
+                    'success' => true,
+                    'data' => $response->json(),
+                ]);
+            }
 
-            return response()->json([
-                'success' => false,
-                'message' => 'Unable to connect to AI Engine.',
-                'error' => $e->getMessage(),
-            ], 500);
-        }
-
-        if (! $response->successful()) {
-            Log::warning('AI Calendar Month API Unsuccessful Response', [
+            Log::warning('AI Calendar Month API Unsuccessful Response, using local fallback', [
                 'status' => $response->status(),
                 'user_id' => $userId,
                 'body' => $response->body(),
             ]);
 
-            return response()->json([
-                'success' => false,
-                'message' => 'Unable to fetch calendar month from AI Engine.',
-                'status' => $response->status(),
-                'error' => $response->json() ?? $response->body(),
-            ], $response->status());
+        } catch (\Throwable $e) {
+            Log::error('AI Calendar Month API Connection Error, using local fallback', [
+                'user_id' => $userId,
+                'message' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+            ]);
         }
 
-        $data = $response->json();
+        // Local fallback: fetch inputs from database
+        $inputs = CycleCalendarInput::where('user_id', $userId)
+            ->orderByDesc('start_date')
+            ->get()
+            ->map(function ($input) {
+                $formatDate = function ($dateVal) {
+                    if (! $dateVal || $dateVal === '0000-00-00' || $dateVal === '0000-00-00 00:00:00') {
+                        return null;
+                    }
+                    if ($dateVal instanceof \DateTimeInterface) {
+                        return $dateVal->format('Y-m-d');
+                    }
+                    return \Carbon\Carbon::parse($dateVal)->format('Y-m-d');
+                };
+
+                return [
+                    'id' => $input->id,
+                    'user_id' => $input->user_id,
+                    'start_date' => $formatDate($input->start_date),
+                    'end_date' => $formatDate($input->end_date),
+                    'is_day_n' => (bool) $input->is_day_n,
+                    'created_at' => $input->created_at,
+                    'updated_at' => $input->updated_at,
+                ];
+            })->values();
 
         return response()->json([
             'success' => true,
-            'data' => $data,
+            'data' => $inputs,
+            'message' => 'Calendar month fetched from local database fallback.',
+            'ai_fallback' => true,
         ]);
     }
 
@@ -127,54 +148,59 @@ class CalendarController extends Controller
                 'response' => $response->json(),
             ]);
 
-        } catch (\Throwable $e) {
-            Log::error('AI Calendar Next Period API Connection Error', [
-                'user_id' => $userId,
-                'message' => $e->getMessage(),
-                'file' => $e->getFile(),
-                'line' => $e->getLine(),
-            ]);
+            if ($response->successful()) {
+                $result = $response->json();
 
-            return response()->json([
-                'success' => false,
-                'message' => 'Unable to connect to AI Engine.',
-                'error' => $e->getMessage(),
-            ], 500);
-        }
+                if (! empty($result['predicted_date'])) {
+                    CycleStatistic::updateOrCreate(
+                        ['user_id' => $userId],
+                        ['predicted_next_period' => $result['predicted_date']]
+                    );
+                }
 
-        if (! $response->successful()) {
-            Log::warning('AI Calendar Next Period API Unsuccessful Response', [
+                return response()->json([
+                    'success' => true,
+                    'data' => $result,
+                ]);
+            }
+
+            Log::warning('AI Calendar Next Period API Unsuccessful Response, using local fallback', [
                 'status' => $response->status(),
                 'user_id' => $userId,
                 'body' => $response->body(),
             ]);
 
-            return response()->json([
-                'success' => false,
-                'message' => 'Unable to fetch next period prediction.',
-                'status' => $response->status(),
-                'error' => $response->json() ?? $response->body(),
-            ], $response->status());
+        } catch (\Throwable $e) {
+            Log::error('AI Calendar Next Period API Connection Error, using local fallback', [
+                'user_id' => $userId,
+                'message' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+            ]);
         }
 
-        $result = $response->json();
+        // Local fallback calculation for next period
+        $latestInput = CycleCalendarInput::where('user_id', $userId)->latest('start_date')->first();
+        $predictedDate = null;
 
-        /*
-        |--------------------------------------------------------------------------
-        | Save predicted next period date
-        |--------------------------------------------------------------------------
-        */
+        if ($latestInput && $latestInput->start_date) {
+            $startDate = \Carbon\Carbon::parse($latestInput->start_date);
+            $predictedDate = $startDate->addDays(28)->toDateString();
 
-        if (! empty($result['predicted_date'])) {
-            \App\Models\CycleStatistic::updateOrCreate(
+            CycleStatistic::updateOrCreate(
                 ['user_id' => $userId],
-                ['predicted_next_period' => $result['predicted_date']]
+                ['predicted_next_period' => $predictedDate]
             );
         }
 
         return response()->json([
             'success' => true,
-            'data' => $result,
+            'data' => [
+                'predicted_date' => $predictedDate,
+                'status' => $predictedDate ? 'calculated_local_fallback' : 'empty',
+            ],
+            'message' => 'Next period prediction calculated from local fallback.',
+            'ai_fallback' => true,
         ]);
     }
 }
