@@ -66,4 +66,49 @@ class CalendarApiTest extends TestCase
             'predicted_next_period' => '2026-08-25 00:00:00',
         ]);
     }
+
+    public function test_sync_month_uses_local_fallback_when_ai_fails(): void
+    {
+        $user = User::factory()->create();
+
+        Http::fake([
+            '*/api/v1/cycle-engine/calendar/month*' => Http::response([
+                'detail' => 'Unable to load cycle calendar inputs for user ' . $user->id,
+            ], 502),
+        ]);
+
+        $response = $this->actingAs($user, 'sanctum')->getJson('/api/v1/cycle-calendar/month');
+
+        $response->assertStatus(200)
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('ai_fallback', true);
+    }
+
+    public function test_sync_next_period_uses_local_fallback_when_ai_fails(): void
+    {
+        $user = User::factory()->create();
+        \App\Models\CycleCalendarInput::create([
+            'user_id' => $user->id,
+            'start_date' => '2026-08-01',
+            'is_day_n' => false,
+        ]);
+
+        Http::fake([
+            '*/api/v1/cycle-engine/calendar/next-period*' => Http::response([
+                'detail' => 'Unable to load cycle calendar inputs for user ' . $user->id,
+            ], 502),
+        ]);
+
+        $response = $this->actingAs($user, 'sanctum')->getJson('/api/v1/cycle-calendar/next-period');
+
+        $response->assertStatus(200)
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('ai_fallback', true)
+            ->assertJsonPath('data.predicted_date', '2026-08-29');
+
+        $this->assertDatabaseHas('cycle_statistics', [
+            'user_id' => $user->id,
+            'predicted_next_period' => '2026-08-29 00:00:00',
+        ]);
+    }
 }
