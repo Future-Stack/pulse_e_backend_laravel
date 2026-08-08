@@ -88,15 +88,36 @@ Route::prefix('v1')->group(function () {
     Route::get('lab-reports/{labReport}', [LabReportController::class, 'show']);
 
 
-    Route::get(
-        '/cycle-calendar-inputs/{user_id}',
-        [CycleCalendarInputController::class, 'show']
-    );
+ Route::get('/cycle-calendar-inputs/{user_id}',[CycleCalendarInputController::class, 'show']);
+    Route::middleware('auth:sanctum')->group(function () {
+
+    Route::post('/cycle-calendar-inputs',[CycleCalendarInputController::class, 'store']);
+
+        //user health log
+        Route::apiResource('health-logs', HealthLogController::class);
+        Route::get('/health-log/today', [HealthLogController::class, 'today']);
+
+
+        Route::apiResource('lab-reports', LabReportController::class)
+        ->except(['show']);
+
+       // Get AI Analysis
+    Route::get('/ai-lab-reports/{labReport}', [LabReportAIController::class, 'show']);
+   
+
+    
+
+// Cycle Calendar Inputs
+Route::get( '/cycle-calendar-inputs/{user_id}',[CycleCalendarInputController::class, 'show']);
+   
+    
+
 
     Route::middleware('auth:sanctum')->group(function () {
         Route::post(
             '/cycle-calendar-inputs',
             [CycleCalendarInputController::class, 'store']
+ 
         );
 
         Route::get('/cycle-calendar-inputs/{user_id}', [CycleCalendarInputController::class, 'show']);
@@ -132,10 +153,9 @@ Route::prefix('v1')->group(function () {
         Route::get('/cycle-engine/bbt/ui', [BbtController::class, 'fetchLog']);
         Route::get('/bbt-database-logs', [BbtController::class, 'fetchBbtLogs']);
         
-       Route::get('/cycle-engine/ttc/sync',[TryingToConceiveController::class, 'sync']);
-    
 
             Route::get('/cycle-engine/engine/sync-summary', [CycleSummaryController::class, 'sync']);
+            Route::get('/cycle-engine/ttc/sync',[TryingToConceiveController::class, 'sync']);
 
 
             Route::get('/engine/signal-status-sync', [CycleSummaryController::class, 'syncSignalStatus']);
@@ -149,7 +169,6 @@ Route::prefix('v1')->group(function () {
 
 
         Route::post('/mode', [AvoidingPregnancyController::class, 'setMode']);
-
         Route::get('/ttc/surge-banner', [TryingToConceiveController::class, 'surgeBanner']);
 
 
@@ -176,10 +195,23 @@ Route::prefix('v1')->group(function () {
 
             Route::post('/avoiding-pregnancy/consent', [AvoidingPregnancyController::class, 'consent']);
 
+
+        Route::post('/change-password', [AuthController::class, 'changePassword']);
+        // Save Firebase device token
+        Route::post('/save-fcm-token', [AuthController::class, 'saveFcmToken']);
+    Route::post('logout', [AuthController::class, 'logout']);
+        //Delete User(self)
+        Route::post('/delete-user', [DeleteUsersController::class, 'destroy']);
+        //suspend user reason
+        Route::post('/users/suspend', [AuthController::class, 'suspendUser']);
+        //user status
+        Route::post('/users/update-status', [AuthController::class, 'updateStatus']);
+
             Route::post('/mode', [AvoidingPregnancyController::class, 'setMode']);
             Route::get('/ttc/surge-banner', [TryingToConceiveController::class, 'surgeBanner']);
 
             Route::get('/ttc/priority-map', [TryingToConceiveController::class, 'priorityMap']);
+
 
             Route::get('/ttc/priority-banner', [TryingToConceiveController::class, 'priorityBanner']);
             Route::get('/awareness/sync', [AwarenessController::class, 'sync']);
@@ -252,10 +284,47 @@ Route::prefix('v1')->group(function () {
             Route::get('/users-notifications', [NotificationController::class, 'fetchUserNotification']);
             Route::get('/admin-read-notifications', [NotificationController::class, 'fetchReadAdminNotification']);
 
+
+        // Comments (nested under a post)
+        Route::get('/posts/{post}/comments', [CommunityCommentController::class, 'index']);
+        Route::post('/posts/{post}/comments', [CommunityCommentController::class, 'store']);
+        Route::delete('/comments/{comment}', [CommunityCommentController::class, 'destroy']);
+
+        // Likes (toggle)
+        Route::post('/posts/{post}/like', [CommunityLikeController::class, 'toggle']);
+
+        // Reports
+        Route::post('/posts/{post}/report', [CommunityPostReportController::class, 'store']);
+
+        Route::get('/reports', [CommunityPostReportController::class, 'index']);
+
+        Route::patch('/reports/{report}/approve', [CommunityPostReportController::class, 'approve']);
+        Route::patch('/reports/{report}/decline', [CommunityPostReportController::class, 'decline']);
+
+        // Approve Post
+        Route::post('/posts/{post}/approve', [CommunityPostController::class, 'approve']);
+
+        // Decline Post
+        Route::post('/posts/{post}/decline', [CommunityPostController::class, 'decline']);
+ Route::post('/terra/widget-session', [TerraWebhookController::class, 'generateWidgetSession']);
+        Route::get('/terra/activity-data', [TerraWebhookController::class, 'getActivityData']);
+        Route::get('/terra/connections', [TerraWebhookController::class, 'getConnections']);
+
+        //Subscription Plans
+        Route::get('/subscription-plans', [SubscriptionPlanController::class, 'getAllPlans']);
+        Route::get('/subscription-plan/{slug}', [SubscriptionPlanController::class, 'getPlanBySlug']);
+        Route::post('/update-subscription-plan/{slug}', [SubscriptionPlanController::class, 'createOrUpdate']);
+
+        //TopUp
+        Route::get('/topups', [TopupController::class, 'getAll']);
+        Route::get('/topup/{slug}', [TopupController::class, 'getBySlug']);
+        Route::post('/update-topup/{slug}', [TopupController::class, 'createOrUpdate']);
+
             //Mark single notification as read
             Route::get('/notifications/{id}/read', [NotificationController::class, 'markAsRead']);
             //Mark all notification as read
             Route::get('/notifications/read-all', [NotificationController::class, 'markAllAsRead']);
+
 
 
             // Community Post
@@ -386,4 +455,33 @@ Route::prefix('v1')->group(function () {
 
     });
 
-    require __DIR__ . '/marketplace_api.php';
+
+    Route::get('/blog-categories', [BlogCategoryController::class, 'index']);
+    Route::get('/blog-categories/{slug}', [BlogCategoryController::class, 'show']); // Show single category
+ Route::get('/blogs', [BlogController::class, 'index']);
+    Route::get('/blog/{slug}', [BlogController::class, 'show']); // Show single blog
+
+    Route::prefix('blogs/{blogId}/comments')->group(function () {
+        Route::get('/', [BlogCommentController::class, 'index']);   // List comments for a blog
+        Route::post('/', [BlogCommentController::class, 'store']);  // Add new comment
+    });
+
+    //Waitlist
+    Route::get('/waitlist/list', [WaitlistController::class, 'getWaitlist']);
+
+    Route::post('/waitlist/submit', [WaitlistController::class, 'submit']);
+    Route::get('/waitlist/confirmation/{token}', [WaitlistController::class, 'confirmation']);
+    Route::post('/waitlist/invite', [WaitlistController::class, 'sendSingleInvite']);
+    Route::get('/waitlist/unsubscribe/{token}', [WaitlistController::class, 'unsubscribe']);
+
+    // Stripe webhook endpoint
+    Route::post('/subscription-stripe/webhook', [SubscriptionController::class, 'handleStripeWebhook']);
+    Route::post('/topup-stripe/webhook', [TopupPaymentController::class, 'handleWebhook']);
+    Route::post('/terra/webhook', [TerraWebhookController::class, 'handle']);
+
+
+});
+
+});
+
+require __DIR__ . '/marketplace_api.php';
