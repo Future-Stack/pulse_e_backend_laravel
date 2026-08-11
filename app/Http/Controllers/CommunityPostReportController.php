@@ -9,12 +9,14 @@ use App\Models\User;
 use App\Notifications\AdminIconNotification;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
 
 class CommunityPostReportController extends Controller
 {
     /**
      * POST /api/community/posts/{post}/report
+     * Regular User: Submit a report for a post
      */
     public function store(Request $request, CommunityPost $post)
     {
@@ -25,13 +27,15 @@ class CommunityPostReportController extends Controller
 
         $userId = Auth::id();
 
-        // Prevent the same user reporting the same post more than once
+        // Check if report already exists
         $existing = CommunityPostReport::where('post_id', $post->id)
             ->where('user_id', $userId)
-            ->first();
+            ->exists();
 
         if ($existing) {
-            return response()->json(['message' => 'You have already reported this post.'], 409);
+            return response()->json([
+                'message' => 'You have already reported this post.'
+            ], 409);
         }
 
         $report = CommunityPostReport::create([
@@ -42,14 +46,14 @@ class CommunityPostReportController extends Controller
             'report_cause' => $validated['report_cause'],
         ]);
 
-        //Send Admin Notification
-        $admin = User::where('user_type', 'admin')->first();
+        // Send notification to ALL Admins
+        $admins = User::where('user_type', 'admin')->get();
 
-        if ($admin) {
-            Notification::send($admin, new AdminIconNotification([
-                'type' => 'report',
-                'title' => 'New Post Report',
-                'message' => 'A new report has been posted.',
+        if ($admins->isNotEmpty()) {
+            Notification::send($admins, new AdminIconNotification([
+                'type'      => 'report',
+                'title'     => 'New Post Report',
+                'message'   => 'A new report has been posted.',
                 'sender_id' => null,
             ]));
         }
@@ -62,12 +66,18 @@ class CommunityPostReportController extends Controller
 
     /**
      * GET /api/admin/community/reports
-     * Admin-only: list all reports, newest first.
+     * Admin-only: List all reports with relationships
      */
     public function index()
     {
+        if (! Auth::user()?->hasRole('admin')) {
+            return response()->json([
+                'message' => 'Unauthorized. Only admins can view reports.'
+            ], 403);
+        }
+
         $reports = CommunityPostReport::query()
-            ->with(['post:id,title,slug', 'user:id,full_name'])
+            ->with(['post:id,title,slug,is_approved', 'user:id,full_name'])
             ->latest()
             ->paginate(20);
 
@@ -76,49 +86,55 @@ class CommunityPostReportController extends Controller
 
     /**
      * PATCH /api/admin/community/reports/{report}/approve
-     * Admin confirms the report is valid — hides the reported post and resolves the report.
+     * Admin-only: Confirms violation, hides post, and closes report
      */
     public function approve(CommunityPostReport $report)
     {
-        $user = Auth::user();
-
-        if (!($user->hasRole('admin') ?? false)) {
+        // Admin authorization check
+        if (! Auth::user()?->hasRole('admin')) {
             return response()->json([
                 'message' => 'Unauthorized. Only admins can approve reports.'
             ], 403);
         }
 
-        $report->update(['is_active' => true]);
+        DB::transaction(function () use ($report) {
+            // Close/Resolve the report
+            $report->update(['is_active' => false]);
 
-        // Confirmed violation — pull the post from public view too
-        $report->post()->update(['is_approved' => false]);
+            // Hide the reported post from public view
+            $report->post()->update(['is_approved' => false]);
+        });
 
         return response()->json([
             'message' => 'Report approved. The post has been hidden.',
-            'report'  => $report->fresh(),
+            'report'  => $report->fresh(['post']),
         ]);
     }
 
     /**
      * PATCH /api/admin/community/reports/{report}/decline
-     * Admin rejects the report as invalid — post stays live, report is resolved.
+     * Admin-only: Rejects report, keeps post live, and closes report
      */
     public function decline(CommunityPostReport $report)
     {
-        $user = Auth::user();
-
-        if (!($user->hasRole('admin') ?? false)) {
+        // Admin authorization check
+        if (! Auth::user()?->hasRole('admin')) {
             return response()->json([
                 'message' => 'Unauthorized. Only admins can decline reports.'
             ], 403);
         }
 
-        $report->update(['is_active' => false]);
-        $report->post()->update(['is_approved' => true]);
+        DB::transaction(function () use ($report) {
+            // Close/Resolve the report
+            $report->update(['is_active' => false]);
+
+            // Keep/Ensure the post is live
+            $report->post()->update(['is_approved' => true]);
+        });
 
         return response()->json([
             'message' => 'Report declined.',
-            'report'  => $report->fresh(),
+            'report'  => $report->fresh(['post']),
         ]);
     }
 }

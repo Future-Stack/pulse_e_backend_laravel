@@ -18,6 +18,7 @@ return new class extends Migration
             $table->string('comment')->nullable();
             $table->boolean('is_active')->default(1);
             $table->enum('report_cause', ['spam', 'sexual_content', 'harassment', 'other']);
+            $table->unique(['post_id', 'user_id']);
             $table->timestamps();
         });
     }
