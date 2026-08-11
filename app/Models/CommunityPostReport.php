@@ -17,13 +17,28 @@ class CommunityPostReport extends Model
         'report_cause',
     ];
 
+    /**
+     * The attributes that should be cast.
+     *
+     * @var array<string, string>
+     */
+    protected $casts = [
+        'is_active' => 'boolean',
+    ];
+
+    /**
+     * Get the post that was reported.
+     */
     public function post()
     {
         return $this->belongsTo(CommunityPost::class, 'post_id');
     }
 
+    /**
+     * Get the user who submitted the report.
+     */
     public function user()
     {
-        return $this->belongsTo(User::class);
+        return $this->belongsTo(User::class, 'user_id');
     }
 }
