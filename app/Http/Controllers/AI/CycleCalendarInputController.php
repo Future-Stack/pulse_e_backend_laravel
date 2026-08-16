@@ -128,7 +128,7 @@ public function store(Request $request): JsonResponse
  */
 public function current(Request $request): JsonResponse
 {
-    $user = $request->user();
+     $user = $request->user();
 
     $calendarInput = CycleCalendarInput::where('user_id', $user->id)
         ->latest('start_date')
