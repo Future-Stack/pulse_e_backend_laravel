@@ -198,7 +198,7 @@ public function current(Request $request): JsonResponse
             'icon' => '🟡',
         ],
 
-        default => [
+         default => [
             'name' => 'Luteal Phase',
             'color' => 'blue',
             'icon' => '🔵',
