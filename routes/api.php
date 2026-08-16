@@ -95,6 +95,7 @@ Route::prefix('v1')->group(function () {
     Route::middleware('auth:sanctum')->group(function () {
 
     Route::post('/cycle-calendar-inputs',[CycleCalendarInputController::class, 'store']);
+    Route::get('/cycle-calendar/current', [CycleCalendarInputController::class, 'current']);
 
         //user health log
         Route::apiResource('health-logs', HealthLogController::class);
