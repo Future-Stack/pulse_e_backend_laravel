@@ -25,7 +25,7 @@ use Illuminate\Support\Facades\Schedule;
 
 Schedule::job(new SyncNppesJob)->weekly()->mondays()->at('03:00');
 
-Schedule::command('marketplace:discover-places')->weekly()->monday()->at('11:00');
+Schedule::command('marketplace:discover-places')->weekly()->mondays()->at('11:00');
 
 Schedule::command('marketplace:refresh-place-cache')->dailyAt('04:00');
 Schedule::command('marketplace:purge-place-cache')->dailyAt('05:00');
@@ -33,3 +33,4 @@ Schedule::job(new ScreenLeieJob)->monthly();
 Schedule::job(new ExpireVettingJob)->dailyAt('01:00');
 Schedule::job(new RebuildSlateJob)->dailyAt('02:00');
 Schedule::command('marketplace:enforce-slot-integrity')->dailyAt('02:30');
+
