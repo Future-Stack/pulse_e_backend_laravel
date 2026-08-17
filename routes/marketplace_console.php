@@ -25,13 +25,7 @@ use Illuminate\Support\Facades\Schedule;
 
 Schedule::job(new SyncNppesJob)->weekly()->mondays()->at('03:00');
 
-Schedule::call(function () {
-    foreach (Metro::where('active', true)->get() as $metro) {
-        foreach (ProviderCategory::where('active', true)->get() as $category) {
-            DiscoverPlacesJob::dispatch($metro, $category);
-        }
-    }
-})->weekly()->tuesdays()->at('03:00')->name('marketplace:places-discover');
+Schedule::command('marketplace:discover-places')->weekly()->monday()->at('11:00');
 
 Schedule::command('marketplace:refresh-place-cache')->dailyAt('04:00');
 Schedule::command('marketplace:purge-place-cache')->dailyAt('05:00');
