@@ -21,7 +21,7 @@ class ProviderFactory extends Factory
             'city' => $this->faker->city(),
             'state' => $this->faker->stateAbbr(),
             'zip' => $this->faker->postcode(),
-            'location' => new Point($this->faker->latitude(25, 49), $this->faker->longitude(-124, -67)),
+            'location' => new Point($this->faker->latitude(25, 49), $this->faker->longitude(-124, -67), 4326),
             'metro_id' => Metro::factory(),
             'source_nppes' => true,
             'source_places' => false,
