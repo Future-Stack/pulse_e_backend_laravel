@@ -14,6 +14,8 @@ return new class extends Migration
             $table->string('display_name', 120);
             $table->enum('vetting_tier', ['medical', 'licensed_nonmedical', 'consumer']);
             $table->boolean('requires_npi')->default(false); // TRUE for medical tier
+            $table->string('vetting_source')->nullable(); // e.g. State Medical Board, NPI Registry
+            $table->unsignedTinyInteger('launch_phase')->default(1); // rollout phase
             $table->boolean('active')->default(true);
             $table->timestamps();
         });

@@ -41,8 +41,15 @@ class ProviderController extends Controller
         $data = $request->validate([
             'display_name' => ['sometimes', 'string', 'max:160'],
             'org_name' => ['sometimes', 'nullable', 'string', 'max:160'],
+            'google_place_id' => ['sometimes', 'nullable', 'string', 'max:255'],
+            'npi' => ['sometimes', 'nullable', 'string', 'size:10'],
             'phone_e164' => ['sometimes', 'nullable', 'string', 'max:20'],
             'website' => ['sometimes', 'nullable', 'url', 'max:255'],
+            'addr_line1' => ['sometimes', 'nullable', 'string', 'max:255'],
+            'addr_line2' => ['sometimes', 'nullable', 'string', 'max:255'],
+            'city' => ['sometimes', 'nullable', 'string', 'max:100'],
+            'state' => ['sometimes', 'nullable', 'string', 'max:50'],
+            'zip' => ['sometimes', 'nullable', 'string', 'max:20'],
             'metro_id' => ['sometimes', 'nullable', 'integer', 'exists:metros,id'],
         ]);
 

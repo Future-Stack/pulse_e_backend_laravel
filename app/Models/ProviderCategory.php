@@ -11,10 +11,11 @@ class ProviderCategory extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['slug', 'display_name', 'vetting_tier', 'requires_npi', 'active'];
+    protected $fillable = ['slug', 'display_name', 'vetting_tier', 'requires_npi', 'vetting_source', 'launch_phase', 'active'];
 
     protected $casts = [
         'requires_npi' => 'boolean',
+        'launch_phase' => 'integer',
         'active' => 'boolean',
     ];
 
@@ -45,7 +46,7 @@ class ProviderCategory extends Model
             ->withPivot('source');
     }
 
-    public function scopeActive($query)
+    public function scopeActive(\Illuminate\Database\Eloquent\Builder $query): \Illuminate\Database\Eloquent\Builder
     {
         return $query->where('active', true);
     }

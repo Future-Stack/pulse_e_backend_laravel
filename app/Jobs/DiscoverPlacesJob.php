@@ -108,13 +108,38 @@ class DiscoverPlacesJob implements ShouldQueue
 
     private function upsertPlace(array $place, string $matchedKeyword): void
     {
-        $existingByPlaceId = Provider::where('google_place_id', $place['place_id'])->first();
-        $existingByPhone = $place['phone_e164']
-            ? Provider::where('phone_e164', $place['phone_e164'])->whereNull('google_place_id')->first()
-            : null;
+        $existing = Provider::where('google_place_id', $place['place_id'])->first();
 
-        $existing = $existingByPlaceId ?? $existingByPhone;
-        $matchedByNppes = $existing && $existing->source_nppes && ! $existing->source_places;
+        if (! $existing && ! empty($place['phone_e164'])) {
+            $existing = Provider::where('phone_e164', $place['phone_e164'])
+                ->whereNull('google_place_id')
+                ->first();
+        }
+
+        // Fuzzy name + address fallback match for NPPES records in this metro with null google_place_id
+        if (! $existing) {
+            $candidates = Provider::where('metro_id', $this->metro->id)
+                ->whereNull('google_place_id')
+                ->where('source_nppes', true)
+                ->get();
+
+            $bestCandidate = null;
+            $bestScore = 0.0;
+
+            foreach ($candidates as $candidate) {
+                $score = $this->matchConfidence($candidate, $place);
+                if ($score >= 0.70 && $score > $bestScore) {
+                    $bestScore = $score;
+                    $bestCandidate = $candidate;
+                }
+            }
+
+            if ($bestCandidate) {
+                $existing = $bestCandidate;
+            }
+        }
+
+        $matchedByNppes = $existing && $existing->source_nppes;
 
         $matchConfidence = $matchedByNppes
             ? $this->matchConfidence($existing, $place)
