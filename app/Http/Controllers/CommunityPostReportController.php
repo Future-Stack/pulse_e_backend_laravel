@@ -70,7 +70,9 @@ class CommunityPostReportController extends Controller
      */
     public function index()
     {
-        if (! Auth::user()?->hasRole('admin')) {
+        /** @var \App\Models\User|null $user */
+        $user = Auth::user();
+        if (! $user?->hasRole('admin')) {
             return response()->json([
                 'message' => 'Unauthorized. Only admins can view reports.'
             ], 403);
@@ -91,7 +93,9 @@ class CommunityPostReportController extends Controller
     public function approve(CommunityPostReport $report)
     {
         // Admin authorization check
-        if (! Auth::user()?->hasRole('admin')) {
+        /** @var \App\Models\User|null $user */
+        $user = Auth::user();
+        if (! $user?->hasRole('admin')) {
             return response()->json([
                 'message' => 'Unauthorized. Only admins can approve reports.'
             ], 403);
@@ -118,7 +122,9 @@ class CommunityPostReportController extends Controller
     public function decline(CommunityPostReport $report)
     {
         // Admin authorization check
-        if (! Auth::user()?->hasRole('admin')) {
+        /** @var \App\Models\User|null $user */
+        $user = Auth::user();
+        if (! $user?->hasRole('admin')) {
             return response()->json([
                 'message' => 'Unauthorized. Only admins can decline reports.'
             ], 403);

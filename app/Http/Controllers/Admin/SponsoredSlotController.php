@@ -66,7 +66,17 @@ class SponsoredSlotController extends Controller
         $data['status'] = 'reserved';
         $slot = SponsoredSlot::create($data);
 
-        return response()->json(['data' => $slot], 201);
+        $billingService = app(\App\Services\StripeSlotBillingService::class);
+        $checkout = $billingService->createCheckoutSession(
+            $slot,
+            url("/admin/slots/{$slot->id}/success"),
+            url("/admin/slots/{$slot->id}/cancel")
+        );
+
+        return response()->json([
+            'data' => $slot,
+            'checkout' => $checkout,
+        ], 201);
     }
 
     public function activate(SponsoredSlot $slot): JsonResponse

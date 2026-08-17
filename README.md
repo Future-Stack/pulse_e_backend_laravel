@@ -57,10 +57,27 @@ Thank you for considering contributing to the Laravel framework! The contributio
 
 In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
 
-## Security Vulnerabilities
+## Neumera Provider Marketplace Architecture
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+The Provider Marketplace is a standalone module delivering geographically scoped, life-stage targeted provider recommendations while maintaining a strict privacy boundary (zero PHI, zero health signals, and zero user identifiers crossing into the marketplace domain).
+
+### API Endpoints
+- `GET /v1/marketplace/slate`: Returns ranked providers (sponsored positions 1..3, followed by organic score ranking).
+- `POST /v1/marketplace/events`: Batched pseudonymous interaction events (`impression`, `tap`, `call`, `directions`, `website`, `share`).
+- `GET /v1/admin/providers`: Admin listing and status management queue.
+- `POST /v1/admin/slots`: B2B sponsored slot reservation with integrated Stripe checkout session generation.
+
+### Scheduled Console Jobs
+- `marketplace:sync-nppes`: Weekly ingestion of NPPES practitioner delta files.
+- `marketplace:discover-places`: Weekly search grid tile execution over Google Places Text Search.
+- `marketplace:refresh-places`: 14-day rolling rehydration of `place_details_cache`.
+- `marketplace:screen-leie`: Monthly OIG LEIE exclusions list match & terminal status flag.
+- `marketplace:expire-vetting`: Daily downgrade of lapsed mandatory provider checks.
+- `marketplace:rebuild-slate`: Nightly precomputation of organic rankings into Redis cache keys.
+
+---
 
 ## License
 
 The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+

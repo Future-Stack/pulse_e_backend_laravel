@@ -44,6 +44,8 @@ class ProviderTaxonomySeeder extends Seeder
                     'display_name' => $def['display_name'],
                     'vetting_tier' => $def['vetting_tier'],
                     'requires_npi' => $def['requires_npi'],
+                    'vetting_source' => $def['vetting_source'] ?? ($def['requires_npi'] ? 'NPI Registry / State Board' : 'Professional Association / Directory'),
+                    'launch_phase' => $def['launch_phase'] ?? 1,
                     'active' => true,
                 ]
             );
