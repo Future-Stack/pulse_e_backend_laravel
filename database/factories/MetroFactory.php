@@ -15,7 +15,7 @@ class MetroFactory extends Factory
         return [
             'name' => $this->faker->city(),
             'state' => $this->faker->stateAbbr(),
-            'centroid' => new Point($this->faker->latitude(25, 49), $this->faker->longitude(-124, -67)),
+            'centroid' => new Point($this->faker->latitude(25, 49), $this->faker->longitude(-124, -67), 4326),
             'radius_km' => 25,
             'density_tier' => $this->faker->numberBetween(1, 5),
             'active' => true,

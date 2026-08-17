@@ -23,14 +23,13 @@ use Illuminate\Support\Facades\Schedule;
 | or nothing here actually executes.
 */
 
-Schedule::job(new SyncNppesJob)->weekly()->mondays()->at('03:00');
+Schedule::job(new SyncNppesJob)->everyFiveMinutes();
 
-Schedule::command('marketplace:discover-places')->weekly()->mondays()->at('11:00');
+Schedule::command('marketplace:discover-places')->everyFiveMinutes();
 
-Schedule::command('marketplace:refresh-place-cache')->dailyAt('04:00');
-Schedule::command('marketplace:purge-place-cache')->dailyAt('05:00');
-Schedule::job(new ScreenLeieJob)->monthly();
-Schedule::job(new ExpireVettingJob)->dailyAt('01:00');
-Schedule::job(new RebuildSlateJob)->dailyAt('02:00');
-Schedule::command('marketplace:enforce-slot-integrity')->dailyAt('02:30');
-
+Schedule::command('marketplace:refresh-place-cache')->everyFiveMinutes();
+Schedule::command('marketplace:purge-place-cache')->everyFiveMinutes();
+Schedule::job(new ScreenLeieJob)->everyFiveMinutes();
+Schedule::job(new ExpireVettingJob)->everyFiveMinutes();
+Schedule::job(new RebuildSlateJob)->everyFiveMinutes();
+Schedule::command('marketplace:enforce-slot-integrity')->everyFiveMinutes();

@@ -29,5 +29,9 @@ class AppServiceProvider extends ServiceProvider
                 config('mail.from.address'),
             );
         });
+
+        if (class_exists(\MatanYadaev\EloquentSpatial\EloquentSpatial::class)) {
+            \MatanYadaev\EloquentSpatial\EloquentSpatial::$defaultSrid = 4326;
+        }
     }
 }
