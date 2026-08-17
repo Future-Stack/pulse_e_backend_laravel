@@ -12,111 +12,80 @@ class CycleCalendarInputController extends Controller
     /**
      * Store cycle calendar input.
      */
-    // public function store(Request $request): JsonResponse
-    // {
-    //     $validated = $request->validate([
-    //         'start_date' => ['required', 'date'],
-    //         'end_date' => ['nullable', 'date', 'after_or_equal:start_date'],
-    //         'is_day_n' => ['required', 'boolean'],
-    //     ]);
-
-    //     $endDate = !empty($validated['end_date']) && $validated['end_date'] !== '0000-00-00' ? $validated['end_date'] : null;
-
-    //     $cycleCalendarInput = CycleCalendarInput::create([
-    //         'user_id' => $request->user()->id,
-    //         'start_date' => $validated['start_date'],
-    //         'end_date' => $endDate,
-    //         'is_day_n' => $validated['is_day_n'],
-    //     ]);
-
-    //     $user = $request->user();
-
-    //     // 1. Update/Create active MenstrualCycle
-    //     $cycle = \App\Models\MenstrualCycle::updateOrCreate(
-    //         [
-    //             'user_id' => $user->id,
-    //             'is_completed' => false,
-    //         ],
-    //         [
-    //             'period_start_date' => $validated['start_date'],
-    //             'period_end_date' => $endDate,
-    //             'prediction_source' => 'calendar',
-    //         ]
-    //     );
-
-    //     // 2. Populate PeriodLogs
-    //     $periodStart = \Carbon\Carbon::parse($validated['start_date']);
-    //     $periodEnd = $endDate ? \Carbon\Carbon::parse($endDate) : $periodStart->copy();
-        
-    //     for ($date = $periodStart->copy(); $date->lte($periodEnd); $date->addDay()) {
-    //         \App\Models\PeriodLog::updateOrCreate(
-    //             [
-    //                 'user_id' => $user->id,
-    //                 'cycle_id' => $cycle->id,
-    //                 'log_date' => $date->toDateString(),
-    //             ],
-    //             [
-    //                 'flow' => 'medium',
-    //             ]
-    //         );
-    //     }
-
-    //     // 3. Trigger AI Engine cycle sync
-    //     try {
-    //         app(\App\Http\Controllers\AI\CycleSummaryController::class)->sync();
-    //     } catch (\Throwable $e) {
-    //         \Illuminate\Support\Facades\Log::warning("Failed to auto-sync AI engine after calendar input: " . $e->getMessage());
-    //     }
-
-    //     return response()->json([
-    //         'success' => true,
-    //         'message' => 'Cycle calendar input saved successfully and cycle synced.',
-    //         'data' => $cycleCalendarInput,
-    //     ], 201);
-    // }
-
-
-
-
-    //new
-
     /**
- * Store cycle calendar input.
- */
-/**
- * Store cycle calendar input.
- */
-public function store(Request $request): JsonResponse
-{
-    $validated = $request->validate([
-        'start_date' => ['required', 'date'],
-        'end_date' => ['required', 'date', 'after_or_equal:start_date'],
-        'is_day_n' => ['required', 'boolean'],
-    ]);
+     * Store cycle calendar input.
+     */
+    public function store(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'start_date' => ['required', 'date'],
+            'end_date' => ['nullable', 'date', 'after_or_equal:start_date'],
+            'is_day_n' => ['required', 'boolean'],
+        ]);
 
-    $user = $request->user();
+        $user = $request->user();
+        $endDate = !empty($validated['end_date']) && $validated['end_date'] !== '0000-00-00' ? $validated['end_date'] : null;
 
-    $cycleCalendarInput = CycleCalendarInput::create([
-        'user_id' => $user->id,
-        'start_date' => $validated['start_date'],
-        'end_date' => $validated['end_date'],
-        'is_day_n' => $validated['is_day_n'],
-    ]);
+        $cycleCalendarInput = CycleCalendarInput::create([
+            'user_id' => $user->id,
+            'start_date' => $validated['start_date'],
+            'end_date' => $endDate,
+            'is_day_n' => $validated['is_day_n'],
+        ]);
 
-    return response()->json([
-        'success' => true,
-        'message' => 'Cycle calendar input saved successfully.',
-        'data' => [
-            'id' => $cycleCalendarInput->id,
-            'user_id' => $cycleCalendarInput->user_id,
-            'start_date' => $cycleCalendarInput->start_date?->format('Y-m-d'),
-            'end_date' => $cycleCalendarInput->end_date?->format('Y-m-d'),
-            'is_day_n' => $cycleCalendarInput->is_day_n,
-            'created_at' => $cycleCalendarInput->created_at,
-            'updated_at' => $cycleCalendarInput->updated_at,
-        ],
-    ], 201);
-}
+        // 1. Update/Create active MenstrualCycle
+        $cycle = \App\Models\MenstrualCycle::updateOrCreate(
+            [
+                'user_id' => $user->id,
+                'is_completed' => false,
+            ],
+            [
+                'period_start_date' => $validated['start_date'],
+                'period_end_date' => $endDate,
+                'prediction_source' => 'calendar',
+            ]
+        );
+
+        // 2. Populate PeriodLogs
+        $periodStart = \Carbon\Carbon::parse($validated['start_date']);
+        $periodEnd = $endDate ? \Carbon\Carbon::parse($endDate) : $periodStart->copy();
+
+        for ($date = $periodStart->copy(); $date->lte($periodEnd); $date->addDay()) {
+            \App\Models\PeriodLog::updateOrCreate(
+                [
+                    'user_id' => $user->id,
+                    'cycle_id' => $cycle->id,
+                    'log_date' => $date->toDateString(),
+                ],
+                [
+                    'flow' => 'medium',
+                ]
+            );
+        }
+
+        // 3. Trigger AI Engine cycle sync if available
+        try {
+            if (class_exists(\App\Http\Controllers\AI\CycleSummaryController::class)) {
+                app(\App\Http\Controllers\AI\CycleSummaryController::class)->sync();
+            }
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning("Failed to auto-sync AI engine after calendar input: " . $e->getMessage());
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Cycle calendar input saved successfully.',
+            'data' => [
+                'id' => $cycleCalendarInput->id,
+                'user_id' => $cycleCalendarInput->user_id,
+                'start_date' => $cycleCalendarInput->start_date?->format('Y-m-d'),
+                'end_date' => $cycleCalendarInput->end_date?->format('Y-m-d'),
+                'is_day_n' => $cycleCalendarInput->is_day_n,
+                'created_at' => $cycleCalendarInput->created_at,
+                'updated_at' => $cycleCalendarInput->updated_at,
+            ],
+        ], 201);
+    }
 
 //current
 

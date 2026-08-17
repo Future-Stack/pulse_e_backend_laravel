@@ -27,7 +27,7 @@ class SeedTestProvider extends Command
         $metroSF = Metro::updateOrCreate(
             ['name' => 'San Francisco', 'state' => 'CA'],
             [
-                'centroid' => new Point(37.7749, -122.4194),
+                'centroid' => new Point(37.7749, -122.4194, 4326),
                 'radius_km' => 40,
                 'density_tier' => 3,
                 'active' => true,
@@ -37,7 +37,7 @@ class SeedTestProvider extends Command
         $metroSLC = Metro::updateOrCreate(
             ['name' => 'Salt Lake City', 'state' => 'UT'],
             [
-                'centroid' => new Point(40.7608, -111.8910),
+                'centroid' => new Point(40.7608, -111.8910, 4326),
                 'radius_km' => 35,
                 'density_tier' => 2,
                 'active' => true,
@@ -176,7 +176,7 @@ class SeedTestProvider extends Command
                     'city' => $item['city'],
                     'state' => $item['state'],
                     'zip' => $item['zip'],
-                    'location' => new Point($item['lat'], $item['lng']),
+                    'location' => new Point($item['lat'], $item['lng'], 4326),
                     'metro_id' => $item['metro']->id,
                     'source_nppes' => true,
                     'source_places' => true,

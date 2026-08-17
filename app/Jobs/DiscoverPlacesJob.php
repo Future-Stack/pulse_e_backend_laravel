@@ -151,7 +151,7 @@ class DiscoverPlacesJob implements ShouldQueue
                 'google_place_id' => $place['place_id'],
                 'display_name' => $existing?->display_name ?? $place['display_name'],
                 'phone_e164' => $existing?->phone_e164 ?? $place['phone_e164'],
-                'location' => new Point($place['lat'], $place['lng']),
+                'location' => new Point($place['lat'], $place['lng'], 4326),
                 'metro_id' => $this->metro->id,
                 'source_places' => true,
                 'match_confidence' => $matchConfidence,

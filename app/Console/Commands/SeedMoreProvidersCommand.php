@@ -65,7 +65,7 @@ class SeedMoreProvidersCommand extends Command
                 'city' => $metro->name,
                 'state' => $metro->state ?? 'CA',
                 'zip' => '941' . sprintf('%02d', rand(1, 30)),
-                'location' => new Point($lat, $lng),
+                'location' => new Point($lat, $lng, 4326),
                 'metro_id' => $metro->id,
                 'source_nppes' => true,
                 'source_places' => true,
