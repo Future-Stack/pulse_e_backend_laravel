@@ -11,26 +11,62 @@ services:
     ports:
       - "8000:8000" # Exposes the application on port 8000
     environment:
-      - DB_PASSWORD="Pul$$e2026_mysql"
+      - DB_PASSWORD=Pul$e2026_mysql
+      - REDIS_HOST=redis
     env_file:
-      - .env.prod
+      - .env
     networks:
       - laravel
 
-  # Laravel Queue Worker Service: Processes background jobs
+  # Laravel Queue Worker Service: Processes background jobs (SyncNppesJob, DiscoverPlacesJob, etc.)
   queue:
     image: softvence/pulse_backend_laravel:latest
     platform: linux/amd64
     container_name: laravel_queue
     restart: unless-stopped
-    command: php artisan queue:work --verbose --tries=3 --timeout=90
+    command: php artisan queue:work --verbose --tries=3 --timeout=3600 --memory=512
     env_file:
-      - .env.prod
+      - .env
     environment:
-      - DB_PASSWORD="Pul$$e2026_mysql"
+      - DB_PASSWORD=Pul$e2026_mysql
+      - REDIS_HOST=redis
     depends_on:
       app:
         condition: service_started
+      redis:
+        condition: service_started
+    networks:
+      - laravel
+
+  # Laravel Scheduler Service: Triggers scheduled console commands and periodic background jobs
+  scheduler:
+    image: softvence/pulse_backend_laravel:latest
+    platform: linux/amd64
+    container_name: laravel_scheduler
+    restart: unless-stopped
+    working_dir: /var/www/html
+    command: >
+      sh -c "while true; do php artisan schedule:run; sleep 60; done"
+    env_file:
+      - .env
+    environment:
+      - DB_PASSWORD=Pul$e2026_mysql
+      - REDIS_HOST=redis
+    depends_on:
+      app:
+        condition: service_started
+      redis:
+        condition: service_started
+    networks:
+      - laravel
+
+  # Redis Cache & In-Memory Store
+  redis:
+    image: redis:7-alpine
+    container_name: laravel_redis
+    restart: always
+    ports:
+      - "6379:6379"
     networks:
       - laravel
 
