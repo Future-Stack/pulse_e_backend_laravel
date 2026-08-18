@@ -1,0 +1,569 @@
+{
+	"info": {
+		"_postman_id": "pulse-e-marketplace-api-v1",
+		"name": "Pulse_E Provider Marketplace APIs",
+		"description": "Complete Postman collection for testing and integrating Pulse_E Provider Marketplace APIs (Public Marketplace & Admin Portal). Note: Admin endpoints require a Sanctum token from a user with is_marketplace_admin = 1.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "1. Public Marketplace APIs",
+			"item": [
+				{
+					"name": "Get Provider Slate",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/marketplace/slate?category=obgyn&zip=94105",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"marketplace",
+								"slate"
+							],
+							"query": [
+								{
+									"key": "category",
+									"value": "obgyn",
+									"description": "Required: Provider category slug (e.g. obgyn, dermatology, physical-therapist-sports, pelvic-floor-pt)"
+								},
+								{
+									"key": "zip",
+									"value": "94105",
+									"description": "Required (unless metro_id supplied): 5-digit US ZIP code"
+								},
+								{
+									"key": "metro_id",
+									"value": "1",
+									"description": "Required (unless zip supplied): Specific Metro ID",
+									"disabled": true
+								},
+								{
+									"key": "life_stage",
+									"value": "beauty-radiance",
+									"description": "Optional: Filter by life stage slug (e.g. beauty-radiance, cycle-fertility, athlete)",
+									"disabled": true
+								},
+								{
+									"key": "limit",
+									"value": "3",
+									"description": "Optional: Number of results (1 to 5, default: 3)",
+									"disabled": true
+								}
+							]
+						},
+						"description": "Returns ranked organic and sponsored providers for a metro area and category."
+					},
+					"response": []
+				},
+				{
+					"name": "Log Slate Events (Analytics)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"session_token\": \"a1b2c3d4e5f678901234567890abcdef\",\n  \"events\": [\n    {\n      \"event_type\": \"impression\",\n      \"category\": \"obgyn\",\n      \"metro_id\": 1,\n      \"provider_id\": 1,\n      \"slot_position\": 1,\n      \"sponsored\": false,\n      \"occurred_at\": \"2026-08-18T09:00:00Z\"\n    },\n    {\n      \"event_type\": \"tap\",\n      \"category\": \"obgyn\",\n      \"metro_id\": 1,\n      \"provider_id\": 1,\n      \"slot_position\": 1,\n      \"sponsored\": false,\n      \"occurred_at\": \"2026-08-18T09:01:00Z\"\n    }\n  ]\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/marketplace/events",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"marketplace",
+								"events"
+							]
+						},
+						"description": "Submits batch analytics events (impression, tap, call, directions, website, share) for marketplace slates."
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "2. Admin - Provider Management",
+			"item": [
+				{
+					"name": "List Providers",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{authToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/admin/providers?status=active",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"admin",
+								"providers"
+							],
+							"query": [
+								{
+									"key": "status",
+									"value": "active",
+									"description": "Filter by status: candidate, vetted, active, suspended"
+								},
+								{
+									"key": "search",
+									"value": "Dermatology",
+									"description": "Search by provider name, NPI, or city",
+									"disabled": true
+								},
+								{
+									"key": "metro_id",
+									"value": "1",
+									"disabled": true
+								}
+							]
+						},
+						"description": "List all providers with filters for status and search terms (Requires user with is_marketplace_admin = 1)."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Single Provider",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{authToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/admin/providers/1",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"admin",
+								"providers",
+								"1"
+							]
+						},
+						"description": "Fetch detailed provider record including categories, vetting history, and place cache."
+					},
+					"response": []
+				},
+				{
+					"name": "Update Provider Details",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{authToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"display_name\": \"Bay Area Dermatology & Laser Center\",\n  \"phone_e164\": \"+14155552345\",\n  \"addr_line1\": \"400 Parnassus Ave Suite 100\",\n  \"city\": \"San Francisco\",\n  \"state\": \"CA\",\n  \"zip\": \"94143\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/admin/providers/1",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"admin",
+								"providers",
+								"1"
+							]
+						},
+						"description": "Update editable provider attributes."
+					},
+					"response": []
+				},
+				{
+					"name": "Transition Provider Status",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{authToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"status\": \"active\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/admin/providers/1/status",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"admin",
+								"providers",
+								"1",
+								"status"
+							]
+						},
+						"description": "Transition provider status (candidate -> vetted -> active -> suspended)."
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "3. Admin - Vetting & Checks",
+			"item": [
+				{
+					"name": "List Vetting Checks",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{authToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/admin/vetting",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"admin",
+								"vetting"
+							]
+						},
+						"description": "Retrieve vetting review queue and check logs."
+					},
+					"response": []
+				},
+				{
+					"name": "Record Vetting Check",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{authToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"check_type\": \"state_license\",\n  \"status\": \"pass\",\n  \"notes\": \"Verified active medical license with State Board.\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/admin/providers/1/vetting",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"admin",
+								"providers",
+								"1",
+								"vetting"
+							]
+						},
+						"description": "Create a new vetting record entry for a provider."
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "4. Admin - Sponsored Slots",
+			"item": [
+				{
+					"name": "List Sponsored Slots",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{authToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/admin/slots",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"admin",
+								"slots"
+							]
+						},
+						"description": "List all sponsored slot reservations and active placements."
+					},
+					"response": []
+				},
+				{
+					"name": "Reserve Sponsored Slot",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{authToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"provider_id\": 1,\n  \"metro_id\": 1,\n  \"category_id\": 1,\n  \"slot_number\": 1,\n  \"starts_at\": \"2026-09-01\",\n  \"ends_at\": \"2026-09-30\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/admin/slots",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"admin",
+								"slots"
+							]
+						},
+						"description": "Reserve a sponsored slot placement for a vetted provider."
+					},
+					"response": []
+				},
+				{
+					"name": "Activate Sponsored Slot",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{authToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/admin/slots/1/activate",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"admin",
+								"slots",
+								"1",
+								"activate"
+							]
+						},
+						"description": "Activate a reserved sponsored slot placement."
+					},
+					"response": []
+				},
+				{
+					"name": "Cancel Sponsored Slot",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{authToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/admin/slots/1/cancel",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"admin",
+								"slots",
+								"1",
+								"cancel"
+							]
+						},
+						"description": "Cancel an active or reserved sponsored slot placement."
+					},
+					"response": []
+				}
+			]
+		}
+	],
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "https://api.fightthenumber.com",
+			"type": "string"
+		},
+		{
+			"key": "authToken",
+			"value": "YOUR_SANCTUM_BEARER_TOKEN_HERE",
+			"type": "string"
+		}
+	]
+}

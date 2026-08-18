@@ -21,6 +21,7 @@ class UserSeeder extends Seeder
                 'password'   => Hash::make('Password@123'),
                 'status'     => 'active',
                 'user_type'  => 'admin',
+                'is_marketplace_admin' => true,
                 'email_verified_at' => now(),
             ]
         );

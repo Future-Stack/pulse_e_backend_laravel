@@ -23,6 +23,7 @@ class MarketplaceEventControllerTest extends TestCase
                     'category' => 'obgyn',
                     'slot_position' => 1,
                     'sponsored' => false,
+                    'occurred_at' => '2026-08-18T09:00:00Z',
                 ],
             ],
         ];
