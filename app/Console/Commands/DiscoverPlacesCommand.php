@@ -13,7 +13,7 @@ use Illuminate\Console\Command;
  */
 class DiscoverPlacesCommand extends Command
 {
-    protected $signature = 'marketplace:discover-places {--metro_id= : Specific metro ID to discover} {--category_id= : Specific category ID to discover}';
+    protected $signature = 'marketplace:discover-places {--metro_id= : Specific metro ID to discover} {--category_id= : Specific category ID to discover} {--queue : Dispatch discovery jobs to the queue worker}';
     protected $description = 'Run Google Places API discovery for active metros and categories to match NPPES records and populate google_place_id';
 
     public function handle(): int
@@ -42,12 +42,23 @@ class DiscoverPlacesCommand extends Command
         $initialCount = \App\Models\Provider::count();
 
         $count = 0;
+        $asQueue = (bool) $this->option('queue');
+
         foreach ($metros as $metro) {
             foreach ($categories as $category) {
-                $this->info("Running Places discovery for metro [{$metro->name}] x category [{$category->display_name}]...");
-                DiscoverPlacesJob::dispatchSync($metro, $category);
+                if ($asQueue) {
+                    DiscoverPlacesJob::dispatch($metro, $category);
+                } else {
+                    $this->info("Running Places discovery for metro [{$metro->name}] x category [{$category->display_name}]...");
+                    DiscoverPlacesJob::dispatchSync($metro, $category);
+                }
                 $count++;
             }
+        }
+
+        if ($asQueue) {
+            $this->info("Dispatched {$count} Google Places discovery jobs to the queue.");
+            return self::SUCCESS;
         }
 
         $newCount = \App\Models\Provider::count();

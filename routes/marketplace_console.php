@@ -23,13 +23,11 @@ use Illuminate\Support\Facades\Schedule;
 | or nothing here actually executes.
 */
 
-Schedule::job(new SyncNppesJob)->everyFiveMinutes();
-
-Schedule::command('marketplace:discover-places')->everyFiveMinutes();
-
-Schedule::command('marketplace:refresh-place-cache')->everyFiveMinutes();
-Schedule::command('marketplace:purge-place-cache')->everyFiveMinutes();
-Schedule::job(new ScreenLeieJob)->everyFiveMinutes();
-Schedule::job(new ExpireVettingJob)->everyFiveMinutes();
-Schedule::job(new RebuildSlateJob)->everyFiveMinutes();
-Schedule::command('marketplace:enforce-slot-integrity')->everyFiveMinutes();
+Schedule::job(new SyncNppesJob)->everyFiveMinutes()->withoutOverlapping();
+Schedule::command('marketplace:discover-places --queue')->everyFiveMinutes()->withoutOverlapping();
+Schedule::command('marketplace:refresh-place-cache')->everyFiveMinutes()->withoutOverlapping();
+Schedule::command('marketplace:purge-place-cache')->everyFiveMinutes()->withoutOverlapping();
+Schedule::job(new ScreenLeieJob)->everyFiveMinutes()->withoutOverlapping();
+Schedule::job(new ExpireVettingJob)->everyFiveMinutes()->withoutOverlapping();
+Schedule::job(new RebuildSlateJob)->everyFiveMinutes()->withoutOverlapping();
+Schedule::command('marketplace:enforce-slot-integrity')->everyFiveMinutes()->withoutOverlapping();

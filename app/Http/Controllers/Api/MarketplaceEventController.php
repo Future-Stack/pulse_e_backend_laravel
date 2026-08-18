@@ -37,14 +37,18 @@ class MarketplaceEventController extends Controller
                 $lifeStageId = $lifeStages[$event['life_stage']] ?? null;
             }
 
+            $occurredAt = isset($event['occurred_at'])
+                ? \Illuminate\Support\Carbon::parse($event['occurred_at'])->format('Y-m-d H:i:s')
+                : now()->format('Y-m-d H:i:s');
+
             return [
-                'occurred_at'                 => $event['occurred_at'] ?? now(),
+                'occurred_at'                 => $occurredAt,
                 'metro_id'                    => $event['metro_id'] ?? null,
                 'category_id'                 => $categories[$event['category']] ?? null,
                 'marketplace_life_stage_id'   => $lifeStageId,
                 'provider_id'                 => $event['provider_id'] ?? null,
                 'slot_position'               => $event['slot_position'] ?? null,
-                'sponsored'                   => $event['sponsored'] ?? false,
+                'sponsored'                   => ! empty($event['sponsored']) ? 1 : 0,
                 'event_type'                  => $event['event_type'],
                 'session_token'               => $sessionToken,
             ];
