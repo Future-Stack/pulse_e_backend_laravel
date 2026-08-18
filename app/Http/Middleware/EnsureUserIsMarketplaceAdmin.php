@@ -28,7 +28,7 @@ class EnsureUserIsMarketplaceAdmin
     {
         $user = $request->user();
 
-        if (! $user || ! $user->is_marketplace_admin) {
+        if (! $user || (! $user->is_marketplace_admin && $user->user_type !== 'admin')) {
             abort(403, 'You do not have access to the Provider Marketplace admin.');
         }
 

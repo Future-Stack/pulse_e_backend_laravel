@@ -1,35 +1,46 @@
 services:
   # Laravel Application Service: The main PHP application
   app:
-    build:
-      context: .
-      dockerfile: Dockerfile
     image: softvence/pulse_backend_laravel:latest
     platform: linux/amd64
     container_name: laravel_app
     restart: always
     ports:
-      - "8000:8000" # Exposes the application on port 8000
-    environment:
-      - DB_PASSWORD=Pul$e2026_mysql
-      - REDIS_HOST=redis
+      - "8000:8000"
     env_file:
       - .env
+    depends_on:
+      redis:
+        condition: service_started
     networks:
       - laravel
 
-  # Laravel Queue Worker Service: Processes background jobs (SyncNppesJob, DiscoverPlacesJob, etc.)
+  # Laravel Primary Queue Worker: Processes default & NPPES background jobs
   queue:
     image: softvence/pulse_backend_laravel:latest
     platform: linux/amd64
     container_name: laravel_queue
     restart: unless-stopped
-    command: php artisan queue:work --verbose --tries=3 --timeout=3600 --memory=512
+    command: php artisan queue:work --verbose --tries=3 --timeout=3600 --memory=512M
     env_file:
       - .env
-    environment:
-      - DB_PASSWORD=Pul$e2026_mysql
-      - REDIS_HOST=redis
+    depends_on:
+      app:
+        condition: service_started
+      redis:
+        condition: service_started
+    networks:
+      - laravel
+
+  # Laravel Marketplace Queue Worker: Dedicated worker for marketplace discovery & ingestion
+  queue_marketplace:
+    image: softvence/pulse_backend_laravel:latest
+    platform: linux/amd64
+    container_name: laravel_queue_marketplace
+    restart: unless-stopped
+    command: php artisan queue:work --queue=default,high,marketplace --verbose --tries=3 --timeout=3600 --memory=512M
+    env_file:
+      - .env
     depends_on:
       app:
         condition: service_started
@@ -49,9 +60,6 @@ services:
       sh -c "while true; do php artisan schedule:run; sleep 60; done"
     env_file:
       - .env
-    environment:
-      - DB_PASSWORD=Pul$e2026_mysql
-      - REDIS_HOST=redis
     depends_on:
       app:
         condition: service_started
@@ -72,4 +80,4 @@ services:
 
 networks:
   laravel:
-    driver: bridge # Creates a custom bridge network
+    driver: bridge
