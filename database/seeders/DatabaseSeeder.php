@@ -22,6 +22,7 @@ class DatabaseSeeder extends Seeder
             HealthGoalSeeder::class,
             LifeJourneySeeder::class,
             LifeStageSeeder::class,
+            MetroSeeder::class,
             ProviderTaxonomySeeder::class,
         ]);
     }
