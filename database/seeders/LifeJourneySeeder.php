@@ -19,7 +19,7 @@ class LifeJourneySeeder extends Seeder
                 'icon' => 'beauty.png',
                 'title' => 'Beauty & Radiance',
                 'subtitle' => 'Skin, hair, confidence - the entry wedge.',
-                'description' => 'Recent sleep disruption may be contributing to increased skin redness. A consistent 10pm bedtime could restore your glow within 5-7 days.',
+                'description' => 'Revealing how skin, energy, and outward vitality reflect inner health, turning daily signals into visible results.',
                 'features' => [
                     'Skin Health Tracking',
                     'Hydration Monitoring',
@@ -32,7 +32,7 @@ class LifeJourneySeeder extends Seeder
                 'icon' => 'tracking.png',
                 'title' => 'Cycle & Fertility',
                 'subtitle' => 'Cycle, ovulation, conception planning.',
-                'description' => "You're in your Ovulatory Phase (Day 14). Peak fertility window opens in the next 24-48 hours. Estrogen is peaking — expect elevated energy and confidence.",
+                'description' => 'Making sense of your cycle month to month — so ovulation, hormones, and fertile windows stop being a mystery, whether you\'re planning for pregnancy or just getting to know your body.',
                 'features' => [
                     'Cycle Tracking',
                     'Ovulation Prediction',
@@ -45,7 +45,7 @@ class LifeJourneySeeder extends Seeder
                 'icon' => 'athlete.png',
                 'title' => 'Athlete',
                 'subtitle' => 'Training, recovery, performance by hormone phase.',
-                'description' => 'Recovery metrics suggest reducing training intensity today. Your HRV indicates moderate nervous system fatigue — a light session will serve you better.',
+                'description' => 'Optimizing training, recovery, and performance around the hormonal rhythms that female-specific data too often ignores.',
                 'features' => [
                     'Training Load Monitoring',
                     'Recovery Analysis',
@@ -56,9 +56,9 @@ class LifeJourneySeeder extends Seeder
             ],
             [
                 'icon' => 'menopause.png',
-                'title' => 'Peri / Menopause & Vitality',
+                'title' => 'Perimenopause/Menopause & Vitality',
                 'subtitle' => 'Symptom navigation and long-term vitality.',
-                'description' => 'Hot flash frequency is down 20% this week — a positive trend. Evening flashes correlate strongly with high-stress days. A consistent 9pm wind-down routine could reduce your overnight flash count within 5-7 days.',
+                'description' => 'Turning the hormonal upheaval of perimenopause and menopause into something you can finally understand — easing symptoms today while protecting your strength for the years ahead.',
                 'features' => [
                     'Hot Flash Tracking',
                     'Sleep Disturbance Monitoring',
@@ -71,7 +71,7 @@ class LifeJourneySeeder extends Seeder
                 'icon' => 'pregnancy.png',
                 'title' => 'Pregnancy & Postpartum',
                 'subtitle' => 'Prenatal through recovery, supported.',
-                'description' => 'Week 24 — your baby is the size of a corn cob! Focus on sleep positioning (left side preferred) and stay well hydrated.',
+                'description' => 'Tracking the body\'s rapid changes and supporting recovery through one of life\'s most demanding chapters.',
                 'features' => [
                     'Week Tracking',
                     'Symptom Monitoring',
@@ -84,7 +84,7 @@ class LifeJourneySeeder extends Seeder
                 'icon' => 'lifelong.png',
                 'title' => 'Lifelong Thriving',
                 'subtitle' => 'Prevention and healthspan for the long run.',
-                'description' => 'Your long-term vitality score has improved 8 points over 6 weeks — sustained sleep quality is the primary driver. Consistent HRV improvement (+12ms) signals cardiovascular adaptation. Your bone density scan is overdue — the preventive window is now.',
+                'description' => 'Sustaining strength, clarity, and well-being across the years, with intelligence that keeps adapting as you do.',
                 'features' => [
                     'Healthy Aging Insights',
                     'Cognitive Wellness Monitoring',
@@ -110,7 +110,7 @@ class LifeJourneySeeder extends Seeder
 
             foreach ($journey['features'] as $featureName) {
                 $insertedJourney->features()->create([
-                    'feature_name' => $featureName
+                    'feature_name' => $featureName,
                 ]);
             }
         }
