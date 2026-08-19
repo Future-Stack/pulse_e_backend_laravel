@@ -99,6 +99,9 @@ class BlogController extends Controller
         try {
             $blog = Blog::with('blogCategory')->where('slug', $slug)->firstOrFail();
 
+            // Increment views_count each time this API is called
+            $blog->increment('views_count');
+
             return response()->json([
                 'success' => true,
                 'data' => $blog,
