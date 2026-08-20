@@ -68,14 +68,19 @@ Route::prefix('v1')->group(function () {
     // ----------------------------
     // Public Routes
     // ----------------------------
-    Route::post('register', [AuthController::class, 'register']);
+    // Throttled: these are OTP/credential entry points and were previously
+    // unprotected, allowing unlimited brute-force attempts against the
+    // 4-digit OTP within its 5-minute validity window.
+    Route::middleware('throttle:5,1')->group(function () {
+        Route::post('register', [AuthController::class, 'register']);
 
-    Route::post('login', [AuthController::class, 'login']);
-    Route::post('resend-otp', [AuthController::class, 'resendOtp']);
+        Route::post('login', [AuthController::class, 'login']);
+        Route::post('resend-otp', [AuthController::class, 'resendOtp']);
 
-    Route::post('forgot-password', [AuthController::class, 'forgotPassword']);
-    Route::post('/verify-otp', [AuthController::class, 'verifyOtp']);
-    Route::post('reset-password', [AuthController::class, 'resetPassword']);
+        Route::post('forgot-password', [AuthController::class, 'forgotPassword']);
+        Route::post('/verify-otp', [AuthController::class, 'verifyOtp']);
+        Route::post('reset-password', [AuthController::class, 'resetPassword']);
+    });
 
     // Google OAuth (public, no auth required)
     Route::post('/google/token', [GoogleAuthController::class, 'tokenLogin']);
