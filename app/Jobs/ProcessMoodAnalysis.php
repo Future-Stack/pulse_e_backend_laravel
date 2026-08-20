@@ -27,14 +27,14 @@ class ProcessMoodAnalysis implements ShouldQueue
 
     public function handle(): void
     {
-        $aiUrl = config('services.ai.mood_analyzer_url', 'https://ai.fightthenumber.com/api/chat/response');
+        $aiUrl = config('services.ai.mood_analyzer_url') ?: (rtrim(config('services.ai.base_url', 'https://ai.fightthenumber.com'), '/') . '/api/chat/response');
 
         try {
             $aiResponse = Http::connectTimeout(10)
                 ->timeout(90)
                 ->retry(1, 3000, fn($e) => $e instanceof \Illuminate\Http\Client\ConnectionException)
                 ->post($aiUrl, [
-                    'user_id' => (string) $this->userId,
+                    'user_id' => $this->userId,
                     'message' => $this->userMessage,
                     'session_id' => $this->sessionId,
                 ]);
