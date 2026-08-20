@@ -143,6 +143,9 @@ Route::prefix('v1')->group(function () {
         Route::post('/avoiding-pregnancy/consent', [AvoidingPregnancyController::class, 'consent']);
 
         Route::post('/mode', [AvoidingPregnancyController::class, 'setMode']);
+        // TTC overview
+        Route::get('/ttc/sync-overview', [TryingToConceiveController::class, 'syncTtcOverview']);
+
         Route::get('/ttc/sync', [TryingToConceiveController::class, 'syncTtcData']);
         Route::get('/ttc/surge-banner', [TryingToConceiveController::class, 'surgeBanner']);
 
