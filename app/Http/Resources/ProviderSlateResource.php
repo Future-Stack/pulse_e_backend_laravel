@@ -34,6 +34,7 @@ class ProviderSlateResource extends JsonResource
             'distance_miles' => round($this->resource['distance_km'] * 0.621371, 1),
             'rating' => $cache?->rating,
             'review_count' => $cache?->review_count,
+            'rating_attribution' => $cache?->rating !== null ? 'Ratings provided by Google' : null,
             'hours' => $cache?->hours_json,
             'business_status' => $cache?->business_status,
             'sponsored' => (bool) $this->resource['sponsored'],

@@ -14,6 +14,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rules\Password;
 use Illuminate\Support\Facades\Auth;
@@ -285,6 +286,17 @@ class AuthController extends Controller
                 'otp.digits'     => 'OTP must be 4 digits.',
             ]);
 
+            // Lock out further guesses after 5 failed attempts within 15 minutes,
+            // per email — closes the brute-force window on the 4-digit OTP.
+            $rateLimitKey = 'verify-otp:' . strtolower($request->email);
+
+            if (RateLimiter::tooManyAttempts($rateLimitKey, 5)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Too many failed attempts. Please try again in ' . RateLimiter::availableIn($rateLimitKey) . ' seconds, or request a new OTP.',
+                ], 429);
+            }
+
             $user = User::where('email', $request->email)->first();
 
             if (!$user) {
@@ -309,11 +321,15 @@ class AuthController extends Controller
             }
 
             if ((string) $user->otp !== (string) $request->otp) {
+                RateLimiter::hit($rateLimitKey, 900);
+
                 return response()->json([
                     'success' => false,
                     'message' => 'Invalid OTP. Please try again.',
                 ], 400);
             }
+
+            RateLimiter::clear($rateLimitKey);
 
             $isRegisterFlow = is_null($user->email_verified_at);
 
@@ -388,9 +404,7 @@ class AuthController extends Controller
 
             $user->update([
                 'otp'           => $otp,
-                'otp_expire_at' => Carbon::now()->addMinutes(5),0
-
-
+                'otp_expire_at' => Carbon::now()->addMinutes(5),
             ]);
 
             $mailType = is_null($user->email_verified_at) ? 'register' : 'forgot';
