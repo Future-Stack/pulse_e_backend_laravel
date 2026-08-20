@@ -1,0 +1,109 @@
+services:
+  # Main Laravel Web Application
+  app:
+    image: softvence/pulse_backend_laravel:latest
+    platform: linux/amd64
+    container_name: laravel_app
+    restart: always
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      # Belt-and-suspenders: force async queue/cache regardless of what .env
+      # says, since queue/queue_marketplace workers are useless with 'sync'.
+      QUEUE_CONNECTION: redis
+      CACHE_STORE: redis
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - laravel
+
+  # Primary Queue Worker
+  queue:
+    image: softvence/pulse_backend_laravel:latest
+    platform: linux/amd64
+    container_name: laravel_queue
+    restart: unless-stopped
+    command: php artisan queue:work --verbose --tries=3 --timeout=3600 --memory=512M
+    env_file:
+      - .env
+    environment:
+      QUEUE_CONNECTION: redis
+      CACHE_STORE: redis
+    depends_on:
+      app:
+        condition: service_started
+      redis:
+        condition: service_healthy
+    networks:
+      - laravel
+
+  # Dedicated Marketplace Queue Worker
+  queue_marketplace:
+    image: softvence/pulse_backend_laravel:latest
+    platform: linux/amd64
+    container_name: laravel_queue_marketplace
+    restart: unless-stopped
+    command: php artisan queue:work --queue=default,high,marketplace --verbose --tries=3 --timeout=3600 --memory=512M
+    env_file:
+      - .env
+    environment:
+      QUEUE_CONNECTION: redis
+      CACHE_STORE: redis
+    depends_on:
+      app:
+        condition: service_started
+      redis:
+        condition: service_healthy
+    networks:
+      - laravel
+
+  # Laravel Scheduler
+  scheduler:
+    image: softvence/pulse_backend_laravel:latest
+    platform: linux/amd64
+    container_name: laravel_scheduler
+    restart: unless-stopped
+    working_dir: /var/www/html
+    # schedule:run only executes whatever is due at the exact minute it's
+    # invoked. Checking once an hour (the old `sleep 3600`) meant every
+    # daily/weekly/monthly/nightly job in routes/marketplace_console.php
+    # (nppes:sync, leie:screen, vetting:expire, slate:rebuild, ...) would
+    # almost always be skipped, since the odds of the hourly check landing
+    # on the job's exact scheduled minute are tiny. Checking every minute
+    # is the standard/correct way to drive Laravel's scheduler.
+    command: >
+      sh -c "while true; do php artisan schedule:run; sleep 60; done"
+    env_file:
+      - .env
+    environment:
+      QUEUE_CONNECTION: redis
+      CACHE_STORE: redis
+    depends_on:
+      app:
+        condition: service_started
+      redis:
+        condition: service_healthy
+    networks:
+      - laravel
+
+  # Redis In-Memory Store & Cache
+  redis:
+    image: redis:7-alpine
+    container_name: laravel_redis
+    restart: always
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - laravel
+
+networks:
+  laravel:
+    driver: bridge

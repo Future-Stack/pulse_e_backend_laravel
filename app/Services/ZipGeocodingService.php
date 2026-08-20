@@ -54,7 +54,7 @@ class ZipGeocodingService
     /** @return array{lat: float, lng: float}|null */
     private function geocodeZip(string $zip): ?array
     {
-        return Cache::remember("zip-geocode:{$zip}", now()->addDays(30), function () use ($zip) {
+        return Cache::remember("zip-geocode:{$zip}", now()->addDays((int) config('marketplace.zip_metro_cache_days', 90)), function () use ($zip) {
             try {
                 $response = Http::timeout(5)->retry(2, 100)->get('https://maps.googleapis.com/maps/api/geocode/json', [
                     'address' => $zip,

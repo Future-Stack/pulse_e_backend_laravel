@@ -23,11 +23,11 @@ use Illuminate\Support\Facades\Schedule;
 | or nothing here actually executes.
 */
 
-Schedule::job(new SyncNppesJob)->everyFiveMinutes()->withoutOverlapping();
-Schedule::command('marketplace:discover-places --queue')->everyFiveMinutes()->withoutOverlapping();
-Schedule::command('marketplace:refresh-place-cache')->everyFiveMinutes()->withoutOverlapping();
-Schedule::command('marketplace:purge-place-cache')->everyFiveMinutes()->withoutOverlapping();
-Schedule::job(new ScreenLeieJob)->everyFiveMinutes()->withoutOverlapping();
-Schedule::job(new ExpireVettingJob)->everyFiveMinutes()->withoutOverlapping();
-Schedule::job(new RebuildSlateJob)->everyFiveMinutes()->withoutOverlapping();
-Schedule::command('marketplace:enforce-slot-integrity')->everyFiveMinutes()->withoutOverlapping();
+Schedule::job(new SyncNppesJob)->weekly()->mondays()->at('03:00')->withoutOverlapping();
+Schedule::command('marketplace:discover-places --queue')->weekly()->mondays()->at('11:00')->withoutOverlapping();
+Schedule::command('marketplace:refresh-place-cache')->daily()->withoutOverlapping();
+Schedule::command('marketplace:purge-place-cache')->daily()->withoutOverlapping();
+Schedule::job(new ScreenLeieJob)->monthly()->withoutOverlapping();
+Schedule::job(new ExpireVettingJob)->dailyAt('01:00')->withoutOverlapping();
+Schedule::job(new RebuildSlateJob)->dailyAt('02:00')->withoutOverlapping();
+Schedule::command('marketplace:enforce-slot-integrity')->dailyAt('02:30')->withoutOverlapping();
