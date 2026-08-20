@@ -51,6 +51,7 @@ return [
 
     'ai' => [
         'base_url' => env('AI_SERVICE_URL', 'https://ai.fightthenumber.com'),
+        'mood_analyzer_url' => env('AI_MOOD_ANALYZER_URL', rtrim(env('AI_SERVICE_URL', 'https://ai.fightthenumber.com'), '/') . '/api/chat/response'),
     ],
 
     'azure' => [
