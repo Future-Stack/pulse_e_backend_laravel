@@ -5,6 +5,7 @@ namespace App\Http\Controllers\AI;
 use App\Http\Controllers\Controller;
 use App\Models\MenstrualCycle;
 use App\Models\TtcPrediction;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
@@ -85,47 +86,30 @@ class TryingToConceiveController extends Controller
                 return $this->applyLocalFallback($user, $cycle);
             }
 
-            $updateData = [];
+            // Extract cycle day safely across blocks
+            $cycleDay = $surge['cycle_day'] ?? $map['cycle_day'] ?? $banner['cycle_day'] ?? 1;
 
-            // From surge_banner
-            if (! empty($surge)) {
-                if (isset($surge['cycle_day'])) {
-                    $updateData['cycle_day'] = $surge['cycle_day'];
-                }
-                $updateData['surge_active'] = $surge['active'] ?? false;
-                $updateData['surge_message'] = $surge['message'] ?? null;
-                $updateData['hours_remaining_estimate'] = $surge['hours_remaining_estimate'] ?? null;
-                $updateData['lh_surge_day'] = $surge['lh_surge_day'] ?? null;
-                if (isset($surge['ai_generated'])) {
-                    $updateData['ai_generated'] = $surge['ai_generated'];
-                }
-            }
+            $updateData = [
+                'cycle_day' => $cycleDay,
+                
+                // Surge banner mapping
+                'surge_active' => $surge['active'] ?? false,
+                'surge_message' => $surge['message'] ?? null,
+                'hours_remaining_estimate' => $surge['hours_remaining_estimate'] ?? null,
+                'lh_surge_day' => $surge['lh_surge_day'] ?? null,
 
-            // From priority_map
-            if (! empty($map)) {
-                if (isset($map['cycle_day'])) {
-                    $updateData['cycle_day'] = $map['cycle_day'];
-                }
-                $updateData['priority_ranges'] = $map['ranges'] ?? [];
-                if (isset($map['ai_generated'])) {
-                    $updateData['ai_generated'] = $map['ai_generated'];
-                }
-            }
+                // Priority map mapping
+                'priority_ranges' => $map['ranges'] ?? [],
 
-            // From priority_banner
-            if (! empty($banner)) {
-                if (isset($banner['cycle_day'])) {
-                    $updateData['cycle_day'] = $banner['cycle_day'];
-                }
-                $updateData['priority'] = $banner['priority'] ?? null;
-                $updateData['label'] = $banner['label'] ?? null;
-                $updateData['priority_message'] = $banner['message'] ?? null;
-                if (isset($banner['ai_generated'])) {
-                    $updateData['ai_generated'] = $banner['ai_generated'];
-                }
-            }
+                // Priority banner mapping
+                'priority' => $banner['priority'] ?? null,
+                'label' => $banner['label'] ?? null,
+                'priority_message' => $banner['message'] ?? null,
 
-            $updateData['ai_fallback'] = false;
+                // Flags
+                'ai_generated' => $surge['ai_generated'] ?? $map['ai_generated'] ?? $banner['ai_generated'] ?? true,
+                'ai_fallback' => false,
+            ];
 
             DB::transaction(function () use ($user, $cycle, $updateData) {
                 TtcPrediction::updateOrCreate(
@@ -169,24 +153,31 @@ class TryingToConceiveController extends Controller
      */
     private function applyLocalFallback($user, $cycle)
     {
-        $prediction = TtcPrediction::where('user_id', $user->id)
-            ->where('cycle_id', $cycle->id)
-            ->first();
+        $startDate = $cycle->period_start_date ? Carbon::parse($cycle->period_start_date) : today();
+        $currentCycleDay = max(1, (int) $startDate->diffInDays(today()) + 1);
 
-        if (! $prediction) {
-            $startDate = $cycle->period_start_date ? \Carbon\Carbon::parse($cycle->period_start_date) : today();
-            $currentCycleDay = max(1, (int) $startDate->diffInDays(today()) + 1);
+        $phase = match (true) {
+            $currentCycleDay <= 5 => 'menstrual',
+            $currentCycleDay <= 13 => 'follicular',
+            $currentCycleDay <= 16 => 'ovulatory',
+            default => 'luteal',
+        };
 
-            $phase = match (true) {
-                $currentCycleDay <= 5 => 'menstrual',
-                $currentCycleDay <= 13 => 'follicular',
-                $currentCycleDay <= 16 => 'ovulatory',
-                default => 'luteal',
-            };
+        $fallbackRanges = [
+            [
+                'start_day' => 10,
+                'end_day' => 16,
+                'label' => 'Estimated Fertile Window',
+                'priority' => 'high',
+            ],
+        ];
 
-            $prediction = TtcPrediction::create([
+        $prediction = TtcPrediction::updateOrCreate(
+            [
                 'user_id' => $user->id,
                 'cycle_id' => $cycle->id,
+            ],
+            [
                 'cycle_day' => $currentCycleDay,
                 'surge_active' => false,
                 'surge_message' => 'No active LH surge detected yet. Continue logging your OPK and BBT data.',
@@ -195,11 +186,11 @@ class TryingToConceiveController extends Controller
                 'priority' => ucfirst($phase),
                 'label' => ucfirst($phase) . ' phase',
                 'priority_message' => "You're on day {$currentCycleDay} of your cycle ({$phase} phase). Log data to track fertility signals.",
-                'priority_ranges' => [],
+                'priority_ranges' => $fallbackRanges,
                 'ai_generated' => false,
                 'ai_fallback' => true,
-            ]);
-        }
+            ]
+        );
 
         return response()->json([
             'success' => true,
