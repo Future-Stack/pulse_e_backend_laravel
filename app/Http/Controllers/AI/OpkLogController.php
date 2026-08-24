@@ -33,8 +33,8 @@ class OpkLogController extends Controller
         $baseUrl = rtrim(config('services.ai.base_url', 'https://ai.fightthenumber.com'), '/');
 
         try {
-            $response = Http::timeout(15)
-                ->connectTimeout(5)
+            $response = Http::timeout(5)
+                ->connectTimeout(2)
                 ->get("{$baseUrl}/api/v1/cycle-engine/opk/ui", [
                     'user_id' => $userId
                 ]);
@@ -124,7 +124,8 @@ class OpkLogController extends Controller
 
         // 2. Call AI Engine for OPK UI (POST -> GET -> Dynamic UI Fallback)
         try {
-            $response = Http::timeout(15)
+            $response = Http::timeout(5)
+                ->connectTimeout(2)
                 ->acceptJson()
                 ->post("{$baseUrl}/api/v1/cycle-engine/opk/ui?user_id={$userId}", [
                     'cards' => $cardsData
@@ -139,7 +140,7 @@ class OpkLogController extends Controller
 
         if (! is_array($apiData) || empty($apiData['testing_window'])) {
             try {
-                $getRes = Http::timeout(15)->acceptJson()->get("{$baseUrl}/api/v1/cycle-engine/opk/ui", ['user_id' => $userId]);
+                $getRes = Http::timeout(5)->connectTimeout(2)->acceptJson()->get("{$baseUrl}/api/v1/cycle-engine/opk/ui", ['user_id' => $userId]);
                 if ($getRes->successful()) {
                     $apiData = $getRes->json();
                 }
@@ -285,7 +286,8 @@ class OpkLogController extends Controller
             $aiData = null;
 
             try {
-                $response = Http::timeout(15)
+                $response = Http::timeout(5)
+                    ->connectTimeout(2)
                     ->acceptJson()
                     ->post("{$baseUrl}/api/v1/cycle-engine/opk/ui?user_id={$userId}", array_merge($request->all(), [
                         'cards'    => $request->input('cards', []),
@@ -300,9 +302,9 @@ class OpkLogController extends Controller
                 Log::warning("OPK AI POST service call warning: " . $e->getMessage());
             }
 
-            if (! is_array($aiData) || empty($aiData['testing_window'])) {
+            if (! is_array($aiData) || empty($apiData['testing_window'])) {
                 try {
-                    $getRes = Http::timeout(15)->acceptJson()->get("{$baseUrl}/api/v1/cycle-engine/opk/ui", ['user_id' => $userId]);
+                    $getRes = Http::timeout(5)->connectTimeout(2)->acceptJson()->get("{$baseUrl}/api/v1/cycle-engine/opk/ui", ['user_id' => $userId]);
                     if ($getRes->successful()) {
                         $aiData = $getRes->json();
                     }
@@ -361,8 +363,8 @@ class OpkLogController extends Controller
         $baseUrl = rtrim(config('services.ai.base_url', 'https://ai.fightthenumber.com'), '/');
 
         try {
-            $response = Http::timeout(15)
-                ->connectTimeout(5)
+            $response = Http::timeout(5)
+                ->connectTimeout(2)
                 ->get("{$baseUrl}/api/v1/cycle-engine/opk/testing-window", [
                     'user_id' => $userId
                 ]);
@@ -389,8 +391,8 @@ class OpkLogController extends Controller
         $baseUrl = rtrim(config('services.ai.base_url', 'https://ai.fightthenumber.com'), '/');
 
         try {
-            $response = Http::timeout(15)
-                ->connectTimeout(5)
+            $response = Http::timeout(5)
+                ->connectTimeout(2)
                 ->get("{$baseUrl}/api/v1/cycle-engine/opk/today-status", [
                     'user_id' => $userId
                 ]);

@@ -46,13 +46,7 @@ class CycleSummaryController extends Controller
         |--------------------------------------------------------------------------
         */
 
-        $baseUrl = rtrim(config('services.ai.base_url', 'https://ai.fightthenumber.com'), '/') . '/api/v1/cycle-engine/engine';
-
-        /*
-        |--------------------------------------------------------------------------
-        | 4. Fetch AI Engine Data
-        |--------------------------------------------------------------------------
-        */
+        $baseUrl = rtrim(config('services.ai.base_url', 'https://ai.fightthenumber.com'), '/') . '/api/v1/cycle-engine/engine/overview';
 
         /*
         |--------------------------------------------------------------------------
@@ -66,23 +60,19 @@ class CycleSummaryController extends Controller
         $summaryData = null;
 
         try {
-            $responses = Http::pool(function ($pool) use ($baseUrl, $user) {
-                return [
-                    $pool->timeout(10)->acceptJson()->get($baseUrl . '/summary', ['user_id' => $user->id]),
-                    $pool->timeout(10)->acceptJson()->get($baseUrl . '/signal-status', ['user_id' => $user->id]),
-                    $pool->timeout(10)->acceptJson()->get($baseUrl . '/discrepancy-note', ['user_id' => $user->id]),
-                ];
-            });
+            $response = Http::timeout(5)
+                ->connectTimeout(2)
+                ->acceptJson()
+                ->get($baseUrl, [
+                    'user_id' => $user->id,
+                ]);
 
-            if (
-                isset($responses[0]) && $responses[0]->successful() &&
-                isset($responses[1]) && $responses[1]->successful() &&
-                isset($responses[2]) && $responses[2]->successful()
-            ) {
-                $summary = $responses[0]->json();
-                $signal = $responses[1]->json();
-                $discrepancy = $responses[2]->json();
-                $summaryData = $summary['data'] ?? $summary;
+            if ($response->successful()) {
+                $overview = $response->json();
+                $summary = $overview['summary'] ?? null;
+                $signal = $overview['signal_status'] ?? null;
+                $discrepancy = $overview['discrepancy_note'] ?? null;
+                $summaryData = is_array($summary) ? ($summary['data'] ?? $summary) : null;
             }
         } catch (\Throwable $e) {
             \Illuminate\Support\Facades\Log::warning("AI Engine connection failed, using dynamic local calculation: " . $e->getMessage());
@@ -401,7 +391,7 @@ class CycleSummaryController extends Controller
                         'cache_key' => "summary_user_{$user->id}_cycle_{$cycle->id}",
                     ],
                     [
-                        'endpoint'           => '/api/v1/cycle-engine/engine/summary',
+                        'endpoint'           => '/api/v1/cycle-engine/engine/overview',
                         'request_payload'    => ['user_id' => $user->id],
                         'prediction'         => $summaryData,
                         'prediction_version' => '1.0',
@@ -470,8 +460,19 @@ class CycleSummaryController extends Controller
                 'summary' => $summary,
                 'signal_status' => $signal,
                 'discrepancy' => $discrepancy,
+                'discrepancy_note' => $discrepancy,
             ],
         ]);
+    }
+
+    public function overview()
+    {
+        return $this->sync();
+    }
+
+    public function syncOverview()
+    {
+        return $this->sync();
     }
 
     public function syncSignalStatus()
@@ -485,17 +486,19 @@ class CycleSummaryController extends Controller
             ], 401);
         }
 
-        $baseUrl = rtrim(config('services.ai.base_url', 'https://ai.fightthenumber.com'), '/') . '/api/v1/cycle-engine/engine/signal-status';
+        $baseUrl = rtrim(config('services.ai.base_url', 'https://ai.fightthenumber.com'), '/') . '/api/v1/cycle-engine/engine/overview';
 
         try {
-            $response = Http::timeout(120)
+            $response = Http::timeout(5)
+                ->connectTimeout(2)
                 ->acceptJson()
                 ->get($baseUrl, [
                     'user_id' => $user->id,
                 ]);
 
             if ($response->successful()) {
-                return response()->json($response->json());
+                $overview = $response->json();
+                return response()->json($overview['signal_status'] ?? $overview);
             }
 
             return response()->json([
@@ -523,17 +526,19 @@ class CycleSummaryController extends Controller
             ], 401);
         }
 
-        $baseUrl = rtrim(config('services.ai.base_url', 'https://ai.fightthenumber.com'), '/') . '/api/v1/cycle-engine/engine/discrepancy-note';
+        $baseUrl = rtrim(config('services.ai.base_url', 'https://ai.fightthenumber.com'), '/') . '/api/v1/cycle-engine/engine/overview';
 
         try {
-            $response = Http::timeout(120)
+            $response = Http::timeout(5)
+                ->connectTimeout(2)
                 ->acceptJson()
                 ->get($baseUrl, [
                     'user_id' => $user->id,
                 ]);
 
             if ($response->successful()) {
-                return response()->json($response->json());
+                $overview = $response->json();
+                return response()->json($overview['discrepancy_note'] ?? $overview);
             }
 
             return response()->json([
@@ -550,42 +555,48 @@ class CycleSummaryController extends Controller
         }
     }
 
-
-
     public function aiSummary()
-{
-    $user = auth()->user();
+    {
+        $user = auth()->user();
 
-    if (! $user) {
-        return response()->json([
-            'success' => false,
-            'message' => 'Unauthenticated.',
-        ], 401);
+        if (! $user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthenticated.',
+            ], 401);
+        }
+
+        $url = rtrim(config('services.ai.base_url', 'https://ai.fightthenumber.com'), '/') . '/api/v1/cycle-engine/engine/overview';
+
+        try {
+            $response = Http::timeout(5)
+                ->connectTimeout(2)
+                ->acceptJson()
+                ->get($url, [
+                    'user_id' => $user->id,
+                ]);
+
+            if ($response->successful()) {
+                $overview = $response->json();
+                return response()->json([
+                    'success' => true,
+                    'data' => $overview['summary'] ?? $overview,
+                ]);
+            }
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Unable to fetch summary from AI Engine.',
+                'error' => $response->json() ?? $response->body(),
+            ], $response->status());
+
+        } catch (\Throwable $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unable to connect AI Engine.',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
     }
-
-    $url = 'https://ai.fightthenumber.com/api/v1/cycle-engine/engine/summary';
-
-    try {
-
-        $response = Http::timeout(120)
-            ->acceptJson()
-            ->get($url, [
-                'user_id' => $user->id,
-            ]);
-
-        return response()->json([
-            'success' => $response->successful(),
-            'data' => $response->json(),
-        ], $response->status());
-
-    } catch (\Throwable $e) {
-
-        return response()->json([
-            'success' => false,
-            'message' => 'Unable to connect AI Engine.',
-            'error' => $e->getMessage(),
-        ], 500);
-    }
-}
 }
 
