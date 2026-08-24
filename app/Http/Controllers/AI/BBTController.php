@@ -73,10 +73,13 @@ class BBTController extends Controller
             $data = null;
 
             try {
-                $response = Http::timeout(10)->post("{$baseUrl}/api/v1/cycle-engine/bbt/ui?user_id=" . $userId, [
-                    'temperature_f' => (float) $tempF,
-                    'flags'         => $flags,
-                ]);
+                $response = Http::timeout(5)
+                    ->connectTimeout(2)
+                    ->acceptJson()
+                    ->post("{$baseUrl}/api/v1/cycle-engine/bbt/ui?user_id=" . $userId, [
+                        'temperature_f' => (float) $tempF,
+                        'flags'         => $flags,
+                    ]);
 
                 if ($response->successful()) {
                     $data = $response->json();
@@ -199,9 +202,12 @@ class BBTController extends Controller
             $baseUrl = rtrim(config('services.ai.base_url', 'https://ai.fightthenumber.com'), '/');
 
             try {
-                $response = Http::timeout(15)->acceptJson()->get("{$baseUrl}/api/v1/cycle-engine/bbt/ui", [
-                    'user_id' => $userId
-                ]);
+                $response = Http::timeout(5)
+                    ->connectTimeout(2)
+                    ->acceptJson()
+                    ->get("{$baseUrl}/api/v1/cycle-engine/bbt/ui", [
+                        'user_id' => $userId
+                    ]);
 
                 if ($response->successful()) {
                     return response()->json($response->json(), 200);
