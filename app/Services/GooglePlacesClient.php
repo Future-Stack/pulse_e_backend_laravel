@@ -31,17 +31,24 @@ class GooglePlacesClient
      */
     public function textSearch(string $textQuery, float $lat, float $lng, int $radiusMeters, ?string $includedType = null): array
     {
-        $payload = array_filter([
+        $payload = [
             'textQuery' => $textQuery,
             'locationBias' => [
                 'circle' => [
-                    'center' => ['latitude' => $lat, 'longitude' => $lng],
-                    'radius' => $radiusMeters,
+                    'center' => [
+                        'latitude' => $lat,
+                        'longitude' => $lng,
+                    ],
+                    'radius' => (float) $radiusMeters,
                 ],
             ],
-            'includedType' => $includedType,
             'maxResultCount' => 20,
-        ]);
+        ];
+
+        // includedType null বা ফাঁকা থাকলে গুগলে রিকোয়েস্ট বডিতে পাঠানো যাবে না
+        if (! empty($includedType)) {
+            $payload['includedType'] = $includedType;
+        }
 
         $response = Http::withHeaders([
             'Content-Type' => 'application/json',
@@ -58,7 +65,10 @@ class GooglePlacesClient
         ])->post('https://places.googleapis.com/v1/places:searchText', $payload);
 
         if (! $response->successful()) {
-            Log::warning('GooglePlacesClient::textSearch failed', ['status' => $response->status(), 'body' => $response->body()]);
+            Log::warning('GooglePlacesClient::textSearch failed', [
+                'status' => $response->status(),
+                'body' => $response->body(),
+            ]);
             return [];
         }
 
@@ -128,7 +138,10 @@ class GooglePlacesClient
         ])->get("https://places.googleapis.com/v1/places/{$placeId}");
 
         if (! $response->successful()) {
-            Log::warning('GooglePlacesClient::placeDetails failed', ['status' => $response->status(), 'body' => $response->body()]);
+            Log::warning('GooglePlacesClient::placeDetails failed', [
+                'status' => $response->status(),
+                'body' => $response->body(),
+            ]);
             return null;
         }
 
