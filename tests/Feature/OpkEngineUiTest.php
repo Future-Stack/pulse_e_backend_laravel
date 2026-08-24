@@ -154,21 +154,24 @@ class OpkEngineUiTest extends TestCase
 
     public function test_cycle_summary_sync_sanitizes_enums(): void
     {
-        $fakeSummary = [
-            'status' => 'ok',
-            'reliability' => ['level' => 'UNKNOWN_LEVEL', 'completed_cycles' => 2],
-            'cycle_summary' => ['avg_cycle_length' => 29, 'current_cycle_day' => 14, 'current_phase' => 'INVALID_PHASE'],
-            'fertile_window' => ['start_day' => 10, 'end_day' => 17, 'peak_day' => 14, 'peak_source' => 'UNMAPPED_SOURCE'],
-            'reconciliation' => ['final_source' => 'CUSTOM_SOURCE'],
+        $fakeOverviewResponse = [
+            'summary' => [
+                'status' => 'ok',
+                'reliability' => ['level' => 'UNKNOWN_LEVEL', 'completed_cycles' => 2],
+                'cycle_summary' => ['avg_cycle_length' => 29, 'current_cycle_day' => 14, 'current_phase' => 'INVALID_PHASE'],
+                'fertile_window' => ['start_day' => 10, 'end_day' => 17, 'peak_day' => 14, 'peak_source' => 'UNMAPPED_SOURCE'],
+                'reconciliation' => ['final_source' => 'CUSTOM_SOURCE'],
+            ],
+            'signal_status' => [
+                'signals' => [],
+            ],
+            'discrepancy_note' => [
+                'active' => false,
+            ],
         ];
 
-        $fakeSignal = ['signals' => []];
-        $fakeDiscrepancy = ['active' => false];
-
         \Illuminate\Support\Facades\Http::fake([
-            'https://ai.fightthenumber.com/api/v1/cycle-engine/engine/summary*' => \Illuminate\Support\Facades\Http::response($fakeSummary, 200),
-            'https://ai.fightthenumber.com/api/v1/cycle-engine/engine/signal-status*' => \Illuminate\Support\Facades\Http::response($fakeSignal, 200),
-            'https://ai.fightthenumber.com/api/v1/cycle-engine/engine/discrepancy-note*' => \Illuminate\Support\Facades\Http::response($fakeDiscrepancy, 200),
+            'https://ai.fightthenumber.com/api/v1/cycle-engine/engine/overview*' => \Illuminate\Support\Facades\Http::response($fakeOverviewResponse, 200),
         ]);
 
         $user = User::factory()->create();

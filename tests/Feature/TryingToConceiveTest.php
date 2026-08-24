@@ -40,28 +40,30 @@ class TryingToConceiveTest extends TestCase
         ]);
 
         Http::fake([
-            '*/api/v1/cycle-engine/ttc/surge-banner*' => Http::response([
-                'cycle_day' => 12,
-                'active' => true,
-                'message' => 'LH Surge detected!',
-                'hours_remaining_estimate' => 24,
-                'lh_surge_day' => 12,
-                'ai_generated' => true,
-                'ai_cached' => false,
-            ], 200),
-            '*/api/v1/cycle-engine/ttc/priority-map*' => Http::response([
-                'cycle_day' => 12,
-                'ranges' => [['start' => 10, 'end' => 14, 'level' => 'high']],
-                'ai_generated' => true,
-                'ai_cached' => false,
-            ], 200),
-            '*/api/v1/cycle-engine/ttc/priority-banner*' => Http::response([
-                'cycle_day' => 12,
-                'priority' => 'High',
-                'label' => 'Peak Fertility',
-                'message' => 'Optimal time for TTC',
-                'ai_generated' => true,
-                'ai_cached' => false,
+            '*/api/v1/cycle-engine/ttc/overview*' => Http::response([
+                'surge_banner' => [
+                    'cycle_day' => 12,
+                    'active' => true,
+                    'message' => 'LH Surge detected!',
+                    'hours_remaining_estimate' => 24,
+                    'lh_surge_day' => 12,
+                    'ai_generated' => true,
+                    'ai_cached' => false,
+                ],
+                'priority_map' => [
+                    'cycle_day' => 12,
+                    'ranges' => [['start' => 10, 'end' => 14, 'level' => 'high']],
+                    'ai_generated' => true,
+                    'ai_cached' => false,
+                ],
+                'priority_banner' => [
+                    'cycle_day' => 12,
+                    'priority' => 'High',
+                    'label' => 'Peak Fertility',
+                    'message' => 'Optimal time for TTC',
+                    'ai_generated' => true,
+                    'ai_cached' => false,
+                ],
             ], 200),
         ]);
 
@@ -95,26 +97,28 @@ class TryingToConceiveTest extends TestCase
         ]);
 
         Http::fake([
-            '*/api/v1/cycle-engine/ttc/surge-banner*' => Http::response([
-                'cycle_day' => 14,
-                'active' => false,
-                'message' => 'Normal LH level',
-                'ai_generated' => true,
-                'ai_cached' => false,
-            ], 200),
-            '*/api/v1/cycle-engine/ttc/priority-map*' => Http::response([
-                'cycle_day' => 14,
-                'ranges' => [],
-                'ai_generated' => true,
-                'ai_cached' => false,
-            ], 200),
-            '*/api/v1/cycle-engine/ttc/priority-banner*' => Http::response([
-                'cycle_day' => 14,
-                'priority' => 'Medium',
-                'label' => 'Moderate Fertility',
-                'message' => 'Secondary window',
-                'ai_generated' => true,
-                'ai_cached' => false,
+            '*/api/v1/cycle-engine/ttc/overview*' => Http::response([
+                'surge_banner' => [
+                    'cycle_day' => 14,
+                    'active' => false,
+                    'message' => 'Normal LH level',
+                    'ai_generated' => true,
+                    'ai_cached' => false,
+                ],
+                'priority_map' => [
+                    'cycle_day' => 14,
+                    'ranges' => [],
+                    'ai_generated' => true,
+                    'ai_cached' => false,
+                ],
+                'priority_banner' => [
+                    'cycle_day' => 14,
+                    'priority' => 'Medium',
+                    'label' => 'Moderate Fertility',
+                    'message' => 'Secondary window',
+                    'ai_generated' => true,
+                    'ai_cached' => false,
+                ],
             ], 200),
         ]);
 
