@@ -65,7 +65,8 @@ class AvoidingPregnancyController extends Controller
             |
             */
 
-            $response = Http::timeout(120)
+            $response = Http::timeout(5)
+                ->connectTimeout(2)
                 ->acceptJson()
                 ->withQueryParameters([
                     'user_id' => $userId,
@@ -201,7 +202,8 @@ class AvoidingPregnancyController extends Controller
             |
             */
 
-            $response = Http::timeout(120)
+            $response = Http::timeout(5)
+                ->connectTimeout(2)
                 ->acceptJson()
                 ->withQueryParameters([
                     'user_id' => $userId,
@@ -317,7 +319,8 @@ class AvoidingPregnancyController extends Controller
             |
             */
 
-            $response = Http::timeout(120)
+            $response = Http::timeout(5)
+                ->connectTimeout(2)
                 ->acceptJson()
                 ->withQueryParameters([
                     'user_id' => $userId,

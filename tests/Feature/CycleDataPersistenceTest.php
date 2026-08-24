@@ -19,9 +19,11 @@ class CycleDataPersistenceTest extends TestCase
     public function test_cycle_calendar_input_persists_to_menstrual_cycles_and_period_logs(): void
     {
         Http::fake([
-            'https://ai.fightthenumber.com/api/v1/cycle-engine/engine/summary*' => Http::response(['status' => 'empty'], 200),
-            'https://ai.fightthenumber.com/api/v1/cycle-engine/engine/signal-status*' => Http::response(['status' => 'empty'], 200),
-            'https://ai.fightthenumber.com/api/v1/cycle-engine/engine/discrepancy-note*' => Http::response(['active' => false], 200),
+            'https://ai.fightthenumber.com/api/v1/cycle-engine/engine/overview*' => Http::response([
+                'summary' => ['status' => 'empty'],
+                'signal_status' => ['signals' => []],
+                'discrepancy_note' => ['active' => false],
+            ], 200),
         ]);
 
         $user = User::factory()->create();
@@ -73,9 +75,11 @@ class CycleDataPersistenceTest extends TestCase
 
         Http::fake([
             'https://ai.fightthenumber.com/api/v1/cycle-engine/bbt/ui*' => Http::response($fakeBbtResponse, 200),
-            'https://ai.fightthenumber.com/api/v1/cycle-engine/engine/summary*' => Http::response(['status' => 'empty'], 200),
-            'https://ai.fightthenumber.com/api/v1/cycle-engine/engine/signal-status*' => Http::response(['status' => 'empty'], 200),
-            'https://ai.fightthenumber.com/api/v1/cycle-engine/engine/discrepancy-note*' => Http::response(['active' => false], 200),
+            'https://ai.fightthenumber.com/api/v1/cycle-engine/engine/overview*' => Http::response([
+                'summary' => ['status' => 'empty'],
+                'signal_status' => ['signals' => []],
+                'discrepancy_note' => ['active' => false],
+            ], 200),
         ]);
 
         $user = User::factory()->create();

@@ -21,6 +21,11 @@ class TryingToConceiveController extends Controller
      */
     public function syncTtcOverview(Request $request)
     {
+        return $this->syncTtcData($request);
+    }
+
+    public function syncTtcData(Request $request)
+    {
         $user = auth()->user();
 
         if (! $user) {
@@ -50,7 +55,8 @@ class TryingToConceiveController extends Controller
                 'cycle_id' => $cycle->id,
             ]);
 
-            $response = Http::timeout(120)
+            $response = Http::timeout(5)
+                ->connectTimeout(2)
                 ->acceptJson()
                 ->get("{$baseUrl}/api/v1/cycle-engine/ttc/overview", [
                     'user_id' => $user->id,
@@ -146,6 +152,21 @@ class TryingToConceiveController extends Controller
                 'error' => $e->getMessage(),
             ], 500);
         }
+    }
+
+    public function surgeBanner(Request $request)
+    {
+        return $this->syncTtcData($request);
+    }
+
+    public function priorityMap(Request $request)
+    {
+        return $this->syncTtcData($request);
+    }
+
+    public function priorityBanner(Request $request)
+    {
+        return $this->syncTtcData($request);
     }
 
     /**
