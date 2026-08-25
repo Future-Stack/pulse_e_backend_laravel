@@ -55,8 +55,8 @@ class TryingToConceiveController extends Controller
                 'cycle_id' => $cycle->id,
             ]);
 
-            $response = Http::timeout(5)
-                ->connectTimeout(2)
+            $response = Http::timeout(90)
+                ->connectTimeout(30)
                 ->acceptJson()
                 ->get("{$baseUrl}/api/v1/cycle-engine/ttc/overview", [
                     'user_id' => $user->id,
@@ -138,7 +138,7 @@ class TryingToConceiveController extends Controller
             ]);
 
         } catch (\Throwable $e) {
-            Log::error('TTC Overview Sync Failed Exception', [
+            Log::error('TTC Overview Sync Failed Exception, applying local fallback', [
                 'user_id' => $user->id,
                 'cycle_id' => $cycle->id,
                 'message' => $e->getMessage(),
@@ -146,11 +146,7 @@ class TryingToConceiveController extends Controller
                 'file' => $e->getFile(),
             ]);
 
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to sync TTC overview data.',
-                'error' => $e->getMessage(),
-            ], 500);
+            return $this->applyLocalFallback($user, $cycle);
         }
     }
 
