@@ -60,4 +60,8 @@ return [
         'client_secret' => env('AZURE_CLIENT_SECRET'),
     ],
 
+    'google' => [
+        'places_api_key' => env('GOOGLE_PLACES_API_KEY'),
+    ],
+
 ];

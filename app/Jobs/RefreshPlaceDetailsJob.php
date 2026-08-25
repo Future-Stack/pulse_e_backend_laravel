@@ -15,13 +15,7 @@ use Illuminate\Queue\SerializesModels;
  * places:refresh — rolling 14-day cycle (spec 2.3).
  * Place Details calls to rehydrate place_details_cache for servable providers only
  * (controls API spend). A separate daily purge deletes anything older than 30 days
- * regardless — see PurgeStalePlaceCacheCommand.
- *
- * Dispatch per servable provider, e.g. from a scheduled command:
- *   Provider::whereIn('status', ['active', 'vetted'])
- *     ->whereNotNull('google_place_id')
- *     ->whereDoesntHave('placeDetailsCache', fn ($q) => $q->where('fetched_at', '>', now()->subDays(14)))
- *     ->each(fn ($p) => RefreshPlaceDetailsJob::dispatch($p));
+ * regardless — see PurgeStalePlaceCache.
  */
 class RefreshPlaceDetailsJob implements ShouldQueue
 {
@@ -33,7 +27,7 @@ class RefreshPlaceDetailsJob implements ShouldQueue
 
     public function handle(GooglePlacesClient $client): void
     {
-        if (! in_array($this->provider->status, ['active', 'vetted'], true) || ! $this->provider->google_place_id) {
+        if (! in_array($this->provider->status, ['active', 'vetted', 'candidate'], true) || ! $this->provider->google_place_id) {
             return;
         }
 
@@ -54,5 +48,30 @@ class RefreshPlaceDetailsJob implements ShouldQueue
                 'expires_at' => now()->addDays(30), // hard ToS backstop regardless of the 14-day refresh cadence
             ]
         );
+
+        // Fill in any missing provider fields if available from Place Details
+        $updates = [];
+        if (empty($this->provider->phone_e164) && ! empty($details['phone_e164'])) {
+            $updates['phone_e164'] = mb_substr($details['phone_e164'], 0, 20);
+        }
+        if (empty($this->provider->website) && ! empty($details['website'])) {
+            $updates['website'] = mb_substr($details['website'], 0, 255);
+        }
+        if (empty($this->provider->addr_line1) && ! empty($details['addr_line1'])) {
+            $updates['addr_line1'] = mb_substr($details['addr_line1'], 0, 255);
+        }
+        if (empty($this->provider->city) && ! empty($details['city'])) {
+            $updates['city'] = mb_substr($details['city'], 0, 255);
+        }
+        if (empty($this->provider->state) && ! empty($details['state'])) {
+            $updates['state'] = mb_substr($details['state'], 0, 255);
+        }
+        if (empty($this->provider->zip) && ! empty($details['zip'])) {
+            $updates['zip'] = mb_substr($details['zip'], 0, 255);
+        }
+
+        if (! empty($updates)) {
+            $this->provider->update($updates);
+        }
     }
 }
