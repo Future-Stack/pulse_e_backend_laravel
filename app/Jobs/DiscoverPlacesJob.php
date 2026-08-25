@@ -4,6 +4,7 @@ namespace App\Jobs;
 
 use App\Models\CategoryPlaceQuery;
 use App\Models\Metro;
+use App\Models\PlaceDetailsCache;
 use App\Models\Provider;
 use App\Models\ProviderCategory;
 use App\Services\GooglePlacesClient;
@@ -13,20 +14,16 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\Log;
 use MatanYadaev\EloquentSpatial\Objects\Point;
 
 /**
  * places:discover — weekly (spec 2.3).
  * For each active metro x category, runs Google Places Text Search over the
  * category_place_queries recipes across a grid derived from the metro
- * centroid/radius. Stores place_id + geocode, attempts the NPPES join
- * (normalized phone + fuzzy name match). Runs only from batch jobs, never
- * from a live user request (spec 2.1 privacy boundary).
- *
- * Dispatch one job per (metro, category), e.g. from a console command:
- *   foreach (Metro::active()->get() as $metro)
- *     foreach (ProviderCategory::active()->get() as $category)
- *       DiscoverPlacesJob::dispatch($metro, $category);
+ * centroid/radius. Stores place_id + geocode, address, phone, and website,
+ * attempts the NPPES join (normalized phone + fuzzy name match).
+ * Runs only from batch jobs, never from a live user request (spec 2.1 privacy boundary).
  */
 class DiscoverPlacesJob implements ShouldQueue
 {
@@ -46,8 +43,20 @@ class DiscoverPlacesJob implements ShouldQueue
     {
         $queries = CategoryPlaceQuery::where('category_id', $this->category->id)->get();
 
+        if ($queries->isEmpty()) {
+            // Fallback default query if no category_place_queries exist
+            $queries = collect([
+                (object) [
+                    'keyword' => $this->category->display_name,
+                    'places_type' => null,
+                ],
+            ]);
+        }
+
+        $grid = $this->searchGrid();
+
         foreach ($queries as $query) {
-            foreach ($this->searchGrid() as $point) {
+            foreach ($grid as $point) {
                 $results = $client->textSearch(
                     textQuery: $query->keyword,
                     lat: $point['lat'],
@@ -65,8 +74,7 @@ class DiscoverPlacesJob implements ShouldQueue
 
     /**
      * Tiles the metro's centroid/radius_km into a square grid of search points so
-     * Text Search (which returns at most ~20 results per call) covers the whole
-     * metro instead of just its center.
+     * Text Search covers the whole metro instead of just its center.
      *
      * @return array<array{lat: float, lng: float}>
      */
@@ -103,11 +111,20 @@ class DiscoverPlacesJob implements ShouldQueue
             }
         }
 
+        // Always ensure at least the metro centroid is included
+        if (empty($points)) {
+            $points[] = ['lat' => $centroid->latitude, 'lng' => $centroid->longitude];
+        }
+
         return $points;
     }
 
     private function upsertPlace(array $place, string $matchedKeyword): void
     {
+        if (empty($place['place_id']) || empty($place['display_name']) || $place['lat'] === null || $place['lng'] === null) {
+            return;
+        }
+
         $existing = Provider::where('google_place_id', $place['place_id'])->first();
 
         if (! $existing && ! empty($place['phone_e164'])) {
@@ -145,13 +162,28 @@ class DiscoverPlacesJob implements ShouldQueue
             ? $this->matchConfidence($existing, $place)
             : null;
 
+        $displayName = mb_substr(trim($existing?->display_name ?? $place['display_name']), 0, 160);
+        $phone = ! empty($place['phone_e164']) ? mb_substr(trim($place['phone_e164']), 0, 20) : ($existing?->phone_e164);
+        $website = ! empty($place['website']) ? mb_substr(trim($place['website']), 0, 255) : ($existing?->website);
+        $addrLine1 = ! empty($place['addr_line1']) ? mb_substr(trim($place['addr_line1']), 0, 255) : ($existing?->addr_line1);
+        $addrLine2 = ! empty($place['addr_line2']) ? mb_substr(trim($place['addr_line2']), 0, 255) : ($existing?->addr_line2);
+        $city = ! empty($place['city']) ? mb_substr(trim($place['city']), 0, 255) : ($existing?->city);
+        $state = ! empty($place['state']) ? mb_substr(trim($place['state']), 0, 255) : ($existing?->state);
+        $zip = ! empty($place['zip']) ? mb_substr(trim($place['zip']), 0, 255) : ($existing?->zip);
+
         $provider = Provider::updateOrCreate(
             $existing ? ['id' => $existing->id] : ['google_place_id' => $place['place_id']],
             array_filter([
                 'google_place_id' => $place['place_id'],
-                'display_name' => $existing?->display_name ?? $place['display_name'],
-                'phone_e164' => $existing?->phone_e164 ?? $place['phone_e164'],
-                'location' => new Point($place['lat'], $place['lng'], 4326),
+                'display_name' => $displayName,
+                'phone_e164' => $phone,
+                'website' => $website,
+                'addr_line1' => $addrLine1,
+                'addr_line2' => $addrLine2,
+                'city' => $city,
+                'state' => $state,
+                'zip' => $zip,
+                'location' => new Point((float) $place['lat'], (float) $place['lng'], 4326),
                 'metro_id' => $this->metro->id,
                 'source_places' => true,
                 'match_confidence' => $matchConfidence,
@@ -162,15 +194,27 @@ class DiscoverPlacesJob implements ShouldQueue
         $provider->categories()->syncWithoutDetaching([
             $this->category->id => ['source' => $matchedByNppes ? 'nppes_taxonomy' : 'places_match'],
         ]);
+
+        // Save rating/reviews/hours into place_details_cache if returned by Google
+        if (isset($place['rating']) || isset($place['review_count']) || ! empty($place['hours_json']) || ! empty($place['business_status'])) {
+            PlaceDetailsCache::updateOrCreate(
+                ['provider_id' => $provider->id],
+                [
+                    'rating' => $place['rating'] ?? null,
+                    'review_count' => $place['review_count'] ?? null,
+                    'hours_json' => $place['hours_json'] ?? null,
+                    'business_status' => $place['business_status'] ?? null,
+                    'fetched_at' => now(),
+                    'expires_at' => now()->addDays(30),
+                ]
+            );
+        }
     }
 
     /**
      * Blended fuzzy-match score (0.00-1.00) between an existing NPPES record and
      * a Places search result: 60% name similarity + 40% normalized-address
-     * similarity (spec 2.2: addresses are "Normalized (libpostal or equivalent)
-     * before matching" — see App\Support\AddressNormalizer). Records below
-     * threshold should route to a manual review queue rather than auto-merge;
-     * wire that queue view in your admin UI keyed off providers.match_confidence.
+     * similarity.
      */
     private function matchConfidence(Provider $existing, array $place): float
     {
