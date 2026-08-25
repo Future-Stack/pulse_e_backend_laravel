@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Jobs\DiscoverPlacesJob;
 use App\Models\Metro;
+use App\Models\Provider;
 use App\Models\ProviderCategory;
 use Illuminate\Console\Command;
 
@@ -13,8 +14,12 @@ use Illuminate\Console\Command;
  */
 class DiscoverPlacesCommand extends Command
 {
-    protected $signature = 'marketplace:discover-places {--metro_id= : Specific metro ID to discover} {--category_id= : Specific category ID to discover} {--queue : Dispatch discovery jobs to the queue worker}';
-    protected $description = 'Run Google Places API discovery for active metros and categories to match NPPES records and populate google_place_id';
+    protected $signature = 'marketplace:discover-places 
+        {--metro_id= : Specific metro ID to discover} 
+        {--category_id= : Specific category ID to discover} 
+        {--queue : Dispatch discovery jobs to the queue worker}';
+        
+    protected $description = 'Run Google Places API discovery for active metros and categories to populate providers and google_place_id';
 
     public function handle(): int
     {
@@ -39,18 +44,23 @@ class DiscoverPlacesCommand extends Command
             $this->warn('Warning: GOOGLE_PLACES_API_KEY is not set in .env. API calls to Google Places will fail unless a valid key is provided.');
         }
 
-        $initialCount = \App\Models\Provider::count();
-
+        $initialCount = Provider::count();
         $count = 0;
         $asQueue = (bool) $this->option('queue');
+
+        $this->info("Starting Places discovery for {$metros->count()} metro(s) and {$categories->count()} category/categories...");
 
         foreach ($metros as $metro) {
             foreach ($categories as $category) {
                 if ($asQueue) {
                     DiscoverPlacesJob::dispatch($metro, $category);
                 } else {
-                    $this->info("Running Places discovery for metro [{$metro->name}] x category [{$category->display_name}]...");
+                    $beforeCount = Provider::count();
+                    $this->line("• Processing metro [{$metro->name}] x category [{$category->display_name}]...");
                     DiscoverPlacesJob::dispatchSync($metro, $category);
+                    $afterCount = Provider::count();
+                    $diff = $afterCount - $beforeCount;
+                    $this->info("  -> Saved {$diff} new provider(s).");
                 }
                 $count++;
             }
@@ -61,15 +71,12 @@ class DiscoverPlacesCommand extends Command
             return self::SUCCESS;
         }
 
-        $newCount = \App\Models\Provider::count();
+        $newCount = Provider::count();
         $added = $newCount - $initialCount;
 
-        $this->info("Completed Google Places discovery across {$count} metro x category pair(s). Total providers in DB: {$newCount} ({$added} new added).");
-
-        if (empty($apiKey)) {
-            $this->warn("Note: To pull live places from Google Places API, add GOOGLE_PLACES_API_KEY=your_key to your .env file.");
-            $this->info("For local testing without an API key, run: php artisan marketplace:seed-test-provider");
-        }
+        $this->info("\n=== Discovery Summary ===");
+        $this->info("Total Pairs Processed: {$count}");
+        $this->info("Total Providers in DB: {$newCount} ({$added} new added in this run).");
 
         return self::SUCCESS;
     }

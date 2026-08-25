@@ -7,21 +7,20 @@ use App\Models\Provider;
 use Illuminate\Console\Command;
 
 /**
- * places:refresh wrapper — dispatches RefreshPlaceDetailsJob for every servable
- * provider whose cache is missing or older than 14 days (spec 2.3 rolling cycle).
- * Scheduled daily so the 14-day cadence is naturally maintained without a
- * single giant nightly batch.
+ * places:refresh wrapper — dispatches RefreshPlaceDetailsJob for providers
+ * whose cache is missing or older than 14 days.
  */
 class RefreshPlaceCache extends Command
 {
-    protected $signature = 'marketplace:refresh-place-cache';
+    protected $signature = 'marketplace:refresh-place-cache {--all : Include candidate status providers as well}';
     protected $description = 'Dispatch RefreshPlaceDetailsJob for providers due for a Places refresh';
 
     public function handle(): int
     {
         $count = 0;
+        $statuses = $this->option('all') ? ['active', 'vetted', 'candidate'] : ['active', 'vetted'];
 
-        Provider::whereIn('status', ['active', 'vetted'])
+        Provider::whereIn('status', $statuses)
             ->whereNotNull('google_place_id')
             ->whereDoesntHave('placeDetailsCache', fn ($q) => $q->where('fetched_at', '>', now()->subDays(14)))
             ->chunkById(200, function ($providers) use (&$count) {
