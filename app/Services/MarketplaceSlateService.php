@@ -10,21 +10,9 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
-/**
- * Builds the ranked provider slate for a (metro, category) pair per spec 2.4:
- *
- *   1. Sponsored slots (currently active, provider status = active) fill positions
- *      1..N first, in slot_number order.
- *   2. Remaining positions are filled organically by:
- *      score = 0.5 * proximity_norm + 0.3 * bayesian_rating + 0.2 * log(review_count+1)_norm
- *
- * Reads the nightly-precomputed Redis/ElastiCache key when present (spec 2.3 slate:rebuild)
- * and falls back to computing on the fly, so the API stays correct even before the cache
- * job has run for a given metro/category.
- */
 class MarketplaceSlateService
 {
-    private const BAYESIAN_PRIOR_WEIGHT = 20; // ~20-review weight, per spec 2.4
+    private const BAYESIAN_PRIOR_WEIGHT = 20; // ~20-review weight
 
     public function buildSlate(ProviderCategory $category, Metro $metro, int $limit = 3): Collection
     {
@@ -41,18 +29,20 @@ class MarketplaceSlateService
             ->where('metro_id', $metro->id)
             ->where('category_id', $category->id)
             ->currentlyActive()
-            ->whereHas('provider', fn ($q) => $q->where('status', 'active'))
+            ->whereHas('provider', fn ($q) => $q->whereIn('status', ['active', 'candidate']))
             ->orderBy('slot_number')
             ->get();
 
         $sponsoredProviderIds = $sponsored->pluck('provider_id')->all();
 
+        $remainingIds = array_values(array_diff($organicIds, $sponsoredProviderIds));
+
         $organicProviders = Provider::query()
             ->with('categories', 'placeDetailsCache')
-            ->whereIn('id', array_diff($organicIds, $sponsoredProviderIds))
-            ->active()
+            ->whereIn('id', $remainingIds)
+            ->whereIn('status', ['active', 'candidate'])
             ->get()
-            ->sortBy(fn ($provider) => array_search($provider->id, $organicIds))
+            ->sortBy(fn ($provider) => array_search($provider->id, $remainingIds))
             ->values();
 
         $slate = collect();
@@ -82,10 +72,6 @@ class MarketplaceSlateService
         return $slate->take($limit);
     }
 
-    /**
-     * Computes the organic ranking on demand. Mirrors the slate:rebuild nightly job
-     * (spec 2.3) so results are correct even for a cold cache.
-     */
     public function computeOrganicRanking(ProviderCategory $category, Metro $metro): Collection
     {
         $globalMean = DB::table('place_details_cache')
@@ -98,7 +84,7 @@ class MarketplaceSlateService
             ->leftJoin('place_details_cache', 'providers.id', '=', 'place_details_cache.provider_id')
             ->where('provider_category.category_id', $category->id)
             ->where('providers.metro_id', $metro->id)
-            ->where('providers.status', 'active')
+            ->whereIn('providers.status', ['active', 'candidate'])
             ->select(
                 'providers.*',
                 'place_details_cache.rating as pd_rating',
@@ -116,12 +102,12 @@ class MarketplaceSlateService
                 $reviewCount = (int) ($provider->pd_review_count ?? 0);
                 $rating = (float) ($provider->pd_rating ?? 0);
 
-                // Bayesian average: (prior_weight * global_mean + reviews * rating) / (prior_weight + reviews)
+                // Bayesian average
                 $bayesianRating = (
                     self::BAYESIAN_PRIOR_WEIGHT * $globalMean + $reviewCount * $rating
                 ) / (self::BAYESIAN_PRIOR_WEIGHT + $reviewCount);
 
-                $reviewCountNorm = log($reviewCount + 1) / log(1000); // normalize against a generous ceiling
+                $reviewCountNorm = log($reviewCount + 1) / log(1000);
 
                 $score = 0.5 * $proximityNorm
                     + 0.3 * ($bayesianRating / 5)
@@ -141,7 +127,7 @@ class MarketplaceSlateService
             return 0.0;
         }
 
-        // Haversine distance between metro centroid and provider location.
+        // Haversine distance
         $lat1 = deg2rad($metro->centroid->latitude);
         $lon1 = deg2rad($metro->centroid->longitude);
         $lat2 = deg2rad($provider->location->latitude);
