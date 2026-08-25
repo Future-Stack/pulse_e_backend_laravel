@@ -51,114 +51,50 @@ class AwarenessController extends Controller
         }
 
         try {
-
-            /*
-            |--------------------------------------------------------------------------
-            | AI API URL
-            |--------------------------------------------------------------------------
-            */
-
-            $aiUrl = rtrim(
-                config('services.ai.base_url'),
+            $baseUrl = rtrim(
+                config('services.ai.base_url', 'https://ai.fightthenumber.com'),
                 '/'
-            ) . '/api/cycle-awareness';
+            );
+            $aiUrl = "{$baseUrl}/api/cycle-awareness";
 
-            /*
-            |--------------------------------------------------------------------------
-            | Call AI API
-            |--------------------------------------------------------------------------
-            |
-            | AI expects:
-            |
-            | GET /api/cycle-awareness?user_id=2
-            |
-            */
-
-            $response = Http::timeout(5)
-                ->connectTimeout(2)
+            $response = Http::timeout(90)
+                ->connectTimeout(30)
                 ->acceptJson()
                 ->get($aiUrl, [
                     'user_id' => $user->id,
                 ]);
 
-            /*
-            |--------------------------------------------------------------------------
-            | Check AI Response
-            |--------------------------------------------------------------------------
-            */
-
             if (! $response->successful()) {
-
-                Log::error('Cycle Awareness AI API Failed', [
+                Log::warning('Cycle Awareness AI API Failed, applying local fallback', [
                     'user_id' => $user->id,
+                    'cycle_id' => $cycle->id,
                     'status' => $response->status(),
                     'body' => $response->body(),
                 ]);
 
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Unable to fetch cycle awareness data.',
-                    'error' => $response->json(),
-                ], $response->status());
+                return $this->applyLocalFallback($user, $cycle);
             }
 
-            /*
-            |--------------------------------------------------------------------------
-            | Decode AI Response
-            |--------------------------------------------------------------------------
-            */
-
             $result = $response->json();
-
-            /*
-            |--------------------------------------------------------------------------
-            | Get cycle_awareness
-            |--------------------------------------------------------------------------
-            */
-
             $awareness = $result['cycle_awareness'] ?? null;
 
             if (! is_array($awareness)) {
-
-                Log::error('Invalid Cycle Awareness AI Response', [
+                Log::warning('Invalid Cycle Awareness AI Response, applying local fallback', [
                     'user_id' => $user->id,
+                    'cycle_id' => $cycle->id,
                     'response' => $result,
                 ]);
 
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Cycle awareness data not found in AI response.',
-                ], 500);
+                return $this->applyLocalFallback($user, $cycle);
             }
 
-            /*
-            |--------------------------------------------------------------------------
-            | Extract AI Data
-            |--------------------------------------------------------------------------
-            |
-            | These are saved exactly as received from AI.
-            |
-            */
-
             $title = $awareness['title'] ?? null;
-
             $cycleContext = $awareness['cycle_context'] ?? null;
-
             $currentPhase = $awareness['current_phase'] ?? null;
-
             $lutealPhase = $awareness['luteal_phase'] ?? null;
-
             $hormoneLevels = $awareness['hormone_levels'] ?? null;
-
             $whatToKnow = $awareness['what_to_know'] ?? null;
-
             $fourPhaseCycle = $awareness['four_phase_cycle'] ?? null;
-
-            /*
-            |--------------------------------------------------------------------------
-            | Save AI Response
-            |--------------------------------------------------------------------------
-            */
 
             DB::transaction(function () use (
                 $user,
@@ -173,114 +109,25 @@ class AwarenessController extends Controller
                 $fourPhaseCycle,
                 $result
             ) {
-
                 NewAwarenessSnapshot::updateOrCreate(
                     [
                         'user_id' => $user->id,
                         'cycle_id' => $cycle->id,
                     ],
                     [
-
-                        /*
-                        |--------------------------------------------------------------------------
-                        | Title
-                        |--------------------------------------------------------------------------
-                        */
-
                         'title' => $title,
-
-                        /*
-                        |--------------------------------------------------------------------------
-                        | Cycle Context
-                        |--------------------------------------------------------------------------
-                        |
-                        | Example:
-                        |
-                        | {
-                        |   "cycle_day": 2,
-                        |   "phase": "Menstrual phase",
-                        |   "average_cycle_length": "~28d (est.)"
-                        | }
-                        |
-                        */
-
                         'cycle_context' => $cycleContext,
-
-                        /*
-                        |--------------------------------------------------------------------------
-                        | Current Phase
-                        |--------------------------------------------------------------------------
-                        |
-                        | Save complete object exactly as AI sends it.
-                        |
-                        */
-
                         'current_phase' => $currentPhase,
-
-                        /*
-                        |--------------------------------------------------------------------------
-                        | Luteal Phase
-                        |--------------------------------------------------------------------------
-                        */
-
                         'luteal_phase' => $lutealPhase,
-
-                        /*
-                        |--------------------------------------------------------------------------
-                        | Hormone Levels
-                        |--------------------------------------------------------------------------
-                        */
-
                         'hormone_levels' => $hormoneLevels,
-
-                        /*
-                        |--------------------------------------------------------------------------
-                        | What To Know
-                        |--------------------------------------------------------------------------
-                        */
-
                         'what_to_know' => $whatToKnow,
-
-                        /*
-                        |--------------------------------------------------------------------------
-                        | Four Phase Cycle
-                        |--------------------------------------------------------------------------
-                        */
-
                         'four_phase_cycle' => $fourPhaseCycle,
-
-                        /*
-                        |--------------------------------------------------------------------------
-                        | Complete cycle_awareness Response
-                        |--------------------------------------------------------------------------
-                        |
-                        | This keeps the complete AI response so no AI data
-                        | is lost even if the AI adds new fields later.
-                        |
-                        */
-
                         'ai_response' => $awareness,
-
-                        /*
-                        |--------------------------------------------------------------------------
-                        | AI Metadata
-                        |--------------------------------------------------------------------------
-                        */
-
-                        'ai_generated' =>
-                            $result['fetched'] ?? true,
-
-                        'ai_cached' =>
-                            $result['fetched'] ?? false,
+                        'ai_generated' => true,
+                        'ai_cached' => $result['cached'] ?? false,
                     ]
                 );
             });
-
-            /*
-            |--------------------------------------------------------------------------
-            | Get Saved Snapshot
-            |--------------------------------------------------------------------------
-            */
 
             $snapshot = NewAwarenessSnapshot::where('user_id', $user->id)
                 ->where('cycle_id', $cycle->id)
@@ -293,7 +140,6 @@ class AwarenessController extends Controller
                     'id' => $snapshot->id,
                     'user_id' => $snapshot->user_id,
                     'cycle_id' => $snapshot->cycle_id,
-
                     'title' => $snapshot->title,
                     'cycle_context' => $snapshot->cycle_context,
                     'current_phase' => $snapshot->current_phase,
@@ -301,17 +147,14 @@ class AwarenessController extends Controller
                     'hormone_levels' => $snapshot->hormone_levels,
                     'what_to_know' => $snapshot->what_to_know,
                     'four_phase_cycle' => $snapshot->four_phase_cycle,
-
                     'ai_generated' => $snapshot->ai_generated,
                     'ai_cached' => $snapshot->ai_cached,
-
                     'created_at' => $snapshot->created_at,
                     'updated_at' => $snapshot->updated_at,
                 ],
             ]);
         } catch (\Throwable $e) {
-
-            Log::error('Cycle Awareness Sync Failed', [
+            Log::error('Cycle Awareness Sync Failed Exception, applying local fallback', [
                 'user_id' => $user->id,
                 'cycle_id' => $cycle->id,
                 'message' => $e->getMessage(),
@@ -319,12 +162,144 @@ class AwarenessController extends Controller
                 'file' => $e->getFile(),
             ]);
 
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to sync cycle awareness data.',
-                'error' => $e->getMessage(),
-            ], 500);
+            return $this->applyLocalFallback($user, $cycle);
         }
+    }
+
+    /**
+     * Shared local fallback logic when AI engine is unreachable or returns invalid data.
+     */
+    private function applyLocalFallback($user, $cycle)
+    {
+        $startDate = $cycle->period_start_date ? \Carbon\Carbon::parse($cycle->period_start_date) : today();
+        $currentCycleDay = max(1, (int) $startDate->diffInDays(today()) + 1);
+        $avgCycleLength = $cycle->cycle_length ?? 28;
+
+        $phaseName = match (true) {
+            $currentCycleDay <= 5 => 'Menstrual phase',
+            $currentCycleDay <= 13 => 'Follicular phase',
+            $currentCycleDay <= 16 => 'Ovulatory phase',
+            default => 'Luteal phase',
+        };
+
+        $phaseKey = match (true) {
+            $currentCycleDay <= 5 => 'menstrual',
+            $currentCycleDay <= 13 => 'follicular',
+            $currentCycleDay <= 16 => 'ovulatory',
+            default => 'luteal',
+        };
+
+        $title = "Cycle Day {$currentCycleDay} • {$phaseName}";
+
+        $cycleContext = [
+            'cycle_day' => $currentCycleDay,
+            'phase' => $phaseName,
+            'average_cycle_length' => "~{$avgCycleLength}d (est.)",
+        ];
+
+        $currentPhase = [
+            'name' => $phaseName,
+            'day_range' => match ($phaseKey) {
+                'menstrual' => 'Day 1 - 5',
+                'follicular' => 'Day 6 - 13',
+                'ovulatory' => 'Day 14 - 16',
+                'luteal' => "Day 17 - {$avgCycleLength}",
+            },
+            'description' => match ($phaseKey) {
+                'menstrual' => 'Uterine lining sheds as a new cycle begins.',
+                'follicular' => 'Follicles mature in preparation for ovulation.',
+                'ovulatory' => 'An egg is released from the ovary; peak fertility window.',
+                'luteal' => 'Progesterone rises to support potential implantation.',
+            },
+        ];
+
+        $lutealPhase = [
+            'estimated_start_day' => 17,
+            'estimated_end_day' => $avgCycleLength,
+            'status' => $phaseKey === 'luteal' ? 'active' : 'upcoming',
+        ];
+
+        $hormoneLevels = [
+            'estrogen' => match ($phaseKey) {
+                'menstrual' => 'Low',
+                'follicular' => 'Rising',
+                'ovulatory' => 'Peak',
+                'luteal' => 'Moderate',
+            },
+            'progesterone' => match ($phaseKey) {
+                'menstrual' => 'Low',
+                'follicular' => 'Low',
+                'ovulatory' => 'Low to Rising',
+                'luteal' => 'High',
+            },
+            'lh' => match ($phaseKey) {
+                'ovulatory' => 'Surge',
+                default => 'Baseline',
+            },
+        ];
+
+        $whatToKnow = [
+            'overview' => "You are currently in your {$phaseName}. Keep logging symptoms, basal body temperature, and daily notes to refine insights.",
+        ];
+
+        $fourPhaseCycle = [
+            'menstrual' => ['days' => '1-5', 'status' => $phaseKey === 'menstrual' ? 'current' : 'completed'],
+            'follicular' => ['days' => '6-13', 'status' => $phaseKey === 'follicular' ? 'current' : ($currentCycleDay > 13 ? 'completed' : 'upcoming')],
+            'ovulatory' => ['days' => '14-16', 'status' => $phaseKey === 'ovulatory' ? 'current' : ($currentCycleDay > 16 ? 'completed' : 'upcoming')],
+            'luteal' => ['days' => "17-{$avgCycleLength}", 'status' => $phaseKey === 'luteal' ? 'current' : 'upcoming'],
+        ];
+
+        $snapshot = DB::transaction(function () use (
+            $user,
+            $cycle,
+            $title,
+            $cycleContext,
+            $currentPhase,
+            $lutealPhase,
+            $hormoneLevels,
+            $whatToKnow,
+            $fourPhaseCycle
+        ) {
+            return NewAwarenessSnapshot::updateOrCreate(
+                [
+                    'user_id' => $user->id,
+                    'cycle_id' => $cycle->id,
+                ],
+                [
+                    'title' => $title,
+                    'cycle_context' => $cycleContext,
+                    'current_phase' => $currentPhase,
+                    'luteal_phase' => $lutealPhase,
+                    'hormone_levels' => $hormoneLevels,
+                    'what_to_know' => $whatToKnow,
+                    'four_phase_cycle' => $fourPhaseCycle,
+                    'ai_response' => null,
+                    'ai_generated' => false,
+                    'ai_cached' => false,
+                ]
+            );
+        });
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Cycle awareness data synced with local fallback.',
+            'data' => [
+                'id' => $snapshot->id,
+                'user_id' => $snapshot->user_id,
+                'cycle_id' => $snapshot->cycle_id,
+                'title' => $snapshot->title,
+                'cycle_context' => $snapshot->cycle_context,
+                'current_phase' => $snapshot->current_phase,
+                'luteal_phase' => $snapshot->luteal_phase,
+                'hormone_levels' => $snapshot->hormone_levels,
+                'what_to_know' => $snapshot->what_to_know,
+                'four_phase_cycle' => $snapshot->four_phase_cycle,
+                'ai_generated' => $snapshot->ai_generated,
+                'ai_cached' => $snapshot->ai_cached,
+                'created_at' => $snapshot->created_at,
+                'updated_at' => $snapshot->updated_at,
+            ],
+        ]);
     }
 }
 
