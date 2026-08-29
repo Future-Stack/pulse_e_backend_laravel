@@ -51,6 +51,9 @@ class RefreshPlaceDetailsJob implements ShouldQueue
 
         // Fill in any missing provider fields if available from Place Details
         $updates = [];
+        if (empty($this->provider->org_name) && ! empty($this->provider->display_name)) {
+            $updates['org_name'] = mb_substr($this->provider->display_name, 0, 160);
+        }
         if (empty($this->provider->phone_e164) && ! empty($details['phone_e164'])) {
             $updates['phone_e164'] = mb_substr($details['phone_e164'], 0, 20);
         }
