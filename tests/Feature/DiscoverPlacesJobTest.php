@@ -116,6 +116,7 @@ class DiscoverPlacesJobTest extends TestCase
         $provider = Provider::where('google_place_id', 'ChIJNewDermPlace_987654')->first();
         $this->assertNotNull($provider);
         $this->assertEquals('Advanced Dermatology Clinic', $provider->display_name);
+        $this->assertEquals('Advanced Dermatology Clinic', $provider->org_name);
         $this->assertEquals('+14155554321', $provider->phone_e164);
         $this->assertEquals('https://advancedderm.example.com', $provider->website);
         $this->assertEquals('450 Sutter St', $provider->addr_line1);
