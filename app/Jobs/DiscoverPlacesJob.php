@@ -171,11 +171,14 @@ class DiscoverPlacesJob implements ShouldQueue
         $state = ! empty($place['state']) ? mb_substr(trim($place['state']), 0, 255) : ($existing?->state);
         $zip = ! empty($place['zip']) ? mb_substr(trim($place['zip']), 0, 255) : ($existing?->zip);
 
+        $orgName = mb_substr(trim($existing?->org_name ?? $displayName), 0, 160);
+
         $provider = Provider::updateOrCreate(
             $existing ? ['id' => $existing->id] : ['google_place_id' => $place['place_id']],
             array_filter([
                 'google_place_id' => $place['place_id'],
                 'display_name' => $displayName,
+                'org_name' => $orgName,
                 'phone_e164' => $phone,
                 'website' => $website,
                 'addr_line1' => $addrLine1,
@@ -208,6 +211,11 @@ class DiscoverPlacesJob implements ShouldQueue
                     'expires_at' => now()->addDays(30),
                 ]
             );
+        }
+
+        // If phone or website is missing from the search payload, queue Place Details refresh
+        if (empty($provider->phone_e164) || empty($provider->website)) {
+            RefreshPlaceDetailsJob::dispatch($provider);
         }
     }
 
