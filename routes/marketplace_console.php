@@ -24,7 +24,7 @@ use Illuminate\Support\Facades\Schedule;
 */
 
 Schedule::job(new SyncNppesJob)->weekly()->mondays()->at('03:00')->withoutOverlapping();
-Schedule::command('marketplace:discover-places --queue')->saturdays()->at('09:00')->withoutOverlapping();
+Schedule::command('marketplace:discover-places --queue')->saturdays()->at('03:00')->withoutOverlapping();
 Schedule::command('marketplace:refresh-place-cache')->daily()->withoutOverlapping();
 Schedule::command('marketplace:purge-place-cache')->daily()->withoutOverlapping();
 Schedule::job(new ScreenLeieJob)->monthly()->withoutOverlapping();
