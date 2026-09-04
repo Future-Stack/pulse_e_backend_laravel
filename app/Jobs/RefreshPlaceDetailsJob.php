@@ -21,6 +21,14 @@ class RefreshPlaceDetailsJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
+    /**
+     * [SAFETY FIX FOR GOOGLE BILLING]:
+     * Hard-capped at 1 to prevent runaway queue retries against Google APIs.
+     * To revert:
+     * // (original: no explicit $tries limit)
+     */
+    public $tries = 1;
+
     public function __construct(private readonly Provider $provider)
     {
     }
@@ -30,6 +38,19 @@ class RefreshPlaceDetailsJob implements ShouldQueue
         if (! in_array($this->provider->status, ['active', 'vetted', 'candidate'], true) || ! $this->provider->google_place_id) {
             return;
         }
+
+        /*
+        |--------------------------------------------------------------------------
+        | [SAFETY FIX FOR GOOGLE BILLING]: 14-day Cache Guard
+        |--------------------------------------------------------------------------
+        | Avoids querying Google Place Details if refreshed within the last 14 days.
+        | If client wants to force-refresh every time (original behavior), comment out:
+        */
+        $existingCache = PlaceDetailsCache::where('provider_id', $this->provider->id)->first();
+        if ($existingCache && $existingCache->fetched_at && $existingCache->fetched_at->gt(now()->subDays(14))) {
+            return;
+        }
+        // [ORIGINAL CODE]: Directly invoked $client->placeDetails(...) without prior cache check.
 
         $details = $client->placeDetails($this->provider->google_place_id);
 
