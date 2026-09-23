@@ -139,6 +139,14 @@ class SkinScanController extends Controller
                     $imagePath = $request->input('image_path');
                 }
 
+                // Collect mask URLs if provided
+                $maskUrls = [];
+                foreach ($validated['output'] as $item) {
+                    if (!empty($item['mask_urls'])) {
+                        $maskUrls[$item['type']] = $item['mask_urls'];
+                    }
+                }
+
                 $scanData = [
                     'user_id'            => $user->id,
                     'image_path'         => $imagePath,
@@ -155,6 +163,7 @@ class SkinScanController extends Controller
                     'pore_health_status' => $this->deriveStatus($poreHealthScore),
                     'elasticity_score'   => $elasticityScore,
                     'elasticity_status'  => $this->deriveStatus($elasticityScore),
+                    'mask_urls'          => !empty($maskUrls) ? $maskUrls : null,
                     'neumera_insight'    => null,
                 ];
 
@@ -166,6 +175,7 @@ class SkinScanController extends Controller
 
                 $validated = $request->validate([
                     'image_path'                 => 'nullable|string',
+                    'mask_urls'                  => 'nullable|array',
                     'scan'                       => 'required|array',
                     'scan.overall_score'         => 'required|numeric',
                     'scan.hydration_score'       => 'required|numeric',
@@ -181,6 +191,7 @@ class SkinScanController extends Controller
                     'scan.elasticity_score'      => 'required|numeric',
                     'scan.elasticity_status'     => 'nullable|string',
                     'scan.neumera_insight'       => 'nullable|string',
+                    'scan.mask_urls'             => 'nullable|array',
                 ]);
 
                 $scan = $validated['scan'];
@@ -201,6 +212,7 @@ class SkinScanController extends Controller
                     'pore_health_status' => $scan['pore_health_status'] ?? $this->deriveStatus((int)$scan['pore_health_score']),
                     'elasticity_score'   => (int) $scan['elasticity_score'],
                     'elasticity_status'  => $scan['elasticity_status'] ?? $this->deriveStatus((int)$scan['elasticity_score']),
+                    'mask_urls'          => $scan['mask_urls'] ?? $validated['mask_urls'] ?? null,
                     'neumera_insight'    => $scan['neumera_insight'] ?? null,
                 ];
             }
