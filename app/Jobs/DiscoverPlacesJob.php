@@ -33,6 +33,14 @@ class DiscoverPlacesJob implements ShouldQueue
     // roughly 5-8km across; a metro with radius_km=15 gets a 3x3-ish grid.
     private const TILE_RADIUS_KM = 6;
 
+    /**
+     * [SAFETY FIX FOR GOOGLE BILLING]:
+     * Hard-capped at 1 to prevent queue worker retry loops against external APIs.
+     * To revert to default Laravel worker behavior, comment out $tries:
+     * // (original: no explicit $tries limit)
+     */
+    public $tries = 1;
+
     public $timeout = 900;
 
     public function __construct(private readonly Metro $metro, private readonly ProviderCategory $category)
@@ -41,6 +49,28 @@ class DiscoverPlacesJob implements ShouldQueue
 
     public function handle(GooglePlacesClient $client): void
     {
+        /*
+        |--------------------------------------------------------------------------
+        | SAFETY GUARDS (GOOGLE BILLING & QUOTA PROTECTION)
+        |--------------------------------------------------------------------------
+        | Protects against accidental discovery sweeps outside production.
+        | If the client ever wants the original behavior without environment checks,
+        | simply comment out the 2 guard blocks below or set MARKETPLACE_ALLOW_LOCAL_DISCOVERY=true in .env
+        |
+        | [ORIGINAL CODE]: Ran directly into $queries without environment checking.
+        */
+        // Guard 1: Master switch in configuration
+        if (! config('marketplace.enable_places_discovery', true)) {
+            Log::info('DiscoverPlacesJob: Skipped because marketplace.enable_places_discovery is false.');
+            return;
+        }
+
+        // Guard 2: Restrict sweeps outside production (local/staging) unless explicitly allowed or in testing
+        if (! app()->isProduction() && ! app()->runningUnitTests() && ! config('marketplace.allow_local_places_discovery', false)) {
+            Log::info("DiscoverPlacesJob: Skipped discovery sweep outside production for Metro [{$this->metro->id}] Category [{$this->category->id}] to prevent accidental API consumption.");
+            return;
+        }
+
         $queries = CategoryPlaceQuery::where('category_id', $this->category->id)->get();
 
         if ($queries->isEmpty()) {
