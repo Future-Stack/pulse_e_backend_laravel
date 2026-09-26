@@ -97,7 +97,25 @@ class SkinScanController extends Controller
         }
 
         try {
-            // Check if the payload contains the new 'output' array format from the app developer
+            $uploadedFile = null;
+            if ($request->hasFile('src_file_image')) {
+                $uploadedFile = $request->file('src_file_image');
+            } elseif ($request->hasFile('image')) {
+                $uploadedFile = $request->file('image');
+            }
+
+            $storedImagePath = null;
+            if ($uploadedFile) {
+                // Validate the file itself
+                $request->validate([
+                    'src_file_image' => 'file|image|mimes:jpg,jpeg,png,webp|max:15360', // 15MB max
+                ]);
+
+                $storedImagePath = $uploadedFile->store('skin_scans/' . $user->id, 'public');
+                // If you want a full public URL instead of a relative path:
+                // $storedImagePath = Storage::disk('public')->url($storedImagePath);
+            }
+
             if ($request->has('output')) {
                 $validated = $request->validate([
                     'src_file_image'     => 'nullable',
@@ -115,7 +133,6 @@ class SkinScanController extends Controller
                     $scores[$type] = (int) round($item['ui_score']);
                 }
 
-                // Check for valid face detection
                 if (count($scores) === 0 || array_sum($scores) === 0) {
                     return response()->json([
                         'success' => false,
@@ -131,15 +148,17 @@ class SkinScanController extends Controller
                 $hydrationScore  = $scores['hd_moisture'] ?? 0;
                 $elasticityScore = $scores['hd_firmness'] ?? 0;
 
-                // Calculate overall score as the average of the metrics
                 $overallScore = (int) round(array_sum($scores) / count($scores));
 
-                $imagePath = $request->input('src_file_image');
-                if ($imagePath === 'null' || empty($imagePath)) {
-                    $imagePath = $request->input('image_path');
+                if ($storedImagePath) {
+                    $imagePath = $storedImagePath;
+                } else {
+                    $imagePath = $request->input('src_file_image');
+                    if ($imagePath === 'null' || empty($imagePath)) {
+                        $imagePath = $request->input('image_path');
+                    }
                 }
 
-                // Collect mask URLs if provided
                 $maskUrls = [];
                 foreach ($validated['output'] as $item) {
                     if (!empty($item['mask_urls'])) {
@@ -168,7 +187,6 @@ class SkinScanController extends Controller
                 ];
 
             } else {
-                // Backward compatibility for legacy scan payload
                 if (!$request->has('scan') && $request->has('metrics')) {
                     $request->merge(['scan' => $request->input('metrics')]);
                 }
@@ -198,7 +216,8 @@ class SkinScanController extends Controller
 
                 $scanData = [
                     'user_id'            => $user->id,
-                    'image_path'         => $validated['image_path'] ?? null,
+                    // ---- Use uploaded file path if present, else fall back to validated string ----
+                    'image_path'         => $storedImagePath ?? ($validated['image_path'] ?? null),
                     'overall_score'      => (int) $scan['overall_score'],
                     'hydration_score'    => (int) $scan['hydration_score'],
                     'hydration_status'   => $scan['hydration_status'] ?? $this->deriveStatus((int)$scan['hydration_score']),
@@ -242,7 +261,7 @@ class SkinScanController extends Controller
                 'message' => 'Validation Failed: Missing or invalid payload parameters.',
                 'errors'  => $e->errors(),
             ], 422);
-        } catch (\Throwable $e) { 
+        } catch (\Throwable $e) {
             Log::error('DB Transaction Error in Skin Scan: ' . $e->getMessage(), [
                 'trace'   => $e->getTraceAsString(),
                 'user_id' => $user->id ?? null,
