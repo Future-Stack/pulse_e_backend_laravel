@@ -16,13 +16,19 @@ class SkinScan extends Model
         'glow_index', 'pore_health_score', 'elasticity_score',
         'hydration_status', 'redness_status', 'texture_status', 
         'glow_status', 'pore_health_status', 'elasticity_status',
-        'neumera_insight', 'mask_urls'
+        'neumera_insight', 'mask_urls',
+        'status_label', 'score_change', 'comparison_text',
+        'findings', 'correlations', 'ai_insights'
     ];
 
     protected function casts(): array
     {
         return [
-            'mask_urls' => 'array',
+            'mask_urls'    => 'array',
+            'findings'     => 'array',
+            'correlations' => 'array',
+            'ai_insights'  => 'array',
+            'score_change' => 'integer',
         ];
     }
 

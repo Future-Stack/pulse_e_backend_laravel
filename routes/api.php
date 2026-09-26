@@ -46,6 +46,7 @@ use App\Http\Controllers\AI\OpkLogController;
 use App\Http\Controllers\AI\TryingToConceiveController;
 use App\Http\Controllers\AI\AwarenessController;
 use App\Http\Controllers\AI\CycleCalendarInputController;
+use App\Http\Controllers\AI\CervicalMucusLogController;
 use Illuminate\Support\Facades\Artisan;
 
 Route::prefix('v1')->group(function () {
@@ -96,6 +97,26 @@ Route::prefix('v1')->group(function () {
 
 
     Route::get('/cycle-calendar-inputs/{user_id}',[CycleCalendarInputController::class, 'show']);
+
+    // Beauty Overview (supports user_id in body/query or token)
+    Route::match(['get', 'post'], '/beauty-overview', [SkinScanController::class, 'handleBeautyOverview']);
+    Route::post('/beauty-overview/save', [SkinScanController::class, 'saveBeautyOverview']);
+    Route::post('/beauty-overview/sync', [SkinScanController::class, 'syncBeautyOverview']);
+
+    // Cervical Mucus (public / user_id parameter support)
+    Route::get('/cycle-engine/cervical-mucus/options', [CervicalMucusLogController::class, 'options']);
+    Route::get('/cervical-mucus/options', [CervicalMucusLogController::class, 'options']);
+    Route::post('/cycle-engine/cervical-mucus/log', [CervicalMucusLogController::class, 'log']);
+    Route::post('/cervical-mucus/log', [CervicalMucusLogController::class, 'log']);
+    Route::get('/cycle-engine/cervical-mucus/today', [CervicalMucusLogController::class, 'today']);
+    Route::get('/cervical-mucus/today', [CervicalMucusLogController::class, 'today']);
+    Route::get('/cycle-engine/cervical-mucus/history', [CervicalMucusLogController::class, 'history']);
+    Route::get('/cervical-mucus/history', [CervicalMucusLogController::class, 'history']);
+
+    // Hormone Trends
+    Route::get('/cycle-engine/hormone-trends', [CervicalMucusLogController::class, 'hormoneTrends']);
+    Route::get('/cervical-mucus/hormone-trends', [CervicalMucusLogController::class, 'hormoneTrends']);
+    Route::get('/hormone-trends', [CervicalMucusLogController::class, 'hormoneTrends']);
 
     Route::middleware('auth:sanctum')->group(function () {
 
@@ -292,6 +313,10 @@ Route::prefix('v1')->group(function () {
 
         //Skin Scan
         Route::get('/skin-scans/history', [SkinScanController::class, 'index']);
+        Route::get('/skin-scans/beauty-overview', [SkinScanController::class, 'getBeautyOverview']);
+        Route::post('/skin-scans/beauty-overview', [SkinScanController::class, 'saveBeautyOverview']);
+        Route::post('/skin-scans/beauty-overview/sync', [SkinScanController::class, 'syncBeautyOverview']);
+        Route::post('/skin-scans/beauty-overview/save', [SkinScanController::class, 'saveBeautyOverview']);
         Route::get('/skin-scans/{id}', [SkinScanController::class, 'show']);
         Route::post('/skin-scans/analyze', [SkinScanController::class, 'store']);
         Route::post('/skin-scans/{id}/insights', [SkinScanController::class, 'updateAiInsights']);
