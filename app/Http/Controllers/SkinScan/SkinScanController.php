@@ -64,78 +64,12 @@ class SkinScanController extends Controller
 
     public function store(Request $request): JsonResponse
     {
-        if (!$request->has('scan') && $request->has('metrics')) {
-            $request->merge(['scan' => $request->input('metrics')]);
-        }
-
-        try {
-            $validated = $request->validate([
-                'success'      => 'required|boolean',
-                'session'      => 'nullable|boolean',
-                'reason'       => 'nullable|string',
-                'frame_count'  => 'nullable|integer',
-                'frame_ids'    => 'nullable|array',
-                'frame_ids.*'  => 'string',
-                'content_type' => 'nullable|string',
-                'image_path'   => 'nullable|string',
-
-                'scan'                       => 'required|array',
-                'scan.overall_score'         => 'required|numeric',
-                'scan.hydration_score'       => 'required|numeric',
-                'scan.hydration_status'      => 'required|string',
-                'scan.redness_score'         => 'required|numeric',
-                'scan.redness_status'        => 'required|string',
-                'scan.texture_score'         => 'required|numeric',
-                'scan.texture_status'        => 'required|string',
-                'scan.glow_index'            => 'required|numeric',
-                'scan.glow_status'           => 'required|string',
-                'scan.pore_health_score'     => 'required|numeric',
-                'scan.pore_health_status'    => 'required|string',
-                'scan.elasticity_score'      => 'required|numeric',
-                'scan.elasticity_status'     => 'required|string',
-                'scan.neumera_insight'       => 'nullable|string',
-
-                'recommendations'                       => 'nullable|array',
-                'recommendations.*.icon_type'           => 'required_with:recommendations|string',
-                'recommendations.*.recommendation_text' => 'required_with:recommendations|string',
-            ]);
-        } catch (ValidationException $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Validation Failed: Missing or invalid payload parameters.',
-                'errors'  => $e->errors(),
-            ], 422);
-        }
-
         $user = $request->user();
         if (!$user) {
             return response()->json([
                 'success' => false,
                 'message' => 'Unauthenticated user. Authorization token missing or invalid.',
             ], 401);
-        }
-
-        $scan = $validated['scan'];
-
-        // Core Scores Check
-        $coreScores = [
-            $scan['overall_score'],
-            $scan['hydration_score'],
-            $scan['redness_score'],
-            $scan['texture_score'],
-            $scan['glow_index'],
-            $scan['pore_health_score'],
-            $scan['elasticity_score'],
-        ];
-        $noFaceDetected = !$validated['success'] || array_sum($coreScores) === 0;
-
-        if ($noFaceDetected) {
-            return response()->json([
-                'success' => false,
-                'message' => $scan['neumera_insight']
-                    ?? 'No skin was detected in the scan. Please retake the scan with your face clearly in view.',
-                'code'    => 'NO_SKIN_DETECTED',
-            ], 422);
         }
 
         // Quota Limit Check
@@ -161,35 +95,150 @@ class SkinScanController extends Controller
                 'code'    => 'QUOTA_EXCEEDED',
             ], 403);
         }
+
         try {
-            $skinScan = DB::transaction(function () use ($user, $validated, $scan, $userLimit) {
-                $skinScan = SkinScan::create([
-                    'user_id'            => $user->id,
-                    'image_path'         => $validated['image_path'] ?? null,
-                    'overall_score'      => (int) $scan['overall_score'],
-                    'hydration_score'    => (int) $scan['hydration_score'],
-                    'hydration_status'   => $scan['hydration_status'],
-                    'redness_score'      => (int) $scan['redness_score'],
-                    'redness_status'     => $scan['redness_status'],
-                    'texture_score'      => (int) $scan['texture_score'],
-                    'texture_status'     => $scan['texture_status'],
-                    'glow_index'         => (int) $scan['glow_index'],
-                    'glow_status'        => $scan['glow_status'],
-                    'pore_health_score'  => (int) $scan['pore_health_score'],
-                    'pore_health_status' => $scan['pore_health_status'],
-                    'elasticity_score'   => (int) $scan['elasticity_score'],
-                    'elasticity_status'  => $scan['elasticity_status'],
-                    'neumera_insight'    => $scan['neumera_insight'] ?? null,
+            $uploadedFile = null;
+            if ($request->hasFile('src_file_image')) {
+                $uploadedFile = $request->file('src_file_image');
+            } elseif ($request->hasFile('image')) {
+                $uploadedFile = $request->file('image');
+            }
+
+            $storedImagePath = null;
+            if ($uploadedFile) {
+                // Validate the file itself
+                $request->validate([
+                    'src_file_image' => 'file|image|mimes:jpg,jpeg,png,webp|max:15360', // 15MB max
                 ]);
 
-                if (!empty($validated['recommendations'])) {
-                    foreach ($validated['recommendations'] as $rec) {
-                        $skinScan->recommendations()->create([
-                            'icon_type'           => $rec['icon_type'],
-                            'recommendation_text' => $rec['recommendation_text'],
-                        ]);
+                $storedImagePath = $uploadedFile->store('skin_scans/' . $user->id, 'public');
+                // If you want a full public URL instead of a relative path:
+                // $storedImagePath = Storage::disk('public')->url($storedImagePath);
+            }
+
+            if ($request->has('output')) {
+                $validated = $request->validate([
+                    'src_file_image'     => 'nullable',
+                    'dst_actions'        => 'nullable|array',
+                    'output'             => 'required|array|min:1',
+                    'output.*.type'      => 'required|string',
+                    'output.*.ui_score'  => 'required|numeric',
+                    'output.*.raw_score' => 'nullable|numeric',
+                    'output.*.mask_urls' => 'nullable|array',
+                ]);
+
+                $scores = [];
+                foreach ($validated['output'] as $item) {
+                    $type = $item['type'];
+                    $scores[$type] = (int) round($item['ui_score']);
+                }
+
+                if (count($scores) === 0 || array_sum($scores) === 0) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'No skin was detected in the scan. Please retake the scan with your face clearly in view.',
+                        'code'    => 'NO_SKIN_DETECTED',
+                    ], 422);
+                }
+
+                $rednessScore    = $scores['hd_redness'] ?? 0;
+                $glowIndex       = $scores['hd_radiance'] ?? 0;
+                $poreHealthScore = $scores['hd_pore'] ?? 0;
+                $textureScore    = $scores['hd_skin_type'] ?? 0;
+                $hydrationScore  = $scores['hd_moisture'] ?? 0;
+                $elasticityScore = $scores['hd_firmness'] ?? 0;
+
+                $overallScore = (int) round(array_sum($scores) / count($scores));
+
+                if ($storedImagePath) {
+                    $imagePath = $storedImagePath;
+                } else {
+                    $imagePath = $request->input('src_file_image');
+                    if ($imagePath === 'null' || empty($imagePath)) {
+                        $imagePath = $request->input('image_path');
                     }
                 }
+
+                $maskUrls = [];
+                foreach ($validated['output'] as $item) {
+                    if (!empty($item['mask_urls'])) {
+                        $maskUrls[$item['type']] = $item['mask_urls'];
+                    }
+                }
+
+                $scanData = [
+                    'user_id'            => $user->id,
+                    'image_path'         => $imagePath,
+                    'overall_score'      => $overallScore,
+                    'hydration_score'    => $hydrationScore,
+                    'hydration_status'   => $this->deriveStatus($hydrationScore),
+                    'redness_score'      => $rednessScore,
+                    'redness_status'     => $this->deriveStatus($rednessScore),
+                    'texture_score'      => $textureScore,
+                    'texture_status'     => $this->deriveStatus($textureScore),
+                    'glow_index'         => $glowIndex,
+                    'glow_status'        => $this->deriveStatus($glowIndex),
+                    'pore_health_score'  => $poreHealthScore,
+                    'pore_health_status' => $this->deriveStatus($poreHealthScore),
+                    'elasticity_score'   => $elasticityScore,
+                    'elasticity_status'  => $this->deriveStatus($elasticityScore),
+                    'mask_urls'          => !empty($maskUrls) ? $maskUrls : null,
+                    'neumera_insight'    => null,
+                ];
+
+            } else {
+                if (!$request->has('scan') && $request->has('metrics')) {
+                    $request->merge(['scan' => $request->input('metrics')]);
+                }
+
+                $validated = $request->validate([
+                    'image_path'                 => 'nullable|string',
+                    'mask_urls'                  => 'nullable|array',
+                    'scan'                       => 'required|array',
+                    'scan.overall_score'         => 'required|numeric',
+                    'scan.hydration_score'       => 'required|numeric',
+                    'scan.hydration_status'      => 'nullable|string',
+                    'scan.redness_score'         => 'required|numeric',
+                    'scan.redness_status'        => 'nullable|string',
+                    'scan.texture_score'         => 'required|numeric',
+                    'scan.texture_status'        => 'nullable|string',
+                    'scan.glow_index'            => 'required|numeric',
+                    'scan.glow_status'           => 'nullable|string',
+                    'scan.pore_health_score'     => 'required|numeric',
+                    'scan.pore_health_status'    => 'nullable|string',
+                    'scan.elasticity_score'      => 'required|numeric',
+                    'scan.elasticity_status'     => 'nullable|string',
+                    'scan.neumera_insight'       => 'nullable|string',
+                    'scan.mask_urls'             => 'nullable|array',
+                ]);
+
+                $scan = $validated['scan'];
+
+                $scanData = [
+                    'user_id'            => $user->id,
+                    // ---- Use uploaded file path if present, else fall back to validated string ----
+                    'image_path'         => $storedImagePath ?? ($validated['image_path'] ?? null),
+                    'overall_score'      => (int) $scan['overall_score'],
+                    'hydration_score'    => (int) $scan['hydration_score'],
+                    'hydration_status'   => $scan['hydration_status'] ?? $this->deriveStatus((int)$scan['hydration_score']),
+                    'redness_score'      => (int) $scan['redness_score'],
+                    'redness_status'     => $scan['redness_status'] ?? $this->deriveStatus((int)$scan['redness_score']),
+                    'texture_score'      => (int) $scan['texture_score'],
+                    'texture_status'     => $scan['texture_status'] ?? $this->deriveStatus((int)$scan['texture_score']),
+                    'glow_index'         => (int) $scan['glow_index'],
+                    'glow_status'        => $scan['glow_status'] ?? $this->deriveStatus((int)$scan['glow_index']),
+                    'pore_health_score'  => (int) $scan['pore_health_score'],
+                    'pore_health_status' => $scan['pore_health_status'] ?? $this->deriveStatus((int)$scan['pore_health_score']),
+                    'elasticity_score'   => (int) $scan['elasticity_score'],
+                    'elasticity_status'  => $scan['elasticity_status'] ?? $this->deriveStatus((int)$scan['elasticity_score']),
+                    'mask_urls'          => $scan['mask_urls'] ?? $validated['mask_urls'] ?? null,
+                    'neumera_insight'    => $scan['neumera_insight'] ?? null,
+                ];
+            }
+
+            // Save skin scan and decrement quota within a database transaction
+            $skinScan = DB::transaction(function () use ($scanData, $userLimit) {
+                $skinScan = SkinScan::create($scanData);
 
                 if ($userLimit->skin_scans_limit > 0) {
                     $userLimit->decrement('skin_scans_limit');
@@ -206,9 +255,15 @@ class SkinScanController extends Controller
                 'data'    => $skinScan->load('recommendations'),
             ], 201);
 
-        } catch (\Throwable $e) { 
+        } catch (ValidationException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation Failed: Missing or invalid payload parameters.',
+                'errors'  => $e->errors(),
+            ], 422);
+        } catch (\Throwable $e) {
             Log::error('DB Transaction Error in Skin Scan: ' . $e->getMessage(), [
-                'trace' => $e->getTraceAsString(),
+                'trace'   => $e->getTraceAsString(),
                 'user_id' => $user->id ?? null,
             ]);
 
@@ -219,6 +274,65 @@ class SkinScanController extends Controller
                 'file'    => $e->getFile() . ' on line ' . $e->getLine(),
             ], 500);
         }
+    }
+
+    /**
+     * Store or update insights and recommendations received from AI service
+     */
+    public function updateAiInsights(Request $request, $id): JsonResponse
+    {
+        $validated = $request->validate([
+            'neumera_insight'                       => 'nullable|string',
+            'recommendations'                       => 'nullable|array',
+            'recommendations.*.icon_type'           => 'required_with:recommendations|string',
+            'recommendations.*.recommendation_text' => 'required_with:recommendations|string',
+        ]);
+
+        $skinScan = SkinScan::find($id);
+
+        if (!$skinScan) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Skin scan record not found.',
+            ], 404);
+        }
+
+        DB::transaction(function () use ($skinScan, $validated) {
+            if (array_key_exists('neumera_insight', $validated)) {
+                $skinScan->update([
+                    'neumera_insight' => $validated['neumera_insight'],
+                ]);
+            }
+
+            if (!empty($validated['recommendations'])) {
+                $skinScan->recommendations()->delete();
+                foreach ($validated['recommendations'] as $rec) {
+                    $skinScan->recommendations()->create([
+                        'icon_type'           => $rec['icon_type'],
+                        'recommendation_text' => $rec['recommendation_text'],
+                    ]);
+                }
+            }
+        });
+
+        return response()->json([
+            'success' => true,
+            'message' => 'AI insights and recommendations updated successfully.',
+            'data'    => $skinScan->load('recommendations'),
+        ], 200);
+    }
+
+    /**
+     * Helper to derive status string from numerical score
+     */
+    private function deriveStatus(int $score): string
+    {
+        if ($score >= 80) {
+            return 'Good';
+        } elseif ($score >= 50) {
+            return 'Fair';
+        }
+        return 'Low';
     }
 
     public function historyByDate(Request $request): JsonResponse
