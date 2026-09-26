@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\OpkLog;
 use App\Models\MenstrualCycle;
 use App\Models\OpkData;
+use App\Models\CervicalMucusLog;
 use App\Models\User;
 use App\Services\OpkReconciliationService;
 use Illuminate\Http\Request;
@@ -118,6 +119,32 @@ class OpkLogController extends Controller
                 'note' => $request->input('note'),
             ]
         );
+
+        // Optional Cervical Mucus Log if provided
+        $mucusInput = $request->input('cervical_mucus') ?? $request->input('mucus_consistency') ?? $request->input('consistency');
+        if ($mucusInput) {
+            $rawMucus = strtolower(trim((string) $mucusInput));
+            $normalizedMucus = match ($rawMucus) {
+                'egg white', 'eggwhite', 'egg-white' => 'egg_white',
+                default => $rawMucus,
+            };
+            if (in_array($normalizedMucus, ['dry', 'sticky', 'creamy', 'watery', 'egg_white'])) {
+                CervicalMucusLog::updateOrCreate(
+                    [
+                        'cycle_id' => $cycle->id,
+                        'log_date' => $logDate,
+                    ],
+                    [
+                        'user_id'         => $userId,
+                        'cycle_id'        => $cycle->id,
+                        'consistency'     => $normalizedMucus,
+                        'fertility_score' => match ($normalizedMucus) {
+                            'dry' => 10, 'sticky' => 25, 'creamy' => 50, 'watery' => 75, 'egg_white' => 100, default => 20
+                        },
+                    ]
+                );
+            }
+        }
 
         $baseUrl = rtrim(config('services.ai.base_url', 'https://ai.fightthenumber.com'), '/');
         $apiData = null;
@@ -281,6 +308,32 @@ class OpkLogController extends Controller
                     'note' => $request->input('note'),
                 ]
             );
+
+            // Optional Cervical Mucus Log if provided
+            $mucusInput = $request->input('cervical_mucus') ?? $request->input('mucus_consistency') ?? $request->input('consistency');
+            if ($mucusInput) {
+                $rawMucus = strtolower(trim((string) $mucusInput));
+                $normalizedMucus = match ($rawMucus) {
+                    'egg white', 'eggwhite', 'egg-white' => 'egg_white',
+                    default => $rawMucus,
+                };
+                if (in_array($normalizedMucus, ['dry', 'sticky', 'creamy', 'watery', 'egg_white'])) {
+                    CervicalMucusLog::updateOrCreate(
+                        [
+                            'cycle_id' => $cycle->id,
+                            'log_date' => $logDate,
+                        ],
+                        [
+                            'user_id'         => $userId,
+                            'cycle_id'        => $cycle->id,
+                            'consistency'     => $normalizedMucus,
+                            'fertility_score' => match ($normalizedMucus) {
+                                'dry' => 10, 'sticky' => 25, 'creamy' => 50, 'watery' => 75, 'egg_white' => 100, default => 20
+                            },
+                        ]
+                    );
+                }
+            }
 
             $baseUrl = rtrim(config('services.ai.base_url', 'https://ai.fightthenumber.com'), '/');
             $aiData = null;
