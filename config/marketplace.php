@@ -43,6 +43,16 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Places Discovery Guard & Environment Controls
+    |--------------------------------------------------------------------------
+    | Master switches to prevent accidental or runaway Google Places API sweeps.
+    | By default outside of production (local/staging), sweeps are blocked.
+    */
+    'enable_places_discovery' => env('MARKETPLACE_ENABLE_PLACES_DISCOVERY', true),
+    'allow_local_places_discovery' => env('MARKETPLACE_ALLOW_LOCAL_DISCOVERY', false),
+
+    /*
+    |--------------------------------------------------------------------------
     | ZIP -> metro resolution cache TTL (days)
     |--------------------------------------------------------------------------
     */
