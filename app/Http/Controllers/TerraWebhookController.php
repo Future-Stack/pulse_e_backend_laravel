@@ -54,13 +54,30 @@ class TerraWebhookController extends Controller
                     ]
                 );
             } else {
-                \App\Models\TerraActivityData::create([
-                    'user_id' => $user?->id,
-                    'terra_user_id' => $terraUserId,
-                    'type' => $type,
-                    'payload' => $payload,
-                    'data_generated_at' => $payload['data'][0]['metadata']['start_time'] ?? null,
-                ]);
+                $rawStartTime = $payload['data'][0]['metadata']['start_time'] ?? null;
+                $generatedAt = $rawStartTime ? \Carbon\Carbon::parse($rawStartTime) : now();
+                $targetDate = $generatedAt->toDateString();
+
+                $existingActivity = \App\Models\TerraActivityData::where('user_id', $user?->id)
+                    ->where('type', $type)
+                    ->whereDate('data_generated_at', $targetDate)
+                    ->first();
+
+                if ($existingActivity) {
+                    $existingActivity->update([
+                        'terra_user_id'     => $terraUserId,
+                        'payload'           => $payload,
+                        'data_generated_at' => $generatedAt,
+                    ]);
+                } else {
+                    \App\Models\TerraActivityData::create([
+                        'user_id'           => $user?->id,
+                        'terra_user_id'     => $terraUserId,
+                        'type'              => $type,
+                        'payload'           => $payload,
+                        'data_generated_at' => $generatedAt,
+                    ]);
+                }
             }
         } catch (\Exception $e) {
             Log::error('Terra webhook save failed: '.$e->getMessage());
@@ -307,15 +324,30 @@ class TerraWebhookController extends Controller
             ],
         ];
 
-        \App\Models\TerraActivityData::create([
-            'user_id'           => $user->id,
-            'terra_user_id'     => 'apple_' . $user->id,
-            'type'              => 'daily',
-            'payload'           => $dailyPayload,
-            'data_generated_at' => $dataGeneratedAt,
-        ]);
+        $targetDate = $dataGeneratedAt->toDateString();
 
-        // 3. If sleep hours are provided, also create a 'sleep' record so sleep-specific queries resolve immediately
+        $existingDaily = \App\Models\TerraActivityData::where('user_id', $user->id)
+            ->where('type', 'daily')
+            ->whereDate('data_generated_at', $targetDate)
+            ->first();
+
+        if ($existingDaily) {
+            $existingDaily->update([
+                'terra_user_id'     => 'apple_' . $user->id,
+                'payload'           => $dailyPayload,
+                'data_generated_at' => $dataGeneratedAt,
+            ]);
+        } else {
+            \App\Models\TerraActivityData::create([
+                'user_id'           => $user->id,
+                'terra_user_id'     => 'apple_' . $user->id,
+                'type'              => 'daily',
+                'payload'           => $dailyPayload,
+                'data_generated_at' => $dataGeneratedAt,
+            ]);
+        }
+
+        // 3. If sleep hours are provided, also update or create a 'sleep' record
         if ($sleepHours !== null) {
             $sleepPayload = [
                 'source'     => $source,
@@ -348,13 +380,26 @@ class TerraWebhookController extends Controller
                 ],
             ];
 
-            \App\Models\TerraActivityData::create([
-                'user_id'           => $user->id,
-                'terra_user_id'     => 'apple_' . $user->id,
-                'type'              => 'sleep',
-                'payload'           => $sleepPayload,
-                'data_generated_at' => $dataGeneratedAt,
-            ]);
+            $existingSleep = \App\Models\TerraActivityData::where('user_id', $user->id)
+                ->where('type', 'sleep')
+                ->whereDate('data_generated_at', $targetDate)
+                ->first();
+
+            if ($existingSleep) {
+                $existingSleep->update([
+                    'terra_user_id'     => 'apple_' . $user->id,
+                    'payload'           => $sleepPayload,
+                    'data_generated_at' => $dataGeneratedAt,
+                ]);
+            } else {
+                \App\Models\TerraActivityData::create([
+                    'user_id'           => $user->id,
+                    'terra_user_id'     => 'apple_' . $user->id,
+                    'type'              => 'sleep',
+                    'payload'           => $sleepPayload,
+                    'data_generated_at' => $dataGeneratedAt,
+                ]);
+            }
         }
 
         return response()->json([
