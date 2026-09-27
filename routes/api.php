@@ -283,6 +283,8 @@ Route::prefix('v1')->group(function () {
         Route::post('/terra/widget-session', [TerraWebhookController::class, 'generateWidgetSession']);
         Route::get('/terra/activity-data', [TerraWebhookController::class, 'getActivityData']);
         Route::get('/terra/connections', [TerraWebhookController::class, 'getConnections']);
+        Route::post('/health-data/sync', [TerraWebhookController::class, 'syncDeviceData']);
+        Route::post('/apple-health/sync', [TerraWebhookController::class, 'syncDeviceData']);
 
         //Subscription Plans
         Route::get('/subscription-plans', [SubscriptionPlanController::class, 'getAllPlans']);
