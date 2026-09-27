@@ -147,14 +147,14 @@ class TerraWebhookController extends Controller
     public function getScores(Request $request)
     {
         $request->validate([
-            'type' => 'nullable|in:sleep,energy,hrv,stress,readiness,calories,step',
+            'type' => 'nullable|in:sleep,energy,hrv,stress,readiness,calories,step,hydration,hydration_ml',
             'date' => 'nullable|date',
         ]);
 
         $type = $request->type;
         $date = $request->date;
 
-        $typesToFetch = $type ? [$type] : ['sleep', 'energy', 'hrv', 'stress', 'readiness', 'calories', 'step'];
+        $typesToFetch = $type ? [$type] : ['sleep', 'energy', 'hrv', 'stress', 'readiness', 'calories', 'step', 'hydration_ml'];
 
         $terraTypesNeeded = collect($typesToFetch)
             ->map(fn($t) => in_array($t, ['sleep', 'hrv', 'readiness', 'energy']) ? 'sleep' : 'daily')
@@ -207,7 +207,7 @@ class TerraWebhookController extends Controller
     {
         $today = now()->timezone(config('app.timezone'))->toDateString(); // যেমন: 2026-07-16
 
-        $types = ['sleep', 'energy', 'hrv', 'stress', 'readiness', 'calories', 'step'];
+        $types = ['sleep', 'energy', 'hrv', 'stress', 'readiness', 'calories', 'step', 'hydration_ml'];
 
         $terraTypesNeeded = collect($types)
             ->map(fn($t) => in_array($t, ['sleep', 'hrv', 'readiness', 'energy']) ? 'sleep' : 'daily')
@@ -247,14 +247,16 @@ class TerraWebhookController extends Controller
     public function syncDeviceData(Request $request)
     {
         $request->validate([
-            'source'      => 'nullable|string',
-            'steps'       => 'nullable',
-            'heart_rate'  => 'nullable',
-            'sleep_hours' => 'nullable',
-            'synced_at'   => 'nullable|string',
+            'user_id'      => 'nullable|integer',
+            'source'       => 'nullable|string',
+            'steps'        => 'nullable',
+            'heart_rate'   => 'nullable',
+            'sleep_hours'  => 'nullable',
+            'hydration_ml' => 'nullable',
+            'synced_at'    => 'nullable|string',
         ]);
 
-        $user = $request->user();
+        $user = $request->user('sanctum') ?? $request->user();
         if (!$user && $request->filled('user_id')) {
             $user = \App\Models\User::find($request->user_id);
         }
@@ -270,6 +272,7 @@ class TerraWebhookController extends Controller
         $steps = $request->has('steps') && $request->steps !== null ? (int) $request->steps : null;
         $heartRate = $request->has('heart_rate') && $request->heart_rate !== null ? (float) $request->heart_rate : null;
         $sleepHours = $request->has('sleep_hours') && $request->sleep_hours !== null ? (float) $request->sleep_hours : null;
+        $hydrationMl = $request->has('hydration_ml') && $request->hydration_ml !== null ? (float) $request->hydration_ml : null;
 
         $dataGeneratedAt = $request->synced_at ? \Carbon\Carbon::parse($request->synced_at) : now();
 
@@ -286,24 +289,43 @@ class TerraWebhookController extends Controller
             ]
         );
 
-        // 2. Save Daily Activity Data (steps, heart rate, etc.)
+        $targetDate = $dataGeneratedAt->toDateString();
+
+        $existingDaily = \App\Models\TerraActivityData::where('user_id', $user->id)
+            ->where('type', 'daily')
+            ->whereDate('data_generated_at', $targetDate)
+            ->first();
+
+        if ($existingDaily && is_array($existingDaily->payload)) {
+            $prev = $existingDaily->payload;
+            $steps = $steps ?? ($prev['steps'] ?? null);
+            $heartRate = $heartRate ?? ($prev['heart_rate'] ?? null);
+            $sleepHours = $sleepHours ?? ($prev['sleep']['hours'] ?? null);
+            $hydrationMl = $hydrationMl ?? ($prev['hydration_ml'] ?? null);
+        }
+
+        // 2. Save Daily Activity Data (steps, heart rate, hydration, etc.)
         $dailyPayload = [
-            'source'     => $source,
-            'steps'      => $steps,
-            'heart_rate' => $heartRate,
-            'sleep'      => [
+            'source'       => $source,
+            'steps'        => $steps,
+            'heart_rate'   => $heartRate,
+            'hydration_ml' => $hydrationMl,
+            'sleep'        => [
                 'hours'   => $sleepHours,
                 'quality' => 'Good',
             ],
-            'hrv'        => [
+            'hrv'          => [
                 'value'  => $heartRate,
                 'status' => 'Normal',
             ],
-            'stress'     => [
+            'stress'       => [
                 'level'  => 20,
                 'status' => 'Low',
             ],
-            'data'       => [
+            'hydration'    => [
+                'amount_ml' => $hydrationMl,
+            ],
+            'data'         => [
                 [
                     'metadata'        => [
                         'start_time' => $dataGeneratedAt->toIso8601String(),
@@ -320,16 +342,12 @@ class TerraWebhookController extends Controller
                     'scores'          => [
                         'sleep' => $sleepHours,
                     ],
+                    'hydration_data'  => [
+                        'hydration_ml' => $hydrationMl,
+                    ],
                 ],
             ],
         ];
-
-        $targetDate = $dataGeneratedAt->toDateString();
-
-        $existingDaily = \App\Models\TerraActivityData::where('user_id', $user->id)
-            ->where('type', 'daily')
-            ->whereDate('data_generated_at', $targetDate)
-            ->first();
 
         if ($existingDaily) {
             $existingDaily->update([
@@ -404,13 +422,14 @@ class TerraWebhookController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Apple Health / Watch data synced successfully.',
+            'message' => 'Health data synced successfully.',
             'synced'  => [
-                'source'      => $source,
-                'steps'       => $steps,
-                'heart_rate'  => $heartRate,
-                'sleep_hours' => $sleepHours,
-                'synced_at'   => $dataGeneratedAt->toIso8601String(),
+                'source'       => $source,
+                'steps'        => $steps,
+                'heart_rate'   => $heartRate,
+                'sleep_hours'  => $sleepHours,
+                'hydration_ml' => $hydrationMl,
+                'synced_at'    => $dataGeneratedAt->toIso8601String(),
             ],
         ], 200);
     }
@@ -426,6 +445,9 @@ class TerraWebhookController extends Controller
         }
         if (($type === 'hrv' || $type === 'heart_rate') && isset($payload['heart_rate'])) {
             return $payload['heart_rate'];
+        }
+        if (($type === 'hydration' || $type === 'hydration_ml') && isset($payload['hydration_ml'])) {
+            return $payload['hydration_ml'];
         }
 
         $data = $payload['data'][0] ?? null;
@@ -456,6 +478,12 @@ class TerraWebhookController extends Controller
 
             case 'calories':
                 return $data['calories_data']['total_burned_calories'] ?? null;
+
+            case 'hydration':
+            case 'hydration_ml':
+                return $data['hydration_data']['hydration_ml']
+                    ?? $data['hydration_data']['amount_ml']
+                    ?? null;
 
             default:
                 return null;

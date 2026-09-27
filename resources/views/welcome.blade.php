@@ -628,6 +628,16 @@
                     <span class="endpoint-name">/cycle-engine/opk/ui</span>
                 </button>
 
+                <div class="endpoint-category-title">Health & Device Data</div>
+                <button class="endpoint-item" onclick="loadEndpoint('POST', '/api/v1/health-data/sync', {'steps': 8500, 'heart_rate': 72, 'sleep_hours': 7.5, 'hydration_ml': 2200}, 'Sync Health & Device Data (Steps, HR, Sleep, Hydration)')">
+                    <span class="method-badge method-post">POST</span>
+                    <span class="endpoint-name">/health-data/sync</span>
+                </button>
+                <button class="endpoint-item" onclick="loadEndpoint('GET', '/api/v1/terra/today-scores', null, 'Today Aggregate Scores & Hydration')">
+                    <span class="method-badge method-get">GET</span>
+                    <span class="endpoint-name">/terra/today-scores</span>
+                </button>
+
                 <div class="endpoint-category-title">TTC & Marketplace</div>
                 <button class="endpoint-item" onclick="loadEndpoint('GET', '/api/v1/ttc/sync-overview', null, 'TTC Conception Overview & Surge Sync')">
                     <span class="method-badge method-get">GET</span>
