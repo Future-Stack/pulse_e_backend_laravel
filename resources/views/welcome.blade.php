@@ -628,6 +628,30 @@
                     <span class="endpoint-name">/cycle-engine/opk/ui</span>
                 </button>
 
+                <div class="endpoint-category-title">Cycle & Fertility (AI Insights)</div>
+                <button class="endpoint-item" onclick="loadEndpoint('GET', '/api/v1/cycle-fertility/overview?user_id=2', null, 'Cycle & Fertility Overview (Hormone Trends, Today Insights)')">
+                    <span class="method-badge method-get">GET</span>
+                    <span class="endpoint-name">/cycle-fertility/overview</span>
+                </button>
+                <button class="endpoint-item" onclick="loadEndpoint('GET', '/api/v1/cycle/hormone-trends?user_id=2', null, 'Hormone Trends (Estrogen, Progesterone, LH Surge)')">
+                    <span class="method-badge method-get">GET</span>
+                    <span class="endpoint-name">/cycle/hormone-trends</span>
+                </button>
+                <button class="endpoint-item" onclick="loadEndpoint('GET', '/api/v1/cycle/today-insights?user_id=2', null, 'Today\'s Insights (Fertility, Mucus, BBT Cards)')">
+                    <span class="method-badge method-get">GET</span>
+                    <span class="endpoint-name">/cycle/today-insights</span>
+                </button>
+
+                <div class="endpoint-category-title">Athlete Performance (Cycle-Synced)</div>
+                <button class="endpoint-item" onclick="loadEndpoint('GET', '/api/v1/athlete/unified-performance?user_id=2', null, 'Athlete Unified Performance (Readiness, HRV, Load, 4 Phase Cards)')">
+                    <span class="method-badge method-get">GET</span>
+                    <span class="endpoint-name">/athlete/unified-performance</span>
+                </button>
+                <button class="endpoint-item" onclick="loadEndpoint('GET', '/api/v1/athlete/history?user_id=2', null, 'Athlete Performance History')">
+                    <span class="method-badge method-get">GET</span>
+                    <span class="endpoint-name">/athlete/history</span>
+                </button>
+
                 <div class="endpoint-category-title">Health & Device Data</div>
                 <button class="endpoint-item" onclick="loadEndpoint('POST', '/api/v1/health-data/sync', {'steps': 8500, 'heart_rate': 72, 'sleep_hours': 7.5, 'hydration_ml': 2200}, 'Sync Health & Device Data (Steps, HR, Sleep, Hydration)')">
                     <span class="method-badge method-post">POST</span>
