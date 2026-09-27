@@ -118,6 +118,10 @@ Route::prefix('v1')->group(function () {
     Route::get('/cervical-mucus/hormone-trends', [CervicalMucusLogController::class, 'hormoneTrends']);
     Route::get('/hormone-trends', [CervicalMucusLogController::class, 'hormoneTrends']);
 
+    // Health data sync (supports user_id in body/query or token)
+    Route::post('/health-data/sync', [TerraWebhookController::class, 'syncDeviceData']);
+    Route::post('/apple-health/sync', [TerraWebhookController::class, 'syncDeviceData']);
+
     Route::middleware('auth:sanctum')->group(function () {
 
     Route::post('/cycle-calendar-inputs',[CycleCalendarInputController::class, 'store']);

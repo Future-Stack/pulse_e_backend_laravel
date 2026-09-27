@@ -16,7 +16,7 @@ class ProfileController extends Controller
     {
         try {
 //            $user = auth()->user();
-            $user = User::where('id',auth()->id())->select('id','full_name','email')->with('profile:id,user_id,life_stage_id,bio,profile_img,age,height,weight','profile.lifeStage','profile.connectDevices','profile.lifeJourneys','latestSubscription.subscriptionPlan')->first();
+            $user = User::where('id',auth()->id())->select('id','full_name','email')->with('profile:id,user_id,life_stage_id,bio,profile_img,age,height,weight','profile.lifeStage','profile.connectDevices','profile.lifeJourneys','latestSubscription.subscriptionPlan', 'userLimits')->first();
 
             return response()->json([
                 'success' => true,
