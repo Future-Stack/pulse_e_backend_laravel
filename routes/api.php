@@ -47,6 +47,8 @@ use App\Http\Controllers\AI\TryingToConceiveController;
 use App\Http\Controllers\AI\AwarenessController;
 use App\Http\Controllers\AI\CycleCalendarInputController;
 use App\Http\Controllers\AI\CervicalMucusLogController;
+use App\Http\Controllers\AI\CycleFertilityController;
+use App\Http\Controllers\AI\AthletePerformanceController;
 use Illuminate\Support\Facades\Artisan;
 
 Route::prefix('v1')->group(function () {
@@ -83,6 +85,9 @@ Route::prefix('v1')->group(function () {
         Route::post('reset-password', [AuthController::class, 'resetPassword']);
     });
 
+    Route::get('/cycle-overview', [CycleFertilityController::class, 'overview']);
+    Route::get('/athlete/unified-performance', [AthletePerformanceController::class, 'unifiedPerformance']);
+
     // Google OAuth (public, no auth required)
     Route::post('/google/token', [GoogleAuthController::class, 'tokenLogin']);
     //Apple
@@ -113,10 +118,22 @@ Route::prefix('v1')->group(function () {
     Route::get('/cycle-engine/cervical-mucus/history', [CervicalMucusLogController::class, 'history']);
     Route::get('/cervical-mucus/history', [CervicalMucusLogController::class, 'history']);
 
-    // Hormone Trends
+    // Hormone Trends & Today's Insights (Cycle & Fertility)
+    Route::get('/cycle-fertility/overview', [CycleFertilityController::class, 'overview']);
+    Route::get('/cycle-overview', [CycleFertilityController::class, 'overview']);
+    Route::get('/cycle-fertility/hormone-trends', [CycleFertilityController::class, 'hormoneTrends']);
+    Route::get('/cycle/hormone-trends', [CycleFertilityController::class, 'hormoneTrends']);
     Route::get('/cycle-engine/hormone-trends', [CervicalMucusLogController::class, 'hormoneTrends']);
     Route::get('/cervical-mucus/hormone-trends', [CervicalMucusLogController::class, 'hormoneTrends']);
-    Route::get('/hormone-trends', [CervicalMucusLogController::class, 'hormoneTrends']);
+    Route::get('/hormone-trends', [CycleFertilityController::class, 'hormoneTrends']);
+    Route::get('/cycle-fertility/today-insights', [CycleFertilityController::class, 'todayInsights']);
+    Route::get('/cycle/today-insights', [CycleFertilityController::class, 'todayInsights']);
+    Route::get('/today-insights', [CycleFertilityController::class, 'todayInsights']);
+
+    // Athlete Performance (Cycle-synced training intelligence)
+    Route::get('/athlete/unified-performance', [AthletePerformanceController::class, 'unifiedPerformance']);
+    Route::get('/athlete/performance', [AthletePerformanceController::class, 'unifiedPerformance']);
+    Route::get('/athlete/history', [AthletePerformanceController::class, 'history']);
 
     // Health data sync (supports user_id in body/query or token)
     Route::post('/health-data/sync', [TerraWebhookController::class, 'syncDeviceData']);
