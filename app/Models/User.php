@@ -133,7 +133,7 @@ class User extends Authenticatable
 
     public function userLimits(): HasMany
     {
-        return $this->hasMany(UserLimit::class);
+        return $this->hasMany(UserLimit::class, 'user_id', 'id');
     }
 
     public function userLimit(): HasOne
@@ -144,38 +144,39 @@ class User extends Authenticatable
 
     //new
     public function cycleMode()
-{
-    return $this->hasOne(CycleMode::class);
-}
+    {
+        return $this->hasOne(CycleMode::class);
+    }
 
-public function cycleSetting()
-{
-    return $this->hasOne(CycleSetting::class);
-}
+    public function cycleSetting()
+    {
+        return $this->hasOne(CycleSetting::class);
+    }
 
-public function cycleStatistic()
-{
-    return $this->hasOne(CycleStatistic::class);
-}
+    public function cycleStatistic()
+    {
+        return $this->hasOne(CycleStatistic::class);
+    }
 
-public function menstrualCycles()
-{
-    return $this->hasMany(MenstrualCycle::class);
-}
+    public function menstrualCycles()
+    {
+        return $this->hasMany(MenstrualCycle::class);
+    }
 
-public function notificationHistories()
-{
-    return $this->hasMany(NotificationHistory::class);
-}
+    public function notificationHistories()
+    {
+        return $this->hasMany(NotificationHistory::class);
+    }
 
-public function cycleConsent()
-{
-    return $this->hasOne(CycleConsent::class);
-}
+    public function cycleConsent()
+    {
+        return $this->hasOne(CycleConsent::class);
+    }
 
 
-public function ttcPredictions()
-{
-    return $this->hasMany(TtcPrediction::class);
-}
+    public function ttcPredictions()
+    {
+        return $this->hasMany(TtcPrediction::class);
+    }
+
 }
