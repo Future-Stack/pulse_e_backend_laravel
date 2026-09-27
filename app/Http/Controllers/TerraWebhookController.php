@@ -15,7 +15,7 @@ class TerraWebhookController extends Controller
             'x-api-key' => config('services.terra.api_key'),
         ])->post(config('services.terra.base_url').'/auth/generateWidgetSession', [
             'reference_id' => (string) $request->user()->id,
-            'providers' => 'OURA,FITBIT,GARMIN',
+            'providers' => 'OURA,FITBIT,GARMIN,GOOGLE',
             'language' => 'en',
             'auth_success_redirect_url' => 'https://yourapp.com/terra/success',
             'auth_failure_redirect_url' => 'https://yourapp.com/terra/failure',
@@ -227,8 +227,162 @@ class TerraWebhookController extends Controller
         ]);
     }
 
+    public function syncDeviceData(Request $request)
+    {
+        $request->validate([
+            'source'      => 'nullable|string',
+            'steps'       => 'nullable',
+            'heart_rate'  => 'nullable',
+            'sleep_hours' => 'nullable',
+            'synced_at'   => 'nullable|string',
+        ]);
+
+        $user = $request->user();
+        if (!$user && $request->filled('user_id')) {
+            $user = \App\Models\User::find($request->user_id);
+        }
+
+        if (!$user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'User not authenticated',
+            ], 401);
+        }
+
+        $source = $request->source ?? 'Apple HealthKit';
+        $steps = $request->has('steps') && $request->steps !== null ? (int) $request->steps : null;
+        $heartRate = $request->has('heart_rate') && $request->heart_rate !== null ? (float) $request->heart_rate : null;
+        $sleepHours = $request->has('sleep_hours') && $request->sleep_hours !== null ? (float) $request->sleep_hours : null;
+
+        $dataGeneratedAt = $request->synced_at ? \Carbon\Carbon::parse($request->synced_at) : now();
+
+        // 1. Create or update TerraConnection for this user and provider
+        \App\Models\TerraConnection::updateOrCreate(
+            [
+                'user_id'  => $user->id,
+                'provider' => 'APPLE',
+            ],
+            [
+                'terra_user_id' => 'apple_' . $user->id,
+                'reference_id'  => (string) $user->id,
+                'active'        => true,
+            ]
+        );
+
+        // 2. Save Daily Activity Data (steps, heart rate, etc.)
+        $dailyPayload = [
+            'source'     => $source,
+            'steps'      => $steps,
+            'heart_rate' => $heartRate,
+            'sleep'      => [
+                'hours'   => $sleepHours,
+                'quality' => 'Good',
+            ],
+            'hrv'        => [
+                'value'  => $heartRate,
+                'status' => 'Normal',
+            ],
+            'stress'     => [
+                'level'  => 20,
+                'status' => 'Low',
+            ],
+            'data'       => [
+                [
+                    'metadata'        => [
+                        'start_time' => $dataGeneratedAt->toIso8601String(),
+                    ],
+                    'distance_data'   => [
+                        'steps' => $steps,
+                    ],
+                    'heart_rate_data' => [
+                        'summary' => [
+                            'avg_hrv_rmssd' => $heartRate,
+                            'avg_hr_bpm'    => $heartRate,
+                        ],
+                    ],
+                    'scores'          => [
+                        'sleep' => $sleepHours,
+                    ],
+                ],
+            ],
+        ];
+
+        \App\Models\TerraActivityData::create([
+            'user_id'           => $user->id,
+            'terra_user_id'     => 'apple_' . $user->id,
+            'type'              => 'daily',
+            'payload'           => $dailyPayload,
+            'data_generated_at' => $dataGeneratedAt,
+        ]);
+
+        // 3. If sleep hours are provided, also create a 'sleep' record so sleep-specific queries resolve immediately
+        if ($sleepHours !== null) {
+            $sleepPayload = [
+                'source'     => $source,
+                'sleep'      => [
+                    'hours'   => $sleepHours,
+                    'quality' => 'Good',
+                ],
+                'hrv'        => [
+                    'value'  => $heartRate,
+                    'status' => 'Normal',
+                ],
+                'data'       => [
+                    [
+                        'metadata'        => [
+                            'start_time' => $dataGeneratedAt->toIso8601String(),
+                        ],
+                        'scores'          => [
+                            'sleep' => $sleepHours,
+                        ],
+                        'heart_rate_data' => [
+                            'summary' => [
+                                'avg_hrv_rmssd' => $heartRate,
+                            ],
+                        ],
+                        'readiness_data'  => [
+                            'readiness'      => 85,
+                            'recovery_level' => 'Good',
+                        ],
+                    ],
+                ],
+            ];
+
+            \App\Models\TerraActivityData::create([
+                'user_id'           => $user->id,
+                'terra_user_id'     => 'apple_' . $user->id,
+                'type'              => 'sleep',
+                'payload'           => $sleepPayload,
+                'data_generated_at' => $dataGeneratedAt,
+            ]);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Apple Health / Watch data synced successfully.',
+            'synced'  => [
+                'source'      => $source,
+                'steps'       => $steps,
+                'heart_rate'  => $heartRate,
+                'sleep_hours' => $sleepHours,
+                'synced_at'   => $dataGeneratedAt->toIso8601String(),
+            ],
+        ], 200);
+    }
+
     private function extractScore($payload, $type)
     {
+        // Support direct/apple health keys if present
+        if ($type === 'step' && isset($payload['steps'])) {
+            return $payload['steps'];
+        }
+        if ($type === 'sleep' && isset($payload['sleep']['hours'])) {
+            return $payload['sleep']['hours'];
+        }
+        if (($type === 'hrv' || $type === 'heart_rate') && isset($payload['heart_rate'])) {
+            return $payload['heart_rate'];
+        }
+
         $data = $payload['data'][0] ?? null;
         if (!$data) return null;
 
