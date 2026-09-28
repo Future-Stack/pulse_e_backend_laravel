@@ -15,7 +15,7 @@ class TerraWebhookController extends Controller
             'x-api-key' => config('services.terra.api_key'),
         ])->post(config('services.terra.base_url').'/auth/generateWidgetSession', [
             'reference_id' => (string) $request->user()->id,
-            'providers' => 'OURA,FITBIT,GARMIN',
+            'providers' => 'OURA,FITBIT,GARMIN,GOOGLE',
             'language' => 'en',
             'auth_success_redirect_url' => 'https://yourapp.com/terra/success',
             'auth_failure_redirect_url' => 'https://yourapp.com/terra/failure',
@@ -54,13 +54,30 @@ class TerraWebhookController extends Controller
                     ]
                 );
             } else {
-                \App\Models\TerraActivityData::create([
-                    'user_id' => $user?->id,
-                    'terra_user_id' => $terraUserId,
-                    'type' => $type,
-                    'payload' => $payload,
-                    'data_generated_at' => $payload['data'][0]['metadata']['start_time'] ?? null,
-                ]);
+                $rawStartTime = $payload['data'][0]['metadata']['start_time'] ?? null;
+                $generatedAt = $rawStartTime ? \Carbon\Carbon::parse($rawStartTime) : now();
+                $targetDate = $generatedAt->toDateString();
+
+                $existingActivity = \App\Models\TerraActivityData::where('user_id', $user?->id)
+                    ->where('type', $type)
+                    ->whereDate('data_generated_at', $targetDate)
+                    ->first();
+
+                if ($existingActivity) {
+                    $existingActivity->update([
+                        'terra_user_id'     => $terraUserId,
+                        'payload'           => $payload,
+                        'data_generated_at' => $generatedAt,
+                    ]);
+                } else {
+                    \App\Models\TerraActivityData::create([
+                        'user_id'           => $user?->id,
+                        'terra_user_id'     => $terraUserId,
+                        'type'              => $type,
+                        'payload'           => $payload,
+                        'data_generated_at' => $generatedAt,
+                    ]);
+                }
             }
         } catch (\Exception $e) {
             Log::error('Terra webhook save failed: '.$e->getMessage());
@@ -130,14 +147,14 @@ class TerraWebhookController extends Controller
     public function getScores(Request $request)
     {
         $request->validate([
-            'type' => 'nullable|in:sleep,energy,hrv,stress,readiness,calories,step',
+            'type' => 'nullable|in:sleep,energy,hrv,stress,readiness,calories,step,hydration,hydration_ml',
             'date' => 'nullable|date',
         ]);
 
         $type = $request->type;
         $date = $request->date;
 
-        $typesToFetch = $type ? [$type] : ['sleep', 'energy', 'hrv', 'stress', 'readiness', 'calories', 'step'];
+        $typesToFetch = $type ? [$type] : ['sleep', 'energy', 'hrv', 'stress', 'readiness', 'calories', 'step', 'hydration_ml'];
 
         $terraTypesNeeded = collect($typesToFetch)
             ->map(fn($t) => in_array($t, ['sleep', 'hrv', 'readiness', 'energy']) ? 'sleep' : 'daily')
@@ -190,7 +207,7 @@ class TerraWebhookController extends Controller
     {
         $today = now()->timezone(config('app.timezone'))->toDateString(); // যেমন: 2026-07-16
 
-        $types = ['sleep', 'energy', 'hrv', 'stress', 'readiness', 'calories', 'step'];
+        $types = ['sleep', 'energy', 'hrv', 'stress', 'readiness', 'calories', 'step', 'hydration_ml'];
 
         $terraTypesNeeded = collect($types)
             ->map(fn($t) => in_array($t, ['sleep', 'hrv', 'readiness', 'energy']) ? 'sleep' : 'daily')
@@ -227,8 +244,212 @@ class TerraWebhookController extends Controller
         ]);
     }
 
+    public function syncDeviceData(Request $request)
+    {
+        $request->validate([
+            'user_id'      => 'nullable|integer',
+            'source'       => 'nullable|string',
+            'steps'        => 'nullable',
+            'heart_rate'   => 'nullable',
+            'sleep_hours'  => 'nullable',
+            'hydration_ml' => 'nullable',
+            'synced_at'    => 'nullable|string',
+        ]);
+
+        $user = $request->user('sanctum') ?? $request->user();
+        if (!$user && $request->filled('user_id')) {
+            $user = \App\Models\User::find($request->user_id);
+        }
+
+        if (!$user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'User not authenticated',
+            ], 401);
+        }
+
+        $source = $request->source ?? 'Apple HealthKit';
+        $steps = $request->has('steps') && $request->steps !== null ? (int) $request->steps : null;
+        $heartRate = $request->has('heart_rate') && $request->heart_rate !== null ? (float) $request->heart_rate : null;
+        $sleepHours = $request->has('sleep_hours') && $request->sleep_hours !== null ? (float) $request->sleep_hours : null;
+        $hydrationMl = $request->has('hydration_ml') && $request->hydration_ml !== null ? (float) $request->hydration_ml : null;
+
+        $dataGeneratedAt = $request->synced_at ? \Carbon\Carbon::parse($request->synced_at) : now();
+
+        // 1. Create or update TerraConnection for this user and provider
+        \App\Models\TerraConnection::updateOrCreate(
+            [
+                'user_id'  => $user->id,
+                'provider' => 'APPLE',
+            ],
+            [
+                'terra_user_id' => 'apple_' . $user->id,
+                'reference_id'  => (string) $user->id,
+                'active'        => true,
+            ]
+        );
+
+        $targetDate = $dataGeneratedAt->toDateString();
+
+        $existingDaily = \App\Models\TerraActivityData::where('user_id', $user->id)
+            ->where('type', 'daily')
+            ->whereDate('data_generated_at', $targetDate)
+            ->first();
+
+        if ($existingDaily && is_array($existingDaily->payload)) {
+            $prev = $existingDaily->payload;
+            $steps = $steps ?? ($prev['steps'] ?? null);
+            $heartRate = $heartRate ?? ($prev['heart_rate'] ?? null);
+            $sleepHours = $sleepHours ?? ($prev['sleep']['hours'] ?? null);
+            $hydrationMl = $hydrationMl ?? ($prev['hydration_ml'] ?? null);
+        }
+
+        // 2. Save Daily Activity Data (steps, heart rate, hydration, etc.)
+        $dailyPayload = [
+            'source'       => $source,
+            'steps'        => $steps,
+            'heart_rate'   => $heartRate,
+            'hydration_ml' => $hydrationMl,
+            'sleep'        => [
+                'hours'   => $sleepHours,
+                'quality' => 'Good',
+            ],
+            'hrv'          => [
+                'value'  => $heartRate,
+                'status' => 'Normal',
+            ],
+            'stress'       => [
+                'level'  => 20,
+                'status' => 'Low',
+            ],
+            'hydration'    => [
+                'amount_ml' => $hydrationMl,
+            ],
+            'data'         => [
+                [
+                    'metadata'        => [
+                        'start_time' => $dataGeneratedAt->toIso8601String(),
+                    ],
+                    'distance_data'   => [
+                        'steps' => $steps,
+                    ],
+                    'heart_rate_data' => [
+                        'summary' => [
+                            'avg_hrv_rmssd' => $heartRate,
+                            'avg_hr_bpm'    => $heartRate,
+                        ],
+                    ],
+                    'scores'          => [
+                        'sleep' => $sleepHours,
+                    ],
+                    'hydration_data'  => [
+                        'hydration_ml' => $hydrationMl,
+                    ],
+                ],
+            ],
+        ];
+
+        if ($existingDaily) {
+            $existingDaily->update([
+                'terra_user_id'     => 'apple_' . $user->id,
+                'payload'           => $dailyPayload,
+                'data_generated_at' => $dataGeneratedAt,
+            ]);
+        } else {
+            \App\Models\TerraActivityData::create([
+                'user_id'           => $user->id,
+                'terra_user_id'     => 'apple_' . $user->id,
+                'type'              => 'daily',
+                'payload'           => $dailyPayload,
+                'data_generated_at' => $dataGeneratedAt,
+            ]);
+        }
+
+        // 3. If sleep hours are provided, also update or create a 'sleep' record
+        if ($sleepHours !== null) {
+            $sleepPayload = [
+                'source'     => $source,
+                'sleep'      => [
+                    'hours'   => $sleepHours,
+                    'quality' => 'Good',
+                ],
+                'hrv'        => [
+                    'value'  => $heartRate,
+                    'status' => 'Normal',
+                ],
+                'data'       => [
+                    [
+                        'metadata'        => [
+                            'start_time' => $dataGeneratedAt->toIso8601String(),
+                        ],
+                        'scores'          => [
+                            'sleep' => $sleepHours,
+                        ],
+                        'heart_rate_data' => [
+                            'summary' => [
+                                'avg_hrv_rmssd' => $heartRate,
+                            ],
+                        ],
+                        'readiness_data'  => [
+                            'readiness'      => 85,
+                            'recovery_level' => 'Good',
+                        ],
+                    ],
+                ],
+            ];
+
+            $existingSleep = \App\Models\TerraActivityData::where('user_id', $user->id)
+                ->where('type', 'sleep')
+                ->whereDate('data_generated_at', $targetDate)
+                ->first();
+
+            if ($existingSleep) {
+                $existingSleep->update([
+                    'terra_user_id'     => 'apple_' . $user->id,
+                    'payload'           => $sleepPayload,
+                    'data_generated_at' => $dataGeneratedAt,
+                ]);
+            } else {
+                \App\Models\TerraActivityData::create([
+                    'user_id'           => $user->id,
+                    'terra_user_id'     => 'apple_' . $user->id,
+                    'type'              => 'sleep',
+                    'payload'           => $sleepPayload,
+                    'data_generated_at' => $dataGeneratedAt,
+                ]);
+            }
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Health data synced successfully.',
+            'synced'  => [
+                'source'       => $source,
+                'steps'        => $steps,
+                'heart_rate'   => $heartRate,
+                'sleep_hours'  => $sleepHours,
+                'hydration_ml' => $hydrationMl,
+                'synced_at'    => $dataGeneratedAt->toIso8601String(),
+            ],
+        ], 200);
+    }
+
     private function extractScore($payload, $type)
     {
+        // Support direct/apple health keys if present
+        if ($type === 'step' && isset($payload['steps'])) {
+            return $payload['steps'];
+        }
+        if ($type === 'sleep' && isset($payload['sleep']['hours'])) {
+            return $payload['sleep']['hours'];
+        }
+        if (($type === 'hrv' || $type === 'heart_rate') && isset($payload['heart_rate'])) {
+            return $payload['heart_rate'];
+        }
+        if (($type === 'hydration' || $type === 'hydration_ml') && isset($payload['hydration_ml'])) {
+            return $payload['hydration_ml'];
+        }
+
         $data = $payload['data'][0] ?? null;
         if (!$data) return null;
 
@@ -257,6 +478,12 @@ class TerraWebhookController extends Controller
 
             case 'calories':
                 return $data['calories_data']['total_burned_calories'] ?? null;
+
+            case 'hydration':
+            case 'hydration_ml':
+                return $data['hydration_data']['hydration_ml']
+                    ?? $data['hydration_data']['amount_ml']
+                    ?? null;
 
             default:
                 return null;
