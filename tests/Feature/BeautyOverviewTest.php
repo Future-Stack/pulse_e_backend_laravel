@@ -191,12 +191,8 @@ class BeautyOverviewTest extends TestCase
         $authResponse->assertStatus(200);
         $authResponse->assertJsonPath('today.id', $savedScan->id);
 
-        // 4. Test POST /api/v1/beauty-overview with {"user_id": ..., "days": 30, "include_correlations": true}
-        $postQueryResponse = $this->postJson('/api/v1/beauty-overview', [
-            'user_id' => $user->id,
-            'days' => 30,
-            'include_correlations' => true,
-        ]);
+        // 4. Test GET /api/v1/beauty-overview with ?user_id=...&days=30&include_correlations=true
+        $postQueryResponse = $this->getJson("/api/v1/beauty-overview?user_id={$user->id}&days=30&include_correlations=true");
         $postQueryResponse->assertStatus(200);
         $postQueryResponse->assertJsonPath('today.id', $savedScan->id);
         $postQueryResponse->assertJsonPath('today.overall_score', 76);
