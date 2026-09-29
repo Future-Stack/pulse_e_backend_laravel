@@ -137,8 +137,8 @@ Route::prefix('v1')->group(function () {
 
     Route::get('/cycle-calendar-inputs/{user_id}',[CycleCalendarInputController::class, 'show']);
 
-    // Beauty Overview (supports user_id in body/query or token)
-    Route::match(['get', 'post'], '/beauty-overview', [SkinScanController::class, 'handleBeautyOverview']);
+    // Beauty Overview (supports user_id in query or token)
+    Route::get('/beauty-overview', [SkinScanController::class, 'getBeautyOverview']);
     Route::post('/beauty-overview/save', [SkinScanController::class, 'saveBeautyOverview']);
     Route::post('/beauty-overview/sync', [SkinScanController::class, 'syncBeautyOverview']);
 
@@ -373,9 +373,6 @@ Route::prefix('v1')->group(function () {
         //Skin Scan
         Route::get('/skin-scans/history', [SkinScanController::class, 'index']);
         Route::get('/skin-scans/beauty-overview', [SkinScanController::class, 'getBeautyOverview']);
-        Route::post('/skin-scans/beauty-overview', [SkinScanController::class, 'saveBeautyOverview']);
-        Route::post('/skin-scans/beauty-overview/sync', [SkinScanController::class, 'syncBeautyOverview']);
-        Route::post('/skin-scans/beauty-overview/save', [SkinScanController::class, 'saveBeautyOverview']);
         Route::get('/skin-scans/{id}', [SkinScanController::class, 'show']);
         Route::post('/skin-scans/analyze', [SkinScanController::class, 'store']);
         Route::post('/skin-scans/{id}/insights', [SkinScanController::class, 'updateAiInsights']);

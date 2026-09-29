@@ -63,7 +63,7 @@ class ProfileController extends Controller
                 $subStage = 'postpartum';
                 $stageDetails = [
                     'stage'           => 'postpartum',
-                    'current_week'    => $postpartum->current_week,
+                    'current_week'    => $postpartum->weeks_since_delivery,
                     'delivery_date'   => $postpartum->delivery_date?->toDateString(),
                 ];
             }
