@@ -409,10 +409,12 @@ class PregnancyPostpartumController extends Controller
 
     private function formatPostpartumData(PostpartumRecovery $postpartum): array
     {
+        $currentWeek = $postpartum->weeks_since_delivery;
+
         return [
             'banner' => [
                 'tag'       => 'Recovery Progress',
-                'week'      => "Week {$postpartum->current_week}",
+                'week'      => "Week {$currentWeek}",
                 'subtitle'  => "Postpartum recovery — you're doing amazing 💙",
             ],
             'recovery_metrics' => [
