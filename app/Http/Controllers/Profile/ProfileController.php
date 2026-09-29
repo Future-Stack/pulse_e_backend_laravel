@@ -3,8 +3,10 @@
 namespace App\Http\Controllers\Profile;
 
 use App\Http\Controllers\Controller;
+use App\Models\PostpartumRecovery;
 use App\Models\Profile;
 use App\Models\User;
+use App\Models\UserPregnancy;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -15,14 +17,66 @@ class ProfileController extends Controller
     public function getProfile()
     {
         try {
-//            $user = auth()->user();
-            $user = User::where('id',auth()->id())->select('id','full_name','email')->with('profile:id,user_id,life_stage_id,bio,profile_img,age,height,weight','profile.lifeStage','profile.connectDevices','profile.lifeJourneys','latestSubscription.subscriptionPlan', 'userLimits')->first();
+            $user = User::where('id', auth()->id())
+                ->select('id', 'full_name', 'email')
+                ->with(
+                    'profile:id,user_id,life_stage_id,bio,profile_img,age,height,weight',
+                    'profile.lifeStage',
+                    'profile.connectDevices',
+                    'profile.lifeJourneys',
+                    'latestSubscription.subscriptionPlan',
+                    'userLimits'
+                )
+                ->first();
+
+            if (!$user) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'User not found.',
+                ], 404);
+            }
+
+            // Check Pregnancy & Postpartum sub-stage
+            $activePregnancy = UserPregnancy::where('user_id', $user->id)
+                ->where('status', 'active')
+                ->latest()
+                ->first();
+
+            $postpartum = PostpartumRecovery::where('user_id', $user->id)
+                ->latest()
+                ->first();
+
+            $subStage = null;
+            $stageDetails = null;
+
+            if ($activePregnancy) {
+                $subStage = 'pregnancy';
+                $stageDetails = [
+                    'stage'           => 'pregnancy',
+                    'current_week'    => $activePregnancy->current_week,
+                    'total_weeks'     => 40,
+                    'due_date'        => $activePregnancy->due_date?->toDateString(),
+                    'days_remaining'  => $activePregnancy->days_to_due_date,
+                    'trimester'       => $activePregnancy->trimester,
+                ];
+            } elseif ($postpartum) {
+                $subStage = 'postpartum';
+                $stageDetails = [
+                    'stage'           => 'postpartum',
+                    'current_week'    => $postpartum->current_week,
+                    'delivery_date'   => $postpartum->delivery_date?->toDateString(),
+                ];
+            }
+
+            $userData = $user->toArray();
+            $userData['active_sub_stage'] = $subStage;
+            $userData['maternal_status'] = $stageDetails;
 
             return response()->json([
                 'success' => true,
                 'message' => 'Profile fetched successfully.',
                 'data' => [
-                    'user' => $user,
+                    'user' => $userData,
                 ],
             ], 200);
 
