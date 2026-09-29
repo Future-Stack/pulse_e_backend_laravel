@@ -51,6 +51,7 @@ use App\Http\Controllers\AI\CycleFertilityController;
 use App\Http\Controllers\AI\AthletePerformanceController;
 use App\Http\Controllers\AI\PregnancyPostpartumController;
 use App\Http\Controllers\AI\PerimenopauseController;
+use App\Http\Controllers\AI\VitalityController;
 use Illuminate\Support\Facades\Artisan;
 
 Route::prefix('v1')->group(function () {
@@ -90,6 +91,22 @@ Route::prefix('v1')->group(function () {
     Route::get('/cycle-overview', [CycleFertilityController::class, 'overview']);
     Route::get('/athlete/unified-performance', [AthletePerformanceController::class, 'unifiedPerformance']);
 
+    // Lifelong Thriving & Vitality
+    Route::match(['get', 'post'], '/lifelong-thriving/vitality', [VitalityController::class, 'overview']);
+    Route::match(['get', 'post'], '/vitality/overview', [VitalityController::class, 'overview']);
+
+    // Lifelong Thriving & Life Arc
+    Route::match(['get', 'post'], '/lifelong-thriving/life-arc', [VitalityController::class, 'lifeArc']);
+    Route::match(['get', 'post'], '/life-arc/overview', [VitalityController::class, 'lifeArc']);
+
+    // Lifelong Thriving & Preventative Reminders
+    Route::match(['get', 'post'], '/lifelong-thriving/preventative-reminders', [VitalityController::class, 'preventativeReminders']);
+    Route::match(['get', 'post'], '/preventative-reminders/overview', [VitalityController::class, 'preventativeReminders']);
+
+    // Lifelong Thriving & Mobility/Stress Indicators
+    Route::match(['get', 'post'], '/lifelong-thriving/mobility-stress-indicators', [VitalityController::class, 'mobilityStressIndicators']);
+    Route::match(['get', 'post'], '/mobility-stress-indicators/overview', [VitalityController::class, 'mobilityStressIndicators']);
+
     // Pregnancy & Postpartum
     Route::match(['get', 'post'], '/pregnancy-postpartum/overview', [PregnancyPostpartumController::class, 'overview']);
     Route::get('/pregnancy/overview', [PregnancyPostpartumController::class, 'overview']);
@@ -120,8 +137,8 @@ Route::prefix('v1')->group(function () {
 
     Route::get('/cycle-calendar-inputs/{user_id}',[CycleCalendarInputController::class, 'show']);
 
-    // Beauty Overview (supports user_id in body/query or token)
-    Route::match(['get', 'post'], '/beauty-overview', [SkinScanController::class, 'handleBeautyOverview']);
+    // Beauty Overview (supports user_id in query or token)
+    Route::get('/beauty-overview', [SkinScanController::class, 'getBeautyOverview']);
     Route::post('/beauty-overview/save', [SkinScanController::class, 'saveBeautyOverview']);
     Route::post('/beauty-overview/sync', [SkinScanController::class, 'syncBeautyOverview']);
 
@@ -226,6 +243,10 @@ Route::prefix('v1')->group(function () {
             '/numera-insight/{userId}',
             [NumeraInsightController::class, 'show']
         );
+        Route::get('/vitality', [VitalityController::class, 'overview']);
+        Route::get('/life-arc', [VitalityController::class, 'lifeArc']);
+        Route::get('/preventative-reminders', [VitalityController::class, 'preventativeReminders']);
+        Route::get('/mobility-stress-indicators', [VitalityController::class, 'mobilityStressIndicators']);
 
         //Admin Dashboard
         Route::get('/users', [UserManagementController::class, 'index']);
@@ -352,9 +373,6 @@ Route::prefix('v1')->group(function () {
         //Skin Scan
         Route::get('/skin-scans/history', [SkinScanController::class, 'index']);
         Route::get('/skin-scans/beauty-overview', [SkinScanController::class, 'getBeautyOverview']);
-        Route::post('/skin-scans/beauty-overview', [SkinScanController::class, 'saveBeautyOverview']);
-        Route::post('/skin-scans/beauty-overview/sync', [SkinScanController::class, 'syncBeautyOverview']);
-        Route::post('/skin-scans/beauty-overview/save', [SkinScanController::class, 'saveBeautyOverview']);
         Route::get('/skin-scans/{id}', [SkinScanController::class, 'show']);
         Route::post('/skin-scans/analyze', [SkinScanController::class, 'store']);
         Route::post('/skin-scans/{id}/insights', [SkinScanController::class, 'updateAiInsights']);
