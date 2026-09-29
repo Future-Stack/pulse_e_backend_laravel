@@ -49,6 +49,8 @@ use App\Http\Controllers\AI\CycleCalendarInputController;
 use App\Http\Controllers\AI\CervicalMucusLogController;
 use App\Http\Controllers\AI\CycleFertilityController;
 use App\Http\Controllers\AI\AthletePerformanceController;
+use App\Http\Controllers\AI\PregnancyPostpartumController;
+use App\Http\Controllers\AI\PerimenopauseController;
 use Illuminate\Support\Facades\Artisan;
 
 Route::prefix('v1')->group(function () {
@@ -87,6 +89,21 @@ Route::prefix('v1')->group(function () {
 
     Route::get('/cycle-overview', [CycleFertilityController::class, 'overview']);
     Route::get('/athlete/unified-performance', [AthletePerformanceController::class, 'unifiedPerformance']);
+
+    // Pregnancy & Postpartum
+    Route::match(['get', 'post'], '/pregnancy-postpartum/overview', [PregnancyPostpartumController::class, 'overview']);
+    Route::get('/pregnancy/overview', [PregnancyPostpartumController::class, 'overview']);
+    Route::post('/pregnancy/setup', [PregnancyPostpartumController::class, 'setup']);
+    Route::post('/pregnancy/milestones/{id}/toggle', [PregnancyPostpartumController::class, 'toggleMilestone']);
+    Route::post('/pregnancy/report-loss', [PregnancyPostpartumController::class, 'reportLoss']);
+    Route::post('/pregnancy/complete-journey', [PregnancyPostpartumController::class, 'completeJourney']);
+    Route::post('/postpartum/checkin', [PregnancyPostpartumController::class, 'checkinPostpartum']);
+
+    // Perimenopause / Menopause & Vitality
+    Route::match(['get', 'post'], '/perimenopause/overview', [PerimenopauseController::class, 'overview']);
+    Route::post('/perimenopause/gsm-checkin', [PerimenopauseController::class, 'saveGsmCheckin']);
+    Route::post('/perimenopause/vasomotor-log', [PerimenopauseController::class, 'logVasomotor']);
+    Route::get('/perimenopause/export-report', [PerimenopauseController::class, 'exportReport']);
 
     // Google OAuth (public, no auth required)
     Route::post('/google/token', [GoogleAuthController::class, 'tokenLogin']);
