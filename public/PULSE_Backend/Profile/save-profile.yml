@@ -15,6 +15,7 @@ http:
         "height": 170.5,
         "weight": 65.2,
         "life_stage_id": 2,
+        "life_journey_id": [1, 5, 6],
         "bio": "Passionate about fitness and technology."
       }
   auth:
