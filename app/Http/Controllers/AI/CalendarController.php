@@ -33,7 +33,15 @@ class CalendarController extends Controller
             . '/api/v1/cycle-engine/calendar/month';
 
         $userId = $request->query('user_id', $user->id);
-        $queryParams = array_merge($request->query(), ['user_id' => $userId]);
+        $userSettings = \App\Services\CycleCalculatorService::getUserCycleSettings($userId);
+        $cycleLength = $userSettings['cycle_length'];
+        $lutealLength = $userSettings['luteal_phase_length'];
+
+        $queryParams = array_merge([
+            'cycle_length' => $cycleLength,
+            'average_cycle_length' => $cycleLength,
+            'luteal_phase_length' => $lutealLength,
+        ], $request->query(), ['user_id' => $userId]);
 
         try {
             Log::info('Calling AI Calendar Month API', [
@@ -101,9 +109,17 @@ class CalendarController extends Controller
                 ];
             })->values();
 
+        $phases = \App\Services\CycleCalculatorService::calculatePhases(
+            $cycleLength,
+            $lutealLength,
+            $userSettings['period_length']
+        );
+
         return response()->json([
             'success' => true,
             'data' => $inputs,
+            'cycle_settings' => $userSettings,
+            'calculated_phases' => $phases,
             'message' => 'Calendar month fetched from local database fallback.',
             'ai_fallback' => true,
         ]);
@@ -130,7 +146,15 @@ class CalendarController extends Controller
             . '/api/v1/cycle-engine/calendar/next-period';
 
         $userId = $request->query('user_id', $user->id);
-        $queryParams = array_merge($request->query(), ['user_id' => $userId]);
+        $userSettings = \App\Services\CycleCalculatorService::getUserCycleSettings($userId);
+        $cycleLength = $userSettings['cycle_length'];
+        $lutealLength = $userSettings['luteal_phase_length'];
+
+        $queryParams = array_merge([
+            'cycle_length' => $cycleLength,
+            'average_cycle_length' => $cycleLength,
+            'luteal_phase_length' => $lutealLength,
+        ], $request->query(), ['user_id' => $userId]);
 
         try {
             Log::info('Calling AI Calendar Next Period API', [
@@ -156,7 +180,10 @@ class CalendarController extends Controller
                 if (! empty($result['predicted_date'])) {
                     CycleStatistic::updateOrCreate(
                         ['user_id' => $userId],
-                        ['predicted_next_period' => $result['predicted_date']]
+                        [
+                            'predicted_next_period' => $result['predicted_date'],
+                            'average_cycle_length'  => $cycleLength,
+                        ]
                     );
                 }
 
@@ -181,17 +208,20 @@ class CalendarController extends Controller
             ]);
         }
 
-        // Local fallback calculation for next period
+        // Local fallback calculation for next period using user's specific cycle length
         $latestInput = CycleCalendarInput::where('user_id', $userId)->latest('start_date')->first();
         $predictedDate = null;
 
         if ($latestInput && $latestInput->start_date) {
             $startDate = \Carbon\Carbon::parse($latestInput->start_date);
-            $predictedDate = $startDate->addDays(28)->toDateString();
+            $predictedDate = $startDate->addDays($cycleLength)->toDateString();
 
             CycleStatistic::updateOrCreate(
                 ['user_id' => $userId],
-                ['predicted_next_period' => $predictedDate]
+                [
+                    'predicted_next_period' => $predictedDate,
+                    'average_cycle_length'  => $cycleLength,
+                ]
             );
         }
 
@@ -199,6 +229,7 @@ class CalendarController extends Controller
             'success' => true,
             'data' => [
                 'predicted_date' => $predictedDate,
+                'cycle_length' => $cycleLength,
                 'status' => $predictedDate ? 'calculated_local_fallback' : 'empty',
             ],
             'message' => 'Next period prediction calculated from local fallback.',
