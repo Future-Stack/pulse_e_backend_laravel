@@ -41,6 +41,7 @@ class CycleCalculatorService
         | Cycle Setting
         |--------------------------------------------------------------------------
         */
+
         $setting = CycleSetting::where('user_id', $userId)->first();
 
         /*
@@ -48,6 +49,7 @@ class CycleCalculatorService
         | Default Values
         |--------------------------------------------------------------------------
         */
+
         $cycleLength = null;
 
         $lutealLength = $setting?->luteal_phase_length ?? 14;
@@ -65,14 +67,12 @@ class CycleCalculatorService
         |
         | Example:
         |
-        | C1:
         | Sep 10 -> Oct 11 = 31 days
-        |
-        | C2:
         | Oct 11 -> Nov 12 = 32 days
         |
         |--------------------------------------------------------------------------
         */
+
         $inputs = CycleCalendarInput::where('user_id', $userId)
             ->whereNotNull('start_date')
             ->orderBy('start_date', 'asc')
@@ -82,8 +82,24 @@ class CycleCalculatorService
         |--------------------------------------------------------------------------
         | Build Cycle History
         |--------------------------------------------------------------------------
+        |
+        | IMPORTANT:
+        | Cycle number is based on valid cycle intervals, NOT database IDs.
+        |
+        | Example:
+        |
+        | DB IDs:
+        | 2, 4, 7
+        |
+        | API cycle names:
+        | C1, C2
+        |
+        |--------------------------------------------------------------------------
         */
+
         if ($inputs->count() >= 2) {
+
+            $cycleNumber = 1;
 
             for ($i = 1; $i < $inputs->count(); $i++) {
 
@@ -97,24 +113,29 @@ class CycleCalculatorService
 
                 /*
                 |--------------------------------------------------------------------------
-                | Calculate cycle length
+                | Calculate Cycle Length
                 |--------------------------------------------------------------------------
                 */
-                $diff = $previousStart->diffInDays($currentStart);
+
+                $diff = $previousStart->diffInDays(
+                    $currentStart
+                );
 
                 /*
                 |--------------------------------------------------------------------------
-                | Accept reasonable cycle lengths only
+                | Accept Reasonable Cycle Lengths Only
                 |--------------------------------------------------------------------------
                 |
-                | 20-50 days supports normal cycle variation while
-                | avoiding obviously invalid data.
+                | 20-50 days supports reasonable cycle variation
+                | while filtering invalid records.
+                |
                 |--------------------------------------------------------------------------
                 */
+
                 if ($diff >= 20 && $diff <= 50) {
 
                     $cycleHistory[] = [
-                        'cycle' => 'C' . $i,
+                        'cycle' => 'C' . $cycleNumber,
 
                         'start_date' => $previousStart->format('Y-m-d'),
 
@@ -122,6 +143,14 @@ class CycleCalculatorService
 
                         'cycle_length' => $diff,
                     ];
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | Increment ONLY after a valid cycle is added.
+                    |--------------------------------------------------------------------------
+                    */
+
+                    $cycleNumber++;
                 }
             }
         }
@@ -131,6 +160,7 @@ class CycleCalculatorService
         | Calculate Average Cycle Length From History
         |--------------------------------------------------------------------------
         */
+
         if (!empty($cycleHistory)) {
 
             $historyLengths = collect($cycleHistory)
@@ -151,9 +181,13 @@ class CycleCalculatorService
         | Used only when historical period start dates are not enough.
         |--------------------------------------------------------------------------
         */
+
         if (!$cycleLength) {
 
-            $recentCycle = MenstrualCycle::where('user_id', $userId)
+            $recentCycle = MenstrualCycle::where(
+                'user_id',
+                $userId
+            )
                 ->whereNotNull('cycle_length')
                 ->latest('id')
                 ->first();
@@ -172,10 +206,13 @@ class CycleCalculatorService
         | 3. Cycle Statistic
         |--------------------------------------------------------------------------
         */
+
         if (!$cycleLength) {
 
-            $statistic = CycleStatistic::where('user_id', $userId)
-                ->first();
+            $statistic = CycleStatistic::where(
+                'user_id',
+                $userId
+            )->first();
 
             if (
                 $statistic &&
@@ -191,9 +228,11 @@ class CycleCalculatorService
         | 4. Explicit Cycle Setting
         |--------------------------------------------------------------------------
         |
-        | Used only when no usable historical/statistical cycle data exists.
+        | Used only when no usable historical/statistical
+        | cycle data exists.
         |--------------------------------------------------------------------------
         */
+
         if (
             !$cycleLength &&
             $setting &&
@@ -215,6 +254,7 @@ class CycleCalculatorService
         | 5. Default Fallback
         |--------------------------------------------------------------------------
         */
+
         $cycleLength = $cycleLength ?: 28;
 
         /*
@@ -222,6 +262,7 @@ class CycleCalculatorService
         | Safety Boundaries
         |--------------------------------------------------------------------------
         */
+
         $cycleLength = max(
             20,
             min(50, $cycleLength)
@@ -237,6 +278,7 @@ class CycleCalculatorService
         | Make Sure Luteal Phase Fits Inside Cycle
         |--------------------------------------------------------------------------
         */
+
         $maxLuteal = max(
             8,
             $cycleLength - $periodLength - 2
@@ -244,7 +286,10 @@ class CycleCalculatorService
 
         $lutealLength = max(
             8,
-            min((int) $lutealLength, $maxLuteal)
+            min(
+                (int) $lutealLength,
+                $maxLuteal
+            )
         );
 
         /*
@@ -252,6 +297,7 @@ class CycleCalculatorService
         | Return Cycle Settings
         |--------------------------------------------------------------------------
         */
+
         return [
             'cycle_length' => $cycleLength,
 
@@ -279,6 +325,7 @@ class CycleCalculatorService
         | Safety Boundaries
         |--------------------------------------------------------------------------
         */
+
         $cycleLength = max(
             20,
             min(50, $cycleLength)
@@ -294,6 +341,7 @@ class CycleCalculatorService
         | Make Sure Luteal Phase Fits Inside Cycle
         |--------------------------------------------------------------------------
         */
+
         $maxLuteal = max(
             8,
             $cycleLength - $periodLength - 2
@@ -301,7 +349,10 @@ class CycleCalculatorService
 
         $lutealLength = max(
             8,
-            min($lutealLength, $maxLuteal)
+            min(
+                $lutealLength,
+                $maxLuteal
+            )
         );
 
         /*
@@ -321,6 +372,7 @@ class CycleCalculatorService
         | 32 - 14 = Day 18
         |--------------------------------------------------------------------------
         */
+
         $ovulationDay = max(
             $periodLength + 2,
             $cycleLength - $lutealLength
@@ -331,6 +383,7 @@ class CycleCalculatorService
         | Menstrual Phase
         |--------------------------------------------------------------------------
         */
+
         $menstrualStart = 1;
 
         $menstrualEnd = $periodLength;
@@ -340,6 +393,7 @@ class CycleCalculatorService
         | Fertile Window
         |--------------------------------------------------------------------------
         */
+
         $fertileStart = max(
             $periodLength + 1,
             $ovulationDay - 5
@@ -350,6 +404,7 @@ class CycleCalculatorService
         | Ovulatory Window
         |--------------------------------------------------------------------------
         */
+
         $ovulatoryStart = max(
             $periodLength + 1,
             $ovulationDay - 1
@@ -367,6 +422,7 @@ class CycleCalculatorService
         | Follicular Phase
         |--------------------------------------------------------------------------
         */
+
         $follicularStart = $periodLength + 1;
 
         $follicularEnd = max(
@@ -379,6 +435,7 @@ class CycleCalculatorService
         | Luteal Phase
         |--------------------------------------------------------------------------
         */
+
         $lutealStart = $ovulatoryEnd + 1;
 
         $lutealEnd = $cycleLength;
@@ -388,6 +445,7 @@ class CycleCalculatorService
         | Return Phase Ranges
         |--------------------------------------------------------------------------
         */
+
         return [
             'cycle_length' => $cycleLength,
 
@@ -435,6 +493,7 @@ class CycleCalculatorService
         | Calculate Phase Boundaries
         |--------------------------------------------------------------------------
         */
+
         $phases = self::calculatePhases(
             $cycleLength,
             $lutealLength,
@@ -446,9 +505,13 @@ class CycleCalculatorService
         | Keep Cycle Day Inside Cycle Boundaries
         |--------------------------------------------------------------------------
         */
+
         $cycleDay = max(
             1,
-            min($cycleDay, $cycleLength)
+            min(
+                $cycleDay,
+                $cycleLength
+            )
         );
 
         /*
@@ -456,6 +519,7 @@ class CycleCalculatorService
         | Determine Current Phase
         |--------------------------------------------------------------------------
         */
+
         if (
             $cycleDay <= $phases['menstrual_end'] ||
             $isPeriodLogged
@@ -509,6 +573,7 @@ class CycleCalculatorService
         | Calendar Status
         |--------------------------------------------------------------------------
         */
+
         $calendarStatus = [
 
             'is_period' => (
@@ -536,6 +601,7 @@ class CycleCalculatorService
             | Currently Estimated Only
             |--------------------------------------------------------------------------
             */
+
             'is_confirmed_ovulation' => false,
         ];
 
@@ -544,6 +610,7 @@ class CycleCalculatorService
         | Return Phase Information
         |--------------------------------------------------------------------------
         */
+
         return [
 
             'phase' => [
@@ -559,4 +626,3 @@ class CycleCalculatorService
         ];
     }
 }
-
