@@ -33,7 +33,7 @@ class Profile extends Model
 
     public function lifeStage(): BelongsTo
     {
-        return $this->belongsTo(LifeJourney::class);
+        return $this->belongsTo(LifeStage::class);
     }
 
     public function activity(): BelongsTo
