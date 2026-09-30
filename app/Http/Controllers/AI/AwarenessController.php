@@ -5,6 +5,8 @@ namespace App\Http\Controllers\AI;
 use App\Http\Controllers\Controller;
 use App\Models\MenstrualCycle;
 use App\Models\NewAwarenessSnapshot;
+use App\Services\CycleCalculatorService;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
@@ -51,10 +53,20 @@ class AwarenessController extends Controller
         }
 
         try {
+            /*
+            |--------------------------------------------------------------------------
+            | Call AI Cycle Awareness API
+            |--------------------------------------------------------------------------
+            */
+
             $baseUrl = rtrim(
-                config('services.ai.base_url', 'https://ai.fightthenumber.com'),
+                config(
+                    'services.ai.base_url',
+                    'https://ai.fightthenumber.com'
+                ),
                 '/'
             );
+
             $aiUrl = "{$baseUrl}/api/cycle-awareness";
 
             $response = Http::timeout(90)
@@ -64,29 +76,54 @@ class AwarenessController extends Controller
                     'user_id' => $user->id,
                 ]);
 
+            /*
+            |--------------------------------------------------------------------------
+            | AI API Failed
+            |--------------------------------------------------------------------------
+            */
+
             if (! $response->successful()) {
-                Log::warning('Cycle Awareness AI API Failed, applying local fallback', [
-                    'user_id' => $user->id,
-                    'cycle_id' => $cycle->id,
-                    'status' => $response->status(),
-                    'body' => $response->body(),
-                ]);
+                Log::warning(
+                    'Cycle Awareness AI API Failed, applying local fallback',
+                    [
+                        'user_id' => $user->id,
+                        'cycle_id' => $cycle->id,
+                        'status' => $response->status(),
+                        'body' => $response->body(),
+                    ]
+                );
 
                 return $this->applyLocalFallback($user, $cycle);
             }
 
+            /*
+            |--------------------------------------------------------------------------
+            | Validate AI Response
+            |--------------------------------------------------------------------------
+            */
+
             $result = $response->json();
+
             $awareness = $result['cycle_awareness'] ?? null;
 
             if (! is_array($awareness)) {
-                Log::warning('Invalid Cycle Awareness AI Response, applying local fallback', [
-                    'user_id' => $user->id,
-                    'cycle_id' => $cycle->id,
-                    'response' => $result,
-                ]);
+                Log::warning(
+                    'Invalid Cycle Awareness AI Response, applying local fallback',
+                    [
+                        'user_id' => $user->id,
+                        'cycle_id' => $cycle->id,
+                        'response' => $result,
+                    ]
+                );
 
                 return $this->applyLocalFallback($user, $cycle);
             }
+
+            /*
+            |--------------------------------------------------------------------------
+            | Extract AI Data
+            |--------------------------------------------------------------------------
+            */
 
             $title = $awareness['title'] ?? null;
             $cycleContext = $awareness['cycle_context'] ?? null;
@@ -95,6 +132,12 @@ class AwarenessController extends Controller
             $hormoneLevels = $awareness['hormone_levels'] ?? null;
             $whatToKnow = $awareness['what_to_know'] ?? null;
             $fourPhaseCycle = $awareness['four_phase_cycle'] ?? null;
+
+            /*
+            |--------------------------------------------------------------------------
+            | Save AI Awareness Snapshot
+            |--------------------------------------------------------------------------
+            */
 
             DB::transaction(function () use (
                 $user,
@@ -129,9 +172,21 @@ class AwarenessController extends Controller
                 );
             });
 
+            /*
+            |--------------------------------------------------------------------------
+            | Get Saved Snapshot
+            |--------------------------------------------------------------------------
+            */
+
             $snapshot = NewAwarenessSnapshot::where('user_id', $user->id)
                 ->where('cycle_id', $cycle->id)
                 ->first();
+
+            /*
+            |--------------------------------------------------------------------------
+            | Return AI Response
+            |--------------------------------------------------------------------------
+            */
 
             return response()->json([
                 'success' => true,
@@ -154,42 +209,181 @@ class AwarenessController extends Controller
                 ],
             ]);
         } catch (\Throwable $e) {
-            Log::error('Cycle Awareness Sync Failed Exception, applying local fallback', [
-                'user_id' => $user->id,
-                'cycle_id' => $cycle->id,
-                'message' => $e->getMessage(),
-                'line' => $e->getLine(),
-                'file' => $e->getFile(),
-            ]);
+            /*
+            |--------------------------------------------------------------------------
+            | Exception -> Local Fallback
+            |--------------------------------------------------------------------------
+            */
+
+            Log::error(
+                'Cycle Awareness Sync Failed Exception, applying local fallback',
+                [
+                    'user_id' => $user->id,
+                    'cycle_id' => $cycle->id,
+                    'message' => $e->getMessage(),
+                    'line' => $e->getLine(),
+                    'file' => $e->getFile(),
+                ]
+            );
 
             return $this->applyLocalFallback($user, $cycle);
         }
     }
 
     /**
-     * Shared local fallback logic when AI engine is unreachable or returns invalid data.
+     * Shared local fallback logic when AI engine is unreachable
+     * or returns invalid data.
      */
     private function applyLocalFallback($user, $cycle)
     {
-        $startDate = $cycle->period_start_date ? \Carbon\Carbon::parse($cycle->period_start_date) : today();
-        $currentCycleDay = max(1, (int) $startDate->diffInDays(today()) + 1);
-        $avgCycleLength = $cycle->cycle_length ?? 28;
+        /*
+        |--------------------------------------------------------------------------
+        | Cycle Start Date
+        |--------------------------------------------------------------------------
+        */
 
-        $phaseName = match (true) {
-            $currentCycleDay <= 5 => 'Menstrual phase',
-            $currentCycleDay <= 13 => 'Follicular phase',
-            $currentCycleDay <= 16 => 'Ovulatory phase',
-            default => 'Luteal phase',
-        };
+        $startDate = $cycle->period_start_date
+            ? Carbon::parse($cycle->period_start_date)
+            : today();
 
-        $phaseKey = match (true) {
-            $currentCycleDay <= 5 => 'menstrual',
-            $currentCycleDay <= 13 => 'follicular',
-            $currentCycleDay <= 16 => 'ovulatory',
-            default => 'luteal',
-        };
+        /*
+        |--------------------------------------------------------------------------
+        | Get Centralized Cycle Settings
+        |--------------------------------------------------------------------------
+        |
+        | CycleCalculatorService is the single source of truth for:
+        | - average cycle length
+        | - cycle history
+        | - luteal length
+        | - period length
+        |
+        */
+
+        $settings = CycleCalculatorService::getUserCycleSettings($user);
+
+        /*
+        |--------------------------------------------------------------------------
+        | Cycle Length
+        |--------------------------------------------------------------------------
+        |
+        | IMPORTANT:
+        | Do not use:
+        |
+        | $cycle->cycle_length ?? $settings['cycle_length']
+        |
+        | because an old cycle_length value can override the dynamically
+        | calculated historical average.
+        |
+        */
+
+        $avgCycleLength = (int) (
+            $settings['cycle_length'] ?? 28
+        );
+
+        $lutealLength = (int) (
+            $settings['luteal_phase_length'] ?? 14
+        );
+
+        $periodLength = (int) (
+            $settings['period_length'] ?? 5
+        );
+
+        /*
+        |--------------------------------------------------------------------------
+        | Logged Period Information
+        |--------------------------------------------------------------------------
+        */
+
+        $isPeriodLogged = false;
+
+        if (! empty($cycle->period_end_date)) {
+            $periodEndDate = Carbon::parse(
+                $cycle->period_end_date
+            );
+
+            $isPeriodLogged = today()->betweenIncluded(
+                $startDate,
+                $periodEndDate
+            );
+
+            $loggedPeriodDays = $startDate->diffInDays(
+                $periodEndDate
+            ) + 1;
+
+            if (
+                $loggedPeriodDays >= 1 &&
+                $loggedPeriodDays <= 12
+            ) {
+                $periodLength = $loggedPeriodDays;
+            }
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Current Cycle Day
+        |--------------------------------------------------------------------------
+        |
+        | Example:
+        |
+        | Cycle length = 32
+        | Start date = Sep 10
+        |
+        | After day 32:
+        | Day 33 -> Day 1
+        |
+        */
+
+        $daysSinceStart = max(
+            0,
+            $startDate->diffInDays(today())
+        );
+
+        $currentCycleDay = (
+            $daysSinceStart % $avgCycleLength
+        ) + 1;
+
+        /*
+        |--------------------------------------------------------------------------
+        | Calculate Phases
+        |--------------------------------------------------------------------------
+        */
+
+        $phases = CycleCalculatorService::calculatePhases(
+            $avgCycleLength,
+            $lutealLength,
+            $periodLength
+        );
+
+        /*
+        |--------------------------------------------------------------------------
+        | Get Current Phase
+        |--------------------------------------------------------------------------
+        */
+
+        $dayInfo = CycleCalculatorService::getPhaseForCycleDay(
+            $currentCycleDay,
+            $avgCycleLength,
+            $lutealLength,
+            $periodLength,
+            $isPeriodLogged
+        );
+
+        $phaseName = $dayInfo['phase']['name'];
+        $phaseKey = $dayInfo['phase']['key'];
+
+        /*
+        |--------------------------------------------------------------------------
+        | Title
+        |--------------------------------------------------------------------------
+        */
 
         $title = "Cycle Day {$currentCycleDay} • {$phaseName}";
+
+        /*
+        |--------------------------------------------------------------------------
+        | Cycle Context
+        |--------------------------------------------------------------------------
+        */
 
         $cycleContext = [
             'cycle_day' => $currentCycleDay,
@@ -197,27 +391,68 @@ class AwarenessController extends Controller
             'average_cycle_length' => "~{$avgCycleLength}d (est.)",
         ];
 
+        /*
+        |--------------------------------------------------------------------------
+        | Current Phase
+        |--------------------------------------------------------------------------
+        */
+
         $currentPhase = [
             'name' => $phaseName,
+
             'day_range' => match ($phaseKey) {
-                'menstrual' => 'Day 1 - 5',
-                'follicular' => 'Day 6 - 13',
-                'ovulatory' => 'Day 14 - 16',
-                'luteal' => "Day 17 - {$avgCycleLength}",
+                'menstrual' => "Day {$phases['menstrual_start']} - {$phases['menstrual_end']}",
+
+                'follicular' => "Day {$phases['follicular_start']} - {$phases['follicular_end']}",
+
+                'ovulatory' => "Day {$phases['ovulatory_start']} - {$phases['ovulatory_end']}",
+
+                'luteal' => "Day {$phases['luteal_start']} - {$phases['luteal_end']}",
+
+                default => null,
             },
+
             'description' => match ($phaseKey) {
-                'menstrual' => 'Uterine lining sheds as a new cycle begins.',
-                'follicular' => 'Follicles mature in preparation for ovulation.',
-                'ovulatory' => 'An egg is released from the ovary; peak fertility window.',
-                'luteal' => 'Progesterone rises to support potential implantation.',
+                'menstrual' =>
+                    'Uterine lining sheds as a new cycle begins.',
+
+                'follicular' =>
+                    'Follicles mature in preparation for ovulation.',
+
+                'ovulatory' =>
+                    'An egg is released from the ovary; peak fertility window.',
+
+                'luteal' =>
+                    'Progesterone rises to support potential implantation.',
+
+                default => null,
             },
         ];
 
+        /*
+        |--------------------------------------------------------------------------
+        | Luteal Phase
+        |--------------------------------------------------------------------------
+        */
+
         $lutealPhase = [
-            'estimated_start_day' => 17,
-            'estimated_end_day' => $avgCycleLength,
-            'status' => $phaseKey === 'luteal' ? 'active' : 'upcoming',
+            'estimated_start_day' => $phases['luteal_start'],
+            'estimated_end_day' => $phases['luteal_end'],
+
+            'status' => $phaseKey === 'luteal'
+                ? 'active'
+                : (
+                    $currentCycleDay < $phases['luteal_start']
+                        ? 'upcoming'
+                        : 'completed'
+                ),
         ];
+
+        /*
+        |--------------------------------------------------------------------------
+        | Hormone Levels
+        |--------------------------------------------------------------------------
+        */
 
         $hormoneLevels = [
             'estrogen' => match ($phaseKey) {
@@ -225,29 +460,105 @@ class AwarenessController extends Controller
                 'follicular' => 'Rising',
                 'ovulatory' => 'Peak',
                 'luteal' => 'Moderate',
+                default => 'Unknown',
             },
+
             'progesterone' => match ($phaseKey) {
                 'menstrual' => 'Low',
                 'follicular' => 'Low',
                 'ovulatory' => 'Low to Rising',
                 'luteal' => 'High',
+                default => 'Unknown',
             },
+
             'lh' => match ($phaseKey) {
                 'ovulatory' => 'Surge',
                 default => 'Baseline',
             },
         ];
 
+        /*
+        |--------------------------------------------------------------------------
+        | What To Know
+        |--------------------------------------------------------------------------
+        */
+
         $whatToKnow = [
-            'overview' => "You are currently in your {$phaseName}. Keep logging symptoms, basal body temperature, and daily notes to refine insights.",
+            'overview' =>
+                "You are currently in your {$phaseName}. "
+                . 'Keep logging symptoms, basal body temperature, '
+                . 'and daily notes to refine insights.',
         ];
 
+        /*
+        |--------------------------------------------------------------------------
+        | Four Phase Cycle
+        |--------------------------------------------------------------------------
+        */
+
         $fourPhaseCycle = [
-            'menstrual' => ['days' => '1-5', 'status' => $phaseKey === 'menstrual' ? 'current' : 'completed'],
-            'follicular' => ['days' => '6-13', 'status' => $phaseKey === 'follicular' ? 'current' : ($currentCycleDay > 13 ? 'completed' : 'upcoming')],
-            'ovulatory' => ['days' => '14-16', 'status' => $phaseKey === 'ovulatory' ? 'current' : ($currentCycleDay > 16 ? 'completed' : 'upcoming')],
-            'luteal' => ['days' => "17-{$avgCycleLength}", 'status' => $phaseKey === 'luteal' ? 'current' : 'upcoming'],
+            'menstrual' => [
+                'days' =>
+                    "{$phases['menstrual_start']}-{$phases['menstrual_end']}",
+
+                'status' =>
+                    $phaseKey === 'menstrual'
+                        ? 'current'
+                        : (
+                            $currentCycleDay > $phases['menstrual_end']
+                                ? 'completed'
+                                : 'upcoming'
+                        ),
+            ],
+
+            'follicular' => [
+                'days' =>
+                    "{$phases['follicular_start']}-{$phases['follicular_end']}",
+
+                'status' =>
+                    $phaseKey === 'follicular'
+                        ? 'current'
+                        : (
+                            $currentCycleDay > $phases['follicular_end']
+                                ? 'completed'
+                                : 'upcoming'
+                        ),
+            ],
+
+            'ovulatory' => [
+                'days' =>
+                    "{$phases['ovulatory_start']}-{$phases['ovulatory_end']}",
+
+                'status' =>
+                    $phaseKey === 'ovulatory'
+                        ? 'current'
+                        : (
+                            $currentCycleDay > $phases['ovulatory_end']
+                                ? 'completed'
+                                : 'upcoming'
+                        ),
+            ],
+
+            'luteal' => [
+                'days' =>
+                    "{$phases['luteal_start']}-{$phases['luteal_end']}",
+
+                'status' =>
+                    $phaseKey === 'luteal'
+                        ? 'current'
+                        : (
+                            $currentCycleDay > $phases['luteal_end']
+                                ? 'completed'
+                                : 'upcoming'
+                        ),
+            ],
         ];
+
+        /*
+        |--------------------------------------------------------------------------
+        | Save Local Fallback Snapshot
+        |--------------------------------------------------------------------------
+        */
 
         $snapshot = DB::transaction(function () use (
             $user,
@@ -273,6 +584,7 @@ class AwarenessController extends Controller
                     'hormone_levels' => $hormoneLevels,
                     'what_to_know' => $whatToKnow,
                     'four_phase_cycle' => $fourPhaseCycle,
+
                     'ai_response' => null,
                     'ai_generated' => false,
                     'ai_cached' => false,
@@ -280,9 +592,16 @@ class AwarenessController extends Controller
             );
         });
 
+        /*
+        |--------------------------------------------------------------------------
+        | Return Local Fallback Response
+        |--------------------------------------------------------------------------
+        */
+
         return response()->json([
             'success' => true,
             'message' => 'Cycle awareness data synced with local fallback.',
+
             'data' => [
                 'id' => $snapshot->id,
                 'user_id' => $snapshot->user_id,
@@ -302,4 +621,3 @@ class AwarenessController extends Controller
         ]);
     }
 }
-
