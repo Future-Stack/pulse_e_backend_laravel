@@ -528,17 +528,25 @@ class CycleFertilityController extends Controller
         $startCarbon = Carbon::parse($startDate);
         $currentCycleDay = max(1, (int) $startCarbon->diffInDays(today()) + 1);
 
-        $phase = match (true) {
-            $currentCycleDay <= 5  => 'menstrual',
-            $currentCycleDay <= 13 => 'follicular',
-            $currentCycleDay <= 16 => 'ovulatory',
-            default               => 'luteal',
-        };
+        $settings = \App\Services\CycleCalculatorService::getUserCycleSettings($userId);
+        $cycleLength = (int) ($cycle?->cycle_length ?? $settings['cycle_length']);
+        $phases = \App\Services\CycleCalculatorService::calculatePhases(
+            $cycleLength,
+            $settings['luteal_phase_length'],
+            $settings['period_length']
+        );
 
-        $cycleLength = $cycle?->cycle_length ?? 28;
-        $fertileStart = max(1, $cycleLength - 18);
-        $fertileEnd   = max(1, $cycleLength - 12);
-        $ovulationDay = (int) round(($fertileStart + $fertileEnd) / 2);
+        $dayInfo = \App\Services\CycleCalculatorService::getPhaseForCycleDay(
+            $currentCycleDay,
+            $cycleLength,
+            $settings['luteal_phase_length'],
+            $settings['period_length']
+        );
+        $phase = $dayInfo['phase']['key'];
+
+        $fertileStart = $phases['fertile_start'];
+        $fertileEnd   = $phases['fertile_end'];
+        $ovulationDay = $phases['ovulation_day'];
         $daysUntilOvu = max(0, $ovulationDay - $currentCycleDay);
 
         $raw = [
@@ -547,7 +555,7 @@ class CycleFertilityController extends Controller
                 'cycle_length'            => $cycleLength,
                 'current_phase'           => $phase,
                 'period_start_date'       => $startDate,
-                'period_end_date'         => Carbon::parse($startDate)->addDays(4)->toDateString(),
+                'period_end_date'         => Carbon::parse($startDate)->addDays($settings['period_length'] - 1)->toDateString(),
                 'predicted_ovulation_day' => $ovulationDay,
                 'confirmed_ovulation_day' => null,
                 'is_confirmed'            => false,
@@ -562,8 +570,8 @@ class CycleFertilityController extends Controller
             'bbt_analysis' => null,
             'cycle_history' => [
                 'previous_cycles_count'  => MenstrualCycle::where('user_id', $userId)->where('is_completed', true)->count(),
-                'avg_cycle_length'       => 28.0,
-                'avg_period_length'      => 5.0,
+                'avg_cycle_length'       => (float) $cycleLength,
+                'avg_period_length'      => (float) $settings['period_length'],
                 'cycle_regularity_score' => 85.0,
             ],
             'hormone_trends' => [
