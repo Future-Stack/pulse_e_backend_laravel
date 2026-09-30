@@ -22,8 +22,11 @@ class CommunityPostController extends Controller
     {
         $query = CommunityPost::query()
             ->where('is_approved', true)
-            ->whereDoesntHave('reports', fn($q) => $q->where('is_active', true))
-            ->with(['user:id,full_name', 'lifeJourneys'])
+            ->whereDoesntHave('reports', fn ($q) => $q->where('is_active', true))
+            ->with([
+                'user:id,full_name',
+                'lifeJourneys' => fn ($q) => $q->withCount('profiles as members_count'),
+            ])
             ->withCount(['likes', 'comments', 'reports'])
             ->latest('posted_at');
 
