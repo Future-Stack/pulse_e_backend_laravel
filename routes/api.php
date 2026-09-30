@@ -110,11 +110,15 @@ Route::prefix('v1')->group(function () {
     // Pregnancy & Postpartum
     Route::match(['get', 'post'], '/pregnancy-postpartum/overview', [PregnancyPostpartumController::class, 'overview']);
     Route::get('/pregnancy/overview', [PregnancyPostpartumController::class, 'overview']);
+    Route::match(['get', 'post'], '/pregnancy/sync', [PregnancyPostpartumController::class, 'syncOverview']);
     Route::post('/pregnancy/setup', [PregnancyPostpartumController::class, 'setup']);
     Route::post('/pregnancy/milestones/{id}/toggle', [PregnancyPostpartumController::class, 'toggleMilestone']);
     Route::post('/pregnancy/report-loss', [PregnancyPostpartumController::class, 'reportLoss']);
     Route::post('/pregnancy/complete-journey', [PregnancyPostpartumController::class, 'completeJourney']);
     Route::post('/postpartum/checkin', [PregnancyPostpartumController::class, 'checkinPostpartum']);
+    Route::match(['get', 'post'], '/support/insights', [PregnancyPostpartumController::class, 'getSupportInsights']);
+    Route::get('/pregnancy/care-communities', [PregnancyPostpartumController::class, 'getCareCommunities']);
+    Route::get('/support/care-communities', [PregnancyPostpartumController::class, 'getCareCommunities']);
 
     // Perimenopause / Menopause & Vitality
     Route::match(['get', 'post'], '/perimenopause/overview', [PerimenopauseController::class, 'overview']);
