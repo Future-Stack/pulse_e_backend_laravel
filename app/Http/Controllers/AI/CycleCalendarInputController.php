@@ -87,133 +87,133 @@ class CycleCalendarInputController extends Controller
         ], 201);
     }
 
-//current
+    //current
 
-/**
- * Get current cycle calendar data.
- *
- * Optional:
- * ?date=2026-08-21
- */
-public function current(Request $request): JsonResponse
-{
-     $user = $request->user();
+    /**
+     * Get current cycle calendar data.
+     *
+     * Optional:
+     * ?date=2026-08-21
+     */
+    public function current(Request $request): JsonResponse
+    {
+        $user = $request->user();
 
-    $calendarInput = CycleCalendarInput::where('user_id', $user->id)
-        ->latest('start_date')
-        ->first();
+        $calendarInput = CycleCalendarInput::where('user_id', $user->id)
+            ->latest('start_date')
+            ->first();
 
-    if (!$calendarInput) {
+        if (!$calendarInput) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No cycle calendar input found.',
+                'data' => null,
+            ], 404);
+        }
+
+        $request->validate([
+            'date' => ['nullable', 'date'],
+        ]);
+
+        $startDate = \Carbon\Carbon::parse($calendarInput->start_date);
+
+        $periodEndDate = $calendarInput->end_date
+            ? \Carbon\Carbon::parse($calendarInput->end_date)
+            : $startDate->copy();
+
+        // If date is provided, use it. Otherwise use today.
+        $selectedDate = $request->filled('date')
+            ? \Carbon\Carbon::parse($request->date)
+            : \Carbon\Carbon::today();
+
+        /*
+        |--------------------------------------------------------------------------
+        | Cycle Day
+        |--------------------------------------------------------------------------
+        */
+
+        if ($selectedDate->lt($startDate)) {
+            $cycleDay = 1;
+        } else {
+            $cycleDay = $startDate->diffInDays($selectedDate) + 1;
+
+            // 28-day cycle
+            $cycleDay = min($cycleDay, 28);
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Phase
+        |--------------------------------------------------------------------------
+        */
+
+        $phase = match (true) {
+
+            $cycleDay <= 5 => [
+                'name' => 'Menstrual Phase',
+                'color' => 'red',
+                'icon' => '🔴',
+            ],
+
+            $cycleDay <= 13 => [
+                'name' => 'Follicular Phase',
+                'color' => 'green',
+                'icon' => '🟢',
+            ],
+
+            $cycleDay <= 16 => [
+                'name' => 'Ovulatory Phase',
+                'color' => 'yellow',
+                'icon' => '🟡',
+            ],
+
+            default => [
+                'name' => 'Luteal Phase',
+                'color' => 'blue',
+                'icon' => '🔵',
+            ],
+        };
+
+        /*
+        |--------------------------------------------------------------------------
+        | Calendar Status
+        |--------------------------------------------------------------------------
+        */
+
+        $isPeriod = $selectedDate->betweenIncluded(
+            $startDate,
+            $periodEndDate
+        );
+
+        $calendarStatus = [
+            'is_period' => $isPeriod,
+            'is_fertile_window' => $cycleDay >= 10 && $cycleDay <= 16,
+            'is_luteal' => $cycleDay >= 17 && $cycleDay <= 28,
+            'is_ovulation' => $cycleDay >= 14 && $cycleDay <= 16,
+            'is_confirmed_ovulation' => false,
+        ];
+
+        /*
+        |--------------------------------------------------------------------------
+        | Response
+        |--------------------------------------------------------------------------
+        */
+
         return response()->json([
-            'success' => false,
-            'message' => 'No cycle calendar input found.',
-            'data' => null,
-        ], 404);
+            'success' => true,
+            'data' => [
+                'start_date' => $startDate->format('Y-m-d'),
+                'period_end_date' => $periodEndDate->format('Y-m-d'),
+                'selected_date' => $selectedDate->format('Y-m-d'),
+
+                'cycle_day' => $cycleDay,
+
+                'phase' => $phase,
+
+                'calendar_status' => $calendarStatus,
+            ],
+        ]);
     }
-
-    $request->validate([
-        'date' => ['nullable', 'date'],
-    ]);
-
-    $startDate = \Carbon\Carbon::parse($calendarInput->start_date);
-
-    $periodEndDate = $calendarInput->end_date
-        ? \Carbon\Carbon::parse($calendarInput->end_date)
-        : $startDate->copy();
-
-    // If date is provided, use it. Otherwise use today.
-    $selectedDate = $request->filled('date')
-        ? \Carbon\Carbon::parse($request->date)
-        : \Carbon\Carbon::today();
-
-    /*
-    |--------------------------------------------------------------------------
-    | Cycle Day
-    |--------------------------------------------------------------------------
-    */
-
-    if ($selectedDate->lt($startDate)) {
-        $cycleDay = 1;
-    } else {
-        $cycleDay = $startDate->diffInDays($selectedDate) + 1;
-
-        // 28-day cycle
-        $cycleDay = min($cycleDay, 28);
-    }
-
-    /*
-    |--------------------------------------------------------------------------
-    | Phase
-    |--------------------------------------------------------------------------
-    */
-
-    $phase = match (true) {
-
-        $cycleDay <= 5 => [
-            'name' => 'Menstrual Phase',
-            'color' => 'red',
-            'icon' => '🔴',
-        ],
-
-        $cycleDay <= 13 => [
-            'name' => 'Follicular Phase',
-            'color' => 'green',
-            'icon' => '🟢',
-        ],
-
-        $cycleDay <= 16 => [
-            'name' => 'Ovulatory Phase',
-            'color' => 'yellow',
-            'icon' => '🟡',
-        ],
-
-         default => [
-            'name' => 'Luteal Phase',
-            'color' => 'blue',
-            'icon' => '🔵',
-        ],
-    };
-
-    /*
-    |--------------------------------------------------------------------------
-    | Calendar Status
-    |--------------------------------------------------------------------------
-    */
-
-    $isPeriod = $selectedDate->betweenIncluded(
-        $startDate,
-        $periodEndDate
-    );
-
-    $calendarStatus = [
-        'is_period' => $isPeriod,
-        'is_fertile_window' => $cycleDay >= 10 && $cycleDay <= 16,
-        'is_luteal' => $cycleDay >= 17 && $cycleDay <= 28,
-        'is_ovulation' => $cycleDay >= 14 && $cycleDay <= 16,
-        'is_confirmed_ovulation' => false,
-    ];
-
-    /*
-    |--------------------------------------------------------------------------
-    | Response
-    |--------------------------------------------------------------------------
-    */
-
-    return response()->json([
-        'success' => true,
-        'data' => [
-            'start_date' => $startDate->format('Y-m-d'),
-            'period_end_date' => $periodEndDate->format('Y-m-d'),
-            'selected_date' => $selectedDate->format('Y-m-d'),
-
-            'cycle_day' => $cycleDay,
-
-            'phase' => $phase,
-
-            'calendar_status' => $calendarStatus,
-        ],
-    ]);
-}
 
     /**
      * Show cycle calendar inputs for a user.
