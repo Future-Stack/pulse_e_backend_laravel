@@ -37,35 +37,53 @@ class ProfileController extends Controller
             }
 
             // Check Pregnancy & Postpartum sub-stage
-            $activePregnancy = UserPregnancy::where('user_id', $user->id)
-                ->where('status', 'active')
-                ->latest()
-                ->first();
-
-            $postpartum = PostpartumRecovery::where('user_id', $user->id)
-                ->latest()
-                ->first();
+            $isPregnancyJourney = true;
+            if ($user->profile && $user->profile->lifeJourneys && $user->profile->lifeJourneys->isNotEmpty()) {
+                $isPregnancyJourney = $user->profile->lifeJourneys->contains(function ($journey) {
+                    return str_contains(strtolower($journey->title), 'pregnancy');
+                }) || str_contains(strtolower($user->profile->lifeStage?->title ?? ''), 'pregnancy')
+                   || str_contains(strtolower($user->profile->lifeStage?->title ?? ''), 'postpartum');
+            }
 
             $subStage = null;
             $stageDetails = null;
 
-            if ($activePregnancy) {
-                $subStage = 'pregnancy';
-                $stageDetails = [
-                    'stage'           => 'pregnancy',
-                    'current_week'    => $activePregnancy->current_week,
-                    'total_weeks'     => 40,
-                    'due_date'        => $activePregnancy->due_date?->toDateString(),
-                    'days_remaining'  => $activePregnancy->days_to_due_date,
-                    'trimester'       => $activePregnancy->trimester,
-                ];
-            } elseif ($postpartum) {
-                $subStage = 'postpartum';
-                $stageDetails = [
-                    'stage'           => 'postpartum',
-                    'current_week'    => $postpartum->weeks_since_delivery,
-                    'delivery_date'   => $postpartum->delivery_date?->toDateString(),
-                ];
+            if ($isPregnancyJourney) {
+                $latestPregnancy = UserPregnancy::where('user_id', $user->id)
+                    ->latest()
+                    ->first();
+
+                $postpartum = PostpartumRecovery::where('user_id', $user->id)
+                    ->latest()
+                    ->first();
+
+                if ($latestPregnancy && $latestPregnancy->status === 'active') {
+                    $subStage = 'pregnancy';
+                    $stageDetails = [
+                        'stage'           => 'pregnancy',
+                        'current_week'    => $latestPregnancy->current_week,
+                        'total_weeks'     => 40,
+                        'due_date'        => $latestPregnancy->due_date?->toDateString(),
+                        'days_remaining'  => $latestPregnancy->days_to_due_date,
+                        'trimester'       => $latestPregnancy->trimester,
+                    ];
+                } elseif ($latestPregnancy && $latestPregnancy->status === 'miscarriage') {
+                    $subStage = 'miscarriage';
+                    $stageDetails = [
+                        'stage'               => 'miscarriage',
+                        'status'              => 'miscarriage',
+                        'healing_mode_active' => true,
+                        'loss_date'           => $latestPregnancy->ended_at?->toDateString() ?? now()->toDateString(),
+                        'active_tab'          => 'support',
+                    ];
+                } elseif ($postpartum && (!$latestPregnancy || $latestPregnancy->status === 'completed')) {
+                    $subStage = 'postpartum';
+                    $stageDetails = [
+                        'stage'           => 'postpartum',
+                        'current_week'    => $postpartum->weeks_since_delivery,
+                        'delivery_date'   => $postpartum->delivery_date?->toDateString(),
+                    ];
+                }
             }
 
             $userData = $user->toArray();
