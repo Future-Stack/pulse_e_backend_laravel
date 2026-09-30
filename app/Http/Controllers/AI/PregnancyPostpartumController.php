@@ -335,6 +335,7 @@ class PregnancyPostpartumController extends Controller
         );
 
         $postpartum->fill($request->only([
+            'delivery_date',
             'mood_stability',
             'anxiety_level',
             'physical_recovery_percent',
@@ -345,6 +346,10 @@ class PregnancyPostpartumController extends Controller
             'screening_due',
             'notes',
         ]));
+
+        if ($request->filled('delivery_date')) {
+            $postpartum->current_week = $postpartum->weeks_since_delivery;
+        }
 
         $postpartum->save();
 
