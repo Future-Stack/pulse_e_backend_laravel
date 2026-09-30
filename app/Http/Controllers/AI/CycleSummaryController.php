@@ -42,9 +42,16 @@ class CycleSummaryController extends Controller
 
         /*
         |--------------------------------------------------------------------------
-        | 3. AI Engine URL
+        /*
+        |--------------------------------------------------------------------------
+        | 3. User Cycle Settings & AI Engine URL
         |--------------------------------------------------------------------------
         */
+
+        $userSettings = \App\Services\CycleCalculatorService::getUserCycleSettings($user);
+        $userCycleLength = (float) $userSettings['cycle_length'];
+        $lutealLength = (int) $userSettings['luteal_phase_length'];
+        $periodLength = (int) $userSettings['period_length'];
 
         $baseUrl = rtrim(config('services.ai.base_url', 'https://ai.fightthenumber.com'), '/') . '/api/v1/cycle-engine/engine/overview';
 
@@ -64,7 +71,10 @@ class CycleSummaryController extends Controller
                 ->connectTimeout(2)
                 ->acceptJson()
                 ->get($baseUrl, [
-                    'user_id' => $user->id,
+                    'user_id'              => $user->id,
+                    'cycle_length'         => $userCycleLength,
+                    'average_cycle_length' => $userCycleLength,
+                    'luteal_phase_length'  => $lutealLength,
                 ]);
 
             if ($response->successful()) {
@@ -92,12 +102,14 @@ class CycleSummaryController extends Controller
             $startCarbon = \Carbon\Carbon::parse($startDate);
             $currentCycleDay = max(1, (int) $startCarbon->diffInDays(today()) + 1);
 
-            $phase = match (true) {
-                $currentCycleDay <= 5 => 'menstrual',
-                $currentCycleDay <= 13 => 'follicular',
-                $currentCycleDay <= 16 => 'ovulatory',
-                default => 'luteal',
-            };
+            $dayInfo = \App\Services\CycleCalculatorService::getPhaseForCycleDay(
+                $currentCycleDay,
+                (int) $userCycleLength,
+                $lutealLength,
+                $periodLength
+            );
+            $phase = $dayInfo['phase']['key'];
+            $phases = $dayInfo['phases'];
 
             $todayBbt = \App\Models\BbtLog::where('user_id', $user->id)
                 ->whereDate('log_date', today())
@@ -111,39 +123,39 @@ class CycleSummaryController extends Controller
 
             $summaryData = [
                 'cycle_summary' => [
-                    'user_id' => $user->id,
-                    'current_cycle_day' => $currentCycleDay,
-                    'current_phase' => $phase,
-                    'avg_cycle_length' => 28.0,
+                    'user_id'             => $user->id,
+                    'current_cycle_day'   => $currentCycleDay,
+                    'current_phase'       => $phase,
+                    'avg_cycle_length'    => (float) $userCycleLength,
                     'cycle_variance_days' => 2,
-                    'current_mode' => 'cycle_awareness',
+                    'current_mode'        => 'cycle_awareness',
                 ],
                 'fertile_window' => [
-                    'start_day' => 10,
-                    'end_day' => 15,
-                    'label' => 'predicted',
-                    'peak_day' => 14,
-                    'peak_source' => 'calendar',
-                    'mucus_peak_day' => null,
-                    'lh_surge_day' => null,
-                    'bbt_confirmed_day' => null,
+                    'start_day'        => $phases['fertile_start'],
+                    'end_day'          => $phases['fertile_end'],
+                    'label'            => 'predicted',
+                    'peak_day'         => $phases['ovulation_day'],
+                    'peak_source'      => 'calendar',
+                    'mucus_peak_day'   => null,
+                    'lh_surge_day'     => null,
+                    'bbt_confirmed_day'=> null,
                 ],
                 'reliability' => [
-                    'level' => 'low',
+                    'level'            => 'low',
                     'completed_cycles' => \App\Models\MenstrualCycle::where('user_id', $user->id)->where('is_completed', true)->count(),
-                    'text' => 'Predictions are dynamically calculated locally from your logged cycle inputs.',
+                    'text'             => 'Predictions are dynamically calculated locally from your logged cycle inputs.',
                 ],
                 'reconciliation' => [
-                    'calendar_predicted_day' => 14,
-                    'bbt_confirmed_day' => null,
-                    'lh_surge_day' => null,
-                    'final_confirmed_day' => 14,
-                    'final_source' => 'calendar',
-                    'offset_days' => 0,
-                    'luteal_phase_length' => 14,
+                    'calendar_predicted_day' => $phases['ovulation_day'],
+                    'bbt_confirmed_day'      => null,
+                    'lh_surge_day'           => null,
+                    'final_confirmed_day'    => $phases['ovulation_day'],
+                    'final_source'           => 'calendar',
+                    'offset_days'            => 0,
+                    'luteal_phase_length'    => $lutealLength,
                 ],
                 'ai_generated' => false,
-                'ai_cached' => false,
+                'ai_cached'    => false,
             ];
 
             $summary = $summaryData;
@@ -169,11 +181,67 @@ class CycleSummaryController extends Controller
 
         /*
         |--------------------------------------------------------------------------
+        | 5.1 Enforce User Cycle Settings on Summary & Signals
+        |--------------------------------------------------------------------------
+        | When AI Engine returns default calendar predictions (e.g. 28) or cached
+        | responses, ensure user's actual configured cycle length (e.g. 26) and
+        | phase boundaries are accurately reflected in summary and signals.
+        */
+        if (is_array($summaryData) && isset($summaryData['cycle_summary'])) {
+            $effectiveCycleLength = (int) $userCycleLength;
+            $summaryData['cycle_summary']['avg_cycle_length'] = $effectiveCycleLength;
+
+            $phases = \App\Services\CycleCalculatorService::calculatePhases(
+                $effectiveCycleLength,
+                $lutealLength,
+                $periodLength
+            );
+
+            $currentCycleDay = (int) ($summaryData['cycle_summary']['current_cycle_day'] ?? 1);
+            $dayInfo = \App\Services\CycleCalculatorService::getPhaseForCycleDay(
+                $currentCycleDay,
+                $effectiveCycleLength,
+                $lutealLength,
+                $periodLength
+            );
+
+            $summaryData['cycle_summary']['current_phase'] = $dayInfo['phase']['key'];
+
+            if (isset($summaryData['fertile_window'])) {
+                if (($summaryData['fertile_window']['peak_source'] ?? 'calendar') === 'calendar') {
+                    $summaryData['fertile_window']['start_day'] = $phases['fertile_start'];
+                    $summaryData['fertile_window']['end_day'] = $phases['fertile_end'];
+                    $summaryData['fertile_window']['peak_day'] = $phases['ovulation_day'];
+                }
+            }
+
+            if (isset($summaryData['reconciliation'])) {
+                $summaryData['reconciliation']['calendar_predicted_day'] = $phases['ovulation_day'];
+                $summaryData['reconciliation']['luteal_phase_length'] = $lutealLength;
+                if (($summaryData['reconciliation']['final_source'] ?? 'calendar') === 'calendar') {
+                    $summaryData['reconciliation']['final_confirmed_day'] = $phases['ovulation_day'];
+                }
+            }
+
+            if (is_array($signal) && isset($signal['signals'])) {
+                foreach ($signal['signals'] as &$sig) {
+                    if (($sig['signal'] ?? '') === 'Calendar') {
+                        $sig['status_text'] = "Cycle day {$currentCycleDay} · {$dayInfo['phase']['key']} phase";
+                    }
+                }
+                unset($sig);
+            }
+
+            $summary = $summaryData;
+        }
+
+        /*
+        |--------------------------------------------------------------------------
         | 6. Get Values for Persistence
         |--------------------------------------------------------------------------
         */
 
-        $averageCycleLength = $summaryData['cycle_summary']['avg_cycle_length'] ?? 28;
+        $averageCycleLength = $summaryData['cycle_summary']['avg_cycle_length'] ?? $userCycleLength;
         $cycleVarianceDays = $summaryData['cycle_summary']['cycle_variance_days'] ?? 2;
         $rawReliability = strtolower((string) ($summaryData['reliability']['level'] ?? 'low'));
         $reliabilityLevel = in_array($rawReliability, ['low', 'medium', 'high']) ? $rawReliability : 'low';
@@ -232,6 +300,9 @@ class CycleSummaryController extends Controller
 
                         'current_cycle_day' =>
                             $summaryData['cycle_summary']['current_cycle_day'] ?? 1,
+
+                        'cycle_length' =>
+                            (int) $averageCycleLength,
 
                         'current_phase' => $currentPhase,
 
