@@ -52,6 +52,7 @@ use App\Http\Controllers\AI\AthletePerformanceController;
 use App\Http\Controllers\AI\PregnancyPostpartumController;
 use App\Http\Controllers\AI\PerimenopauseController;
 use App\Http\Controllers\AI\VitalityController;
+use App\Http\Controllers\AI\CycleSettingsController;
 use Illuminate\Support\Facades\Artisan;
 
 Route::prefix('v1')->group(function () {
@@ -181,6 +182,9 @@ Route::prefix('v1')->group(function () {
 
     Route::post('/cycle-calendar-inputs',[CycleCalendarInputController::class, 'store']);
     Route::get('/cycle-calendar/current', [CycleCalendarInputController::class, 'current']);
+    Route::get('/cycle-settings', [CycleSettingsController::class, 'show']);
+    Route::post('/cycle-settings', [CycleSettingsController::class, 'update']);
+    Route::put('/cycle-settings', [CycleSettingsController::class, 'update']);
 
         //user health log
         Route::apiResource('health-logs', HealthLogController::class);
