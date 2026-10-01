@@ -183,6 +183,8 @@ Route::prefix('v1')->group(function () {
         Route::match(['get', 'post'], '/pregnancy-postpartum/overview', [PregnancyPostpartumController::class, 'overview']);
         Route::match(['get', 'post'], '/pregnancy/overview', [PregnancyPostpartumController::class, 'overview']);
         Route::match(['get', 'post'], '/pregnancy/summary', [PregnancyPostpartumController::class, 'summary']);
+        Route::match(['get', 'post'], '/postpartum/recovery', [PregnancyPostpartumController::class, 'recovery']);
+        Route::match(['get', 'post'], '/postpartum/overview', [PregnancyPostpartumController::class, 'recovery']);
         Route::post('/pregnancy/setup', [PregnancyPostpartumController::class, 'setup']);
         Route::post('/pregnancy/milestones/{id}/toggle', [PregnancyPostpartumController::class, 'toggleMilestone']);
         Route::post('/pregnancy/report-loss', [PregnancyPostpartumController::class, 'reportLoss']);
