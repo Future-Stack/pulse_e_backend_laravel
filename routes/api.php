@@ -52,7 +52,7 @@ use App\Http\Controllers\AI\AthletePerformanceController;
 use App\Http\Controllers\AI\PregnancyPostpartumController;
 use App\Http\Controllers\AI\PerimenopauseController;
 use App\Http\Controllers\AI\VitalityController;
-use App\Http\Controllers\AI\CycleSettingsController;
+use App\Http\Controllers\AI\MenopauseController;
 use Illuminate\Support\Facades\Artisan;
 
 Route::prefix('v1')->group(function () {
@@ -108,22 +108,29 @@ Route::prefix('v1')->group(function () {
     Route::match(['get', 'post'], '/lifelong-thriving/mobility-stress-indicators', [VitalityController::class, 'mobilityStressIndicators']);
     Route::match(['get', 'post'], '/mobility-stress-indicators/overview', [VitalityController::class, 'mobilityStressIndicators']);
 
+    // Menopause & Perimenopause (Symptoms, Insights, Export)
+    Route::match(['get', 'post'], '/menopause/symptoms', [MenopauseController::class, 'symptoms']);
+    Route::match(['get', 'post'], '/perimenopause/symptoms', [MenopauseController::class, 'symptoms']);
+    Route::match(['get', 'post'], '/menopause/insights', [MenopauseController::class, 'insights']);
+    Route::match(['get', 'post'], '/perimenopause/insights', [MenopauseController::class, 'insights']);
+    Route::match(['get', 'post'], '/menopause/export', [MenopauseController::class, 'export']);
+    Route::match(['get', 'post'], '/perimenopause/export', [MenopauseController::class, 'export']);
+
+    Route::post('/perimenopause/gsm-checkin', [PerimenopauseController::class, 'saveGsmCheckin']);
+//    Route::get('/perimenopause/gsm-checkin2/{user_id}', [PerimenopauseController::class, 'getGsmCheckin']);
+
     // Pregnancy & Postpartum
     Route::match(['get', 'post'], '/pregnancy-postpartum/overview', [PregnancyPostpartumController::class, 'overview']);
     Route::get('/pregnancy/overview', [PregnancyPostpartumController::class, 'overview']);
-    Route::match(['get', 'post'], '/pregnancy/sync', [PregnancyPostpartumController::class, 'syncOverview']);
     Route::post('/pregnancy/setup', [PregnancyPostpartumController::class, 'setup']);
     Route::post('/pregnancy/milestones/{id}/toggle', [PregnancyPostpartumController::class, 'toggleMilestone']);
     Route::post('/pregnancy/report-loss', [PregnancyPostpartumController::class, 'reportLoss']);
     Route::post('/pregnancy/complete-journey', [PregnancyPostpartumController::class, 'completeJourney']);
     Route::post('/postpartum/checkin', [PregnancyPostpartumController::class, 'checkinPostpartum']);
-    Route::match(['get', 'post'], '/support/insights', [PregnancyPostpartumController::class, 'getSupportInsights']);
-    Route::get('/pregnancy/care-communities', [PregnancyPostpartumController::class, 'getCareCommunities']);
-    Route::get('/support/care-communities', [PregnancyPostpartumController::class, 'getCareCommunities']);
 
     // Perimenopause / Menopause & Vitality
     Route::match(['get', 'post'], '/perimenopause/overview', [PerimenopauseController::class, 'overview']);
-    Route::post('/perimenopause/gsm-checkin', [PerimenopauseController::class, 'saveGsmCheckin']);
+
     Route::post('/perimenopause/vasomotor-log', [PerimenopauseController::class, 'logVasomotor']);
     Route::get('/perimenopause/export-report', [PerimenopauseController::class, 'exportReport']);
 
@@ -142,8 +149,8 @@ Route::prefix('v1')->group(function () {
 
     Route::get('/cycle-calendar-inputs/{user_id}',[CycleCalendarInputController::class, 'show']);
 
-    // Beauty Overview (supports user_id in query or token)
-    Route::get('/beauty-overview', [SkinScanController::class, 'getBeautyOverview']);
+    // Beauty Overview (supports user_id in body/query or token)
+    Route::match(['get', 'post'], '/beauty-overview', [SkinScanController::class, 'handleBeautyOverview']);
     Route::post('/beauty-overview/save', [SkinScanController::class, 'saveBeautyOverview']);
     Route::post('/beauty-overview/sync', [SkinScanController::class, 'syncBeautyOverview']);
 
@@ -182,9 +189,6 @@ Route::prefix('v1')->group(function () {
 
     Route::post('/cycle-calendar-inputs',[CycleCalendarInputController::class, 'store']);
     Route::get('/cycle-calendar/current', [CycleCalendarInputController::class, 'current']);
-    Route::get('/cycle-settings', [CycleSettingsController::class, 'show']);
-    Route::post('/cycle-settings', [CycleSettingsController::class, 'update']);
-    Route::put('/cycle-settings', [CycleSettingsController::class, 'update']);
 
         //user health log
         Route::apiResource('health-logs', HealthLogController::class);
@@ -255,6 +259,9 @@ Route::prefix('v1')->group(function () {
         Route::get('/life-arc', [VitalityController::class, 'lifeArc']);
         Route::get('/preventative-reminders', [VitalityController::class, 'preventativeReminders']);
         Route::get('/mobility-stress-indicators', [VitalityController::class, 'mobilityStressIndicators']);
+        Route::get('/menopause/symptoms', [MenopauseController::class, 'symptoms']);
+        Route::get('/menopause/insights', [MenopauseController::class, 'insights']);
+        Route::get('/menopause/export', [MenopauseController::class, 'export']);
 
         //Admin Dashboard
         Route::get('/users', [UserManagementController::class, 'index']);

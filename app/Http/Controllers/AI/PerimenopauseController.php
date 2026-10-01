@@ -99,6 +99,42 @@ class PerimenopauseController extends Controller
     }
 
     /**
+     * Fetch the latest Intimate & Urinary Health (GSM) Check-in.
+     * GET /api/v1/perimenopause/gsm-checkin
+     */
+    public function getGsmCheckin(Request $request, string $user_id): JsonResponse
+    {
+        return $user_id;
+
+        $log = GsmCheckinLog::where('user_id', $userId)
+            ->orderByDesc('checkin_date')
+            ->orderByDesc('id')
+            ->first();
+
+        if (!$log) {
+            return response()->json([
+                'success' => true,
+                'message' => 'No GSM check-in found.',
+                'data'    => null,
+            ], 200);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Latest GSM check-in fetched successfully.',
+            'data'    => [
+                'id'                => $log->id,
+                'checkin_date'      => $log->checkin_date->toDateString(),
+                'created_at'        => optional($log->created_at)->toDateTimeString(),
+                'vaginal_dryness'   => $log->vaginal_dryness,
+                'urinary_frequency' => $log->urinary_frequency,
+                'pelvic_discomfort' => $log->pelvic_discomfort,
+                'libido_impact'     => $log->libido_impact,
+            ],
+        ], 200);
+    }
+
+    /**
      * Log Vasomotor (Hot Flash) Daily Episodes.
      * POST /api/v1/perimenopause/vasomotor-log
      */
