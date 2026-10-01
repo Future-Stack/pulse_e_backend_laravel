@@ -23,6 +23,7 @@ class UserPregnancy extends Model
         'delivery_date',
         'delivery_type',
         'notes',
+        'ai_data',
     ];
 
     protected $casts = [
@@ -31,6 +32,7 @@ class UserPregnancy extends Model
         'conception_date' => 'date',
         'ended_at' => 'date',
         'delivery_date' => 'date',
+        'ai_data' => 'array',
     ];
 
     public function user(): BelongsTo
@@ -53,6 +55,10 @@ class UserPregnancy extends Model
      */
     public function getCurrentWeekAttribute(): int
     {
+        if (!empty($this->ai_data['current_week'])) {
+            return (int) $this->ai_data['current_week'];
+        }
+
         if (!$this->due_date) {
             return 24;
         }
@@ -63,7 +69,7 @@ class UserPregnancy extends Model
         // Full term = 40 weeks = 280 days
         $daysRemaining = $now->diffInDays($due, false);
         $daysPassed = 280 - $daysRemaining;
-        $week = (int) ceil($daysPassed / 7);
+        $week = (int) floor($daysPassed / 7);
 
         return max(1, min(42, $week));
     }

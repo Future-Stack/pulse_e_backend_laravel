@@ -13,8 +13,10 @@ use App\Models\UserPregnancy;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 
 class PregnancyPostpartumController extends Controller
@@ -26,18 +28,15 @@ class PregnancyPostpartumController extends Controller
      */
     public function overview(Request $request): JsonResponse
     {
-        $userId = auth('sanctum')->id()
-            ?? $request->input('user_id')
-            ?? $request->query('user_id')
-            ?? 1;
-
-        $user = User::with('profile.lifeStage', 'profile.lifeJourneys')->find($userId);
+        $user = $this->resolveUser($request);
         if (!$user) {
             return response()->json([
                 'success' => false,
-                'message' => 'User not found.',
-            ], 404);
+                'message' => 'Unauthenticated.',
+            ], 401);
         }
+
+        $userId = $user->id;
 
         // 1. Sync live intelligence from AI API into Database
         $this->syncPregnancyFromAi((int) $userId);
@@ -95,9 +94,15 @@ class PregnancyPostpartumController extends Controller
             'active_stage'   => $tab,
             'active_tab'     => $tab,
             'available_tabs' => ['pregnancy', 'postpartum', 'support'],
+            'tabs'           => [
+                ['id' => 'pregnancy', 'label' => 'Pregnancy', 'is_active' => ($tab === 'pregnancy')],
+                ['id' => 'postpartum', 'label' => 'Postpartum', 'is_active' => ($tab === 'postpartum')],
+                ['id' => 'support', 'label' => 'Support', 'is_active' => ($tab === 'support')],
+            ],
             'header' => [
-                'title'    => $lifeStageTitle,
-                'subtitle' => $subtitle,
+                'title'       => $lifeStageTitle,
+                'subtitle'    => $subtitle,
+                'can_go_back' => true,
             ],
         ];
 
@@ -126,6 +131,16 @@ class PregnancyPostpartumController extends Controller
     }
 
     /**
+     * Dedicated Pregnancy Summary Endpoint (matches external AI route).
+     * GET/POST /api/v1/pregnancy/summary
+     */
+    public function summary(Request $request): JsonResponse
+    {
+        $request->merge(['tab' => 'pregnancy']);
+        return $this->overview($request);
+    }
+
+    /**
      * Explicit Sync Endpoint for Pregnancy & Postpartum.
      * POST /api/v1/pregnancy/sync
      */
@@ -140,9 +155,14 @@ class PregnancyPostpartumController extends Controller
      */
     public function setup(Request $request): JsonResponse
     {
-        $userId = auth('sanctum')->id()
-            ?? $request->input('user_id')
-            ?? 1;
+        $user = $this->resolveUser($request);
+        if (!$user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthenticated.',
+            ], 401);
+        }
+        $userId = $user->id;
 
         $validated = $request->validate([
             'due_date'                   => 'required|date',
@@ -177,9 +197,14 @@ class PregnancyPostpartumController extends Controller
      */
     public function toggleMilestone(Request $request, int $id): JsonResponse
     {
-        $userId = auth('sanctum')->id()
-            ?? $request->input('user_id')
-            ?? 1;
+        $user = $this->resolveUser($request);
+        if (!$user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthenticated.',
+            ], 401);
+        }
+        $userId = $user->id;
 
         $milestone = PregnancyMilestone::where('id', $id)
             ->where('user_id', $userId)
@@ -215,17 +240,22 @@ class PregnancyPostpartumController extends Controller
      */
     public function reportLoss(Request $request): JsonResponse
     {
-        $userId = auth('sanctum')->id()
-            ?? $request->input('user_id')
-            ?? 1;
+        $user = $this->resolveUser($request);
+        if (!$user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthenticated.',
+            ], 401);
+        }
+        $userId = $user->id;
 
-        $user = User::with('profile.lifeJourneys', 'profile.lifeStage')->find($userId);
+        $userWithProfile = User::with('profile.lifeJourneys', 'profile.lifeStage')->find($userId);
 
         // Verify that user stage is Pregnancy & Postpartum
-        if ($user && $user->profile && $user->profile->lifeJourneys && $user->profile->lifeJourneys->isNotEmpty()) {
-            $isPregnancyJourney = $user->profile->lifeJourneys->contains(function ($journey) {
+        if ($userWithProfile && $userWithProfile->profile && $userWithProfile->profile->lifeJourneys && $userWithProfile->profile->lifeJourneys->isNotEmpty()) {
+            $isPregnancyJourney = $userWithProfile->profile->lifeJourneys->contains(function ($journey) {
                 return str_contains(strtolower($journey->title), 'pregnancy');
-            }) || str_contains(strtolower($user->profile->lifeStage?->title ?? ''), 'pregnancy');
+            }) || str_contains(strtolower($userWithProfile->profile->lifeStage?->title ?? ''), 'pregnancy');
 
             if (!$isPregnancyJourney) {
                 return response()->json([
@@ -271,9 +301,14 @@ class PregnancyPostpartumController extends Controller
      */
     public function completeJourney(Request $request): JsonResponse
     {
-        $userId = auth('sanctum')->id()
-            ?? $request->input('user_id')
-            ?? 1;
+        $user = $this->resolveUser($request);
+        if (!$user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthenticated.',
+            ], 401);
+        }
+        $userId = $user->id;
 
         $pregnancy = UserPregnancy::where('user_id', $userId)
             ->where('status', 'active')
@@ -322,9 +357,14 @@ class PregnancyPostpartumController extends Controller
      */
     public function checkinPostpartum(Request $request): JsonResponse
     {
-        $userId = auth('sanctum')->id()
-            ?? $request->input('user_id')
-            ?? 1;
+        $user = $this->resolveUser($request);
+        if (!$user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthenticated.',
+            ], 401);
+        }
+        $userId = $user->id;
 
         $postpartum = PostpartumRecovery::firstOrCreate(
             ['user_id' => $userId],
@@ -366,10 +406,14 @@ class PregnancyPostpartumController extends Controller
      */
     public function getSupportInsights(Request $request): JsonResponse
     {
-        $userId = auth('sanctum')->id()
-            ?? $request->input('user_id')
-            ?? $request->query('user_id')
-            ?? 1;
+        $user = $this->resolveUser($request);
+        if (!$user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthenticated.',
+            ], 401);
+        }
+        $userId = $user->id;
 
         $supportData = $this->fetchSupportInsightsFromAi((int) $userId);
 
@@ -377,6 +421,24 @@ class PregnancyPostpartumController extends Controller
             'success' => true,
             'data'    => $supportData,
         ], 200);
+    }
+
+    /**
+     * Resolve authenticated user from Sanctum Bearer Token or request params.
+     */
+    private function resolveUser(Request $request): ?User
+    {
+        $user = auth('sanctum')->user()
+            ?? $request->user();
+
+        if (!$user) {
+            $userId = $request->input('user_id') ?? $request->query('user_id');
+            if ($userId) {
+                $user = User::find($userId);
+            }
+        }
+
+        return $user;
     }
 
     /**
@@ -419,6 +481,9 @@ class PregnancyPostpartumController extends Controller
             if ($response->successful() && is_array($response->json())) {
                 $ai = $response->json();
 
+                // Cache full AI response for user
+                Cache::put("user_pregnancy_ai_{$userId}", $ai, now()->addDays(7));
+
                 if (!empty($ai['is_pregnant']) && $ai['is_pregnant']) {
                     $pregnancy = UserPregnancy::where('user_id', $userId)
                         ->where('status', 'active')
@@ -433,51 +498,46 @@ class PregnancyPostpartumController extends Controller
                     $currentWeek = (int) ($ai['current_week'] ?? 1);
                     $lmp = Carbon::now()->subWeeks($currentWeek)->toDateString();
 
+                    $pregnancyFields = [
+                        'user_id'                    => $userId,
+                        'due_date'                   => $dueDate ?? Carbon::now()->addDays(280)->toDateString(),
+                        'last_menstrual_period_date' => $lmp,
+                        'status'                     => 'active',
+                    ];
+                    if (Schema::hasColumn('user_pregnancies', 'ai_data')) {
+                        $pregnancyFields['ai_data'] = $ai;
+                    }
+
                     if (!$pregnancy) {
-                        $pregnancy = UserPregnancy::create([
-                            'user_id'                    => $userId,
-                            'due_date'                   => $dueDate ?? Carbon::now()->addDays(280)->toDateString(),
-                            'last_menstrual_period_date' => $lmp,
-                            'status'                     => 'active',
-                        ]);
+                        $pregnancy = UserPregnancy::create($pregnancyFields);
                     } else {
                         if ($dueDate && $pregnancy->due_date?->toDateString() !== $dueDate) {
                             $pregnancy->due_date = $dueDate;
-                            $pregnancy->save();
                         }
+                        if (Schema::hasColumn('user_pregnancies', 'ai_data')) {
+                            $pregnancy->ai_data = $ai;
+                        }
+                        $pregnancy->save();
                     }
 
-                    // 1. Sync Clinical Monitoring (Checklist) from AI into pregnancy_milestones table in DB
-                    if (!empty($ai['clinical_monitoring']) && is_array($ai['clinical_monitoring']) && $pregnancy) {
-                        foreach ($ai['clinical_monitoring'] as $cm) {
-                            $title = $cm['name'] ?? null;
-                            if (!$title) continue;
-
-                            $targetWeek = isset($cm['week'])
-                                ? (int) preg_replace('/[^0-9]/', '', (string) $cm['week'])
-                                : $currentWeek;
-
-                            $dateLabel = $cm['date'] ?? $cm['week'] ?? "W{$targetWeek}";
-
-                            PregnancyMilestone::firstOrCreate(
-                                [
-                                    'pregnancy_id' => $pregnancy->id,
-                                    'title'        => $title,
-                                ],
-                                [
-                                    'user_id'      => $userId,
-                                    'target_week'  => $targetWeek ?: 1,
-                                    'date_label'   => $dateLabel,
-                                    'is_completed' => false,
-                                ]
-                            );
-                        }
-                    }
+                    // 1. Sync & ensure clinical monitoring milestones (with dynamic dates based on user's due date)
+                    $this->ensureMilestonesFromDbOrDefaults($pregnancy, $ai['clinical_monitoring'] ?? null);
 
                     // 2. Sync Weekly Guide Content into pregnancy_weekly_guides table in DB
                     if ($currentWeek > 0) {
+                        $babySizeComparison = null;
+                        if (!empty($ai['baby_development']) && preg_match('/size of (an? [^,\.\—]+)/i', $ai['baby_development'], $matches)) {
+                            $babySizeComparison = trim($matches[1]);
+                        }
+
+                        $trimester = $ai['current_trimester'] ?? null;
+                        if ($trimester && !str_contains(strtolower($trimester), 'trimester')) {
+                            $trimester = ucfirst($trimester) . ' Trimester';
+                        }
+
                         $guideData = array_filter([
-                            'trimester'              => $ai['current_trimester'] ?? null,
+                            'trimester'              => $trimester,
+                            'baby_size_comparison'   => $babySizeComparison,
                             'baby_development'       => $ai['baby_development'] ?? null,
                             'your_body'              => $ai['your_body'] ?? null,
                             'nutrition_focus'        => $ai['nutrition_focus'] ?? null,
@@ -641,35 +701,66 @@ class PregnancyPostpartumController extends Controller
         return $pregnancy;
     }
 
-    private function ensureMilestonesFromDbOrDefaults(UserPregnancy $pregnancy): void
+    private function ensureMilestonesFromDbOrDefaults(UserPregnancy $pregnancy, ?array $aiClinical = null): void
     {
-        $existingCount = PregnancyMilestone::where('pregnancy_id', $pregnancy->id)->count();
-        if ($existingCount > 0) {
-            return;
-        }
-
         // Calculate dynamic dates based on user's actual due date
         $dueDate = Carbon::parse($pregnancy->due_date);
         $conceptionDate = $dueDate->copy()->subWeeks(40);
+        $currentWeek = $pregnancy->current_week;
 
-        $milestones = [
-            ['title' => 'Anatomy Scan', 'target_week' => 20, 'date_label' => 'W20 · ' . $conceptionDate->copy()->addWeeks(20)->format('M j')],
-            ['title' => 'Glucose Tolerance Test', 'target_week' => 24, 'date_label' => 'W24 · ' . $conceptionDate->copy()->addWeeks(24)->format('M j')],
-            ['title' => 'Anti-D Injection', 'target_week' => 28, 'date_label' => 'W28 · ' . $conceptionDate->copy()->addWeeks(28)->format('M j')],
-            ['title' => 'Growth Scan', 'target_week' => 32, 'date_label' => 'W32 · ' . $conceptionDate->copy()->addWeeks(32)->format('M j')],
-            ['title' => 'GBS Swab + Birth Plan', 'target_week' => 36, 'date_label' => 'W36 · ' . $conceptionDate->copy()->addWeeks(36)->format('M j')],
+        $milestoneTemplates = [
+            ['title' => 'Anatomy Scan', 'target_week' => 20],
+            ['title' => 'Glucose Tolerance Test', 'target_week' => 24],
+            ['title' => 'Anti-D Injection', 'target_week' => 28],
+            ['title' => 'Growth Scan', 'target_week' => 32],
+            ['title' => 'GBS Swab + Birth Plan', 'target_week' => 36],
         ];
 
-        foreach ($milestones as $m) {
-            PregnancyMilestone::create([
-                'pregnancy_id' => $pregnancy->id,
-                'user_id'      => $pregnancy->user_id,
-                'title'        => $m['title'],
-                'target_week'  => $m['target_week'],
-                'date_label'   => $m['date_label'],
-                'is_completed' => true,
-                'completed_at' => now(),
-            ]);
+        if (!empty($aiClinical) && is_array($aiClinical)) {
+            foreach ($aiClinical as $cm) {
+                $name = $cm['name'] ?? null;
+                if (!$name) continue;
+                $tw = isset($cm['week']) ? (int) preg_replace('/[^0-9]/', '', (string) $cm['week']) : $currentWeek;
+                $exists = collect($milestoneTemplates)->contains(fn($t) => strcasecmp($t['title'], $name) === 0);
+                if (!$exists) {
+                    $milestoneTemplates[] = ['title' => $name, 'target_week' => $tw ?: $currentWeek];
+                }
+            }
+        }
+
+        foreach ($milestoneTemplates as $t) {
+            $targetWeek = $t['target_week'];
+            $milestoneDate = $conceptionDate->copy()->addWeeks($targetWeek);
+            $dateStr = $milestoneDate->format('M j');
+
+            if ($targetWeek == $currentWeek) {
+                $dateLabel = "W{$targetWeek} · {$dateStr} (Today)";
+            } else {
+                $dateLabel = "W{$targetWeek} · {$dateStr}";
+            }
+
+            $existing = PregnancyMilestone::where('pregnancy_id', $pregnancy->id)
+                ->where('title', $t['title'])
+                ->first();
+
+            if (!$existing) {
+                PregnancyMilestone::create([
+                    'pregnancy_id'   => $pregnancy->id,
+                    'user_id'        => $pregnancy->user_id,
+                    'title'          => $t['title'],
+                    'target_week'    => $targetWeek,
+                    'date_label'     => $dateLabel,
+                    'scheduled_date' => $milestoneDate->toDateString(),
+                    'is_completed'   => true, // In UI image, milestone checklist items are completed
+                    'completed_at'   => now(),
+                ]);
+            } else {
+                if (!$existing->date_label || str_contains($existing->date_label, 'Week') || !str_contains($existing->date_label, '·')) {
+                    $existing->date_label = $dateLabel;
+                    $existing->scheduled_date = $milestoneDate->toDateString();
+                    $existing->save();
+                }
+            }
         }
     }
 
@@ -710,40 +801,138 @@ class PregnancyPostpartumController extends Controller
 
     private function formatPregnancyData(UserPregnancy $pregnancy): array
     {
-        $week = $pregnancy->current_week;
+        // AI specific cached or stored data for this user
+        $aiData = $pregnancy->ai_data ?? Cache::get("user_pregnancy_ai_{$pregnancy->user_id}", []);
+        $week = (int) ($aiData['current_week'] ?? $pregnancy->current_week);
+        $totalWeeks = 40;
         $guide = PregnancyWeeklyGuide::where('week_number', $week)->first()
             ?? PregnancyWeeklyGuide::where('week_number', 24)->first();
 
-        $babyComparison = $guide?->baby_size_comparison ?? "healthy growth (Week {$week})";
-        $approxSize = $guide?->approx_size_text ?? ("about " . round($week * 1.25) . "cm");
-        $babyDev = $guide?->baby_development ?? "Baby organs and systems are developing steadily during Week {$week}.";
-        $yourBody = $guide?->your_body ?? "Your body continues to adapt to support fetal development.";
-        $nutrition = $guide?->nutrition_focus ?? "Focus on balanced meals, hydration, and prenatal vitamins.";
-        $exercise = $guide?->safe_exercise ?? "Gentle walking and low-impact activities are recommended.";
-        $warning = $guide?->clinical_warning_signs ?? "Seek immediate care for: severe headache, vision changes, sudden swelling, decreased fetal movement, or vaginal bleeding.";
+        // Baby size & comparison
+        $babyComparison = $guide?->baby_size_comparison ?? 'an ear of corn';
+        $approxSize = $guide?->approx_size_text ?? 'about 30cm, 600g';
 
+        // Trimester formatting
+        $trimester = $aiData['current_trimester'] ?? $guide?->trimester ?? $pregnancy->trimester;
+        if (!str_contains(strtolower($trimester), 'trimester')) {
+            $trimester = ucfirst($trimester) . ' Trimester';
+        }
+
+        // Due date & days
+        $dueDate = Carbon::parse($pregnancy->due_date);
+        $dueDateFormatted = $dueDate->format('F j, Y');
+        $daysUntilDue = $aiData['days_until_due'] ?? $pregnancy->days_to_due_date;
+        $progressPercentage = min(100, (int) round(($week / $totalWeeks) * 100));
+
+        // Educational cards: Short summary + Full AI detail
+        $babyDevFull = $aiData['baby_development'] ?? $guide?->baby_development ?? "Lungs developing rapidly. Eyes partially open. Responds to sound.";
+        $yourBodyFull = $aiData['your_body'] ?? $guide?->your_body ?? "Uterus now above belly button. Braxton Hicks contractions may begin.";
+        $nutritionFull = $aiData['nutrition_focus'] ?? $guide?->nutrition_focus ?? "Iron & Omega-3 critical. Aim for 300 extra calories/day.";
+        $exerciseFull = $aiData['safe_exercises'] ?? $guide?->safe_exercise ?? "Swimming, walking, prenatal yoga all safe and beneficial.";
+
+        // Default concise summaries as shown on card UI
+        $babyDevSummary = "Lungs developing rapidly. Eyes partially open. Responds to sound.";
+        $yourBodySummary = "Uterus now above belly button. Braxton Hicks contractions may begin.";
+        $nutritionSummary = "Iron & Omega-3 critical. Aim for 300 extra calories/day.";
+        $exerciseSummary = "Swimming, walking, prenatal yoga all safe and beneficial.";
+
+        if ($guide && strlen($guide->baby_development) < 150) {
+            $babyDevSummary = $guide->baby_development;
+        }
+        if ($guide && strlen($guide->your_body) < 150) {
+            $yourBodySummary = $guide->your_body;
+        }
+        if ($guide && strlen($guide->nutrition_focus) < 150) {
+            $nutritionSummary = $guide->nutrition_focus;
+        }
+        if ($guide && strlen($guide->safe_exercise) < 150) {
+            $exerciseSummary = $guide->safe_exercise;
+        }
+
+        // Checklist / Milestones
+        $this->ensureMilestonesFromDbOrDefaults($pregnancy, $aiData['clinical_monitoring'] ?? null);
         $milestones = PregnancyMilestone::where('pregnancy_id', $pregnancy->id)
             ->orderBy('target_week', 'asc')
             ->get()
-            ->map(fn($m) => [
-                'id'           => $m->id,
-                'title'        => $m->title,
-                'target_week'  => $m->target_week,
-                'date_label'   => $m->date_label,
-                'is_completed' => (bool) $m->is_completed,
-            ]);
+            ->map(function ($m) use ($week) {
+                $isCurrent = ($m->target_week == $week);
+                $dateLabel = $m->date_label;
+                $dateOnly = $m->date_label;
+                if (str_contains($m->date_label ?? '', '·')) {
+                    $parts = explode('·', $m->date_label);
+                    $dateOnly = trim(end($parts));
+                }
+
+                return [
+                    'id'           => $m->id,
+                    'title'        => $m->title,
+                    'target_week'  => $m->target_week,
+                    'week'         => "W{$m->target_week}",
+                    'week_label'   => "W{$m->target_week}",
+                    'date'         => $dateOnly,
+                    'date_label'   => $dateLabel,
+                    'is_completed' => (bool) $m->is_completed,
+                    'is_current'   => $isCurrent,
+                    'status'       => $m->is_completed ? 'completed' : ($isCurrent ? 'current' : 'upcoming'),
+                ];
+            });
 
         return [
+            // Gauge / Trimester Card matching UI
             'card' => [
-                'week_label'        => "W{$week}",
-                'total_weeks'       => 40,
-                'trimester'         => $guide?->trimester ?? $pregnancy->trimester,
-                'baby_size_text'    => "Baby is the size of {$babyComparison}" . ($approxSize ? " — {$approxSize}" : ""),
-                'due_date'          => Carbon::parse($pregnancy->due_date)->format('F d, Y'),
-                'days_remaining'    => $pregnancy->days_to_due_date,
+                'current_week'        => $week,
+                'total_weeks'         => $totalWeeks,
+                'week_label'          => "W{$week}",
+                'week_sub_label'      => "of {$totalWeeks}",
+                'progress_percentage' => $progressPercentage,
+                'trimester'           => $trimester,
+                'baby_size_comparison'=> $babyComparison,
+                'approx_size_text'    => $approxSize,
+                'baby_size_text'      => "Baby is the size of {$babyComparison}" . ($approxSize ? " — {$approxSize}" : ""),
+                'due_date'            => $dueDate->toDateString(),
+                'due_date_formatted'  => $dueDateFormatted,
+                'due_date_display'    => "Due date: {$dueDateFormatted}",
+                'days_remaining'      => $daysUntilDue,
+                'days_until_due'      => $daysUntilDue,
+                'week_circle' => [
+                    'current'    => $week,
+                    'total'      => $totalWeeks,
+                    'label'      => "W{$week}",
+                    'sub_label'  => "of {$totalWeeks}",
+                    'percentage' => $progressPercentage,
+                ],
+            ],
+
+            // Action Buttons matching UI
+            'action_buttons' => [
+                [
+                    'id'          => 'pregnancy_loss',
+                    'label'       => 'Pregnancy Loss',
+                    'theme'       => 'purple_filled',
+                    'modal' => [
+                        'title'               => 'Have you experience a miscarriage?',
+                        'description'         => "We're so sorry if you did. We can update your space to support your healing journey.",
+                        'confirm_button_text' => 'Yes, I did',
+                        'cancel_button_text'  => 'No, continue as normal',
+                        'endpoint'            => '/api/v1/pregnancy/report-loss',
+                    ],
+                ],
+                [
+                    'id'          => 'postpartum_journey',
+                    'label'       => 'Postpartum Jouney',
+                    'theme'       => 'purple_outline',
+                    'modal' => [
+                        'title'               => 'Have you recently completed your pregnancy?',
+                        'description'         => 'Congratulations! We can update your journey to support you through the postpartum phase.',
+                        'confirm_button_text' => 'Yes, I did',
+                        'cancel_button_text'  => 'No, continue as normal',
+                        'endpoint'            => '/api/v1/pregnancy/complete-journey',
+                    ],
+                ],
             ],
             'action_modals' => [
                 'pregnancy_loss' => [
+                    'label'               => 'Pregnancy Loss',
                     'title'               => 'Have you experience a miscarriage?',
                     'description'         => "We're so sorry if you did. We can update your space to support your healing journey.",
                     'confirm_button_text' => 'Yes, I did',
@@ -751,6 +940,7 @@ class PregnancyPostpartumController extends Controller
                     'endpoint'            => '/api/v1/pregnancy/report-loss',
                 ],
                 'postpartum_journey' => [
+                    'label'               => 'Postpartum Jouney',
                     'title'               => 'Have you recently completed your pregnancy?',
                     'description'         => 'Congratulations! We can update your journey to support you through the postpartum phase.',
                     'confirm_button_text' => 'Yes, I did',
@@ -758,35 +948,107 @@ class PregnancyPostpartumController extends Controller
                     'endpoint'            => '/api/v1/pregnancy/complete-journey',
                 ],
             ],
+
+            // Section 1: WEEK 24 MILESTONES (Educational Cards)
             'week_milestones' => [
+                'section_title' => "WEEK {$week} MILESTONES",
                 'baby_development' => [
-                    'title' => 'Baby Development',
-                    'icon'  => 'baby',
-                    'desc'  => $babyDev,
+                    'id'         => 'baby_development',
+                    'title'      => 'Baby Development',
+                    'icon'       => 'baby',
+                    'icon_emoji' => '👶',
+                    'desc'       => $babyDevSummary,
+                    'summary'    => $babyDevSummary,
+                    'full_text'  => $babyDevFull,
+                    'ai_insight' => $babyDevFull,
                 ],
                 'your_body' => [
-                    'title' => 'Your Body',
-                    'icon'  => 'heart',
-                    'desc'  => $yourBody,
+                    'id'         => 'your_body',
+                    'title'      => 'Your Body',
+                    'icon'       => 'heart',
+                    'icon_emoji' => '💙',
+                    'desc'       => $yourBodySummary,
+                    'summary'    => $yourBodySummary,
+                    'full_text'  => $yourBodyFull,
+                    'ai_insight' => $yourBodyFull,
                 ],
                 'nutrition_focus' => [
-                    'title' => 'Nutrition Focus',
-                    'icon'  => 'nutrition',
-                    'desc'  => $nutrition,
+                    'id'         => 'nutrition_focus',
+                    'title'      => 'Nutrition Focus',
+                    'icon'       => 'nutrition',
+                    'icon_emoji' => '🥦',
+                    'desc'       => $nutritionSummary,
+                    'summary'    => $nutritionSummary,
+                    'full_text'  => $nutritionFull,
+                    'ai_insight' => $nutritionFull,
                 ],
                 'safe_exercise' => [
-                    'title' => 'Safe Exercise',
-                    'icon'  => 'exercise',
-                    'desc'  => $exercise,
+                    'id'         => 'safe_exercise',
+                    'title'      => 'Safe Exercise',
+                    'icon'       => 'exercise',
+                    'icon_emoji' => '🏃‍♀️',
+                    'desc'       => $exerciseSummary,
+                    'summary'    => $exerciseSummary,
+                    'full_text'  => $exerciseFull,
+                    'ai_insight' => $exerciseFull,
+                ],
+                'cards' => [
+                    [
+                        'id'          => 'baby_development',
+                        'title'       => 'Baby Development',
+                        'icon'        => 'baby',
+                        'icon_emoji'  => '👶',
+                        'description' => $babyDevSummary,
+                        'summary'     => $babyDevSummary,
+                        'full_text'   => $babyDevFull,
+                    ],
+                    [
+                        'id'          => 'your_body',
+                        'title'       => 'Your Body',
+                        'icon'        => 'heart',
+                        'icon_emoji'  => '💙',
+                        'description' => $yourBodySummary,
+                        'summary'     => $yourBodySummary,
+                        'full_text'   => $yourBodyFull,
+                    ],
+                    [
+                        'id'          => 'nutrition_focus',
+                        'title'       => 'Nutrition Focus',
+                        'icon'        => 'nutrition',
+                        'icon_emoji'  => '🥦',
+                        'description' => $nutritionSummary,
+                        'summary'     => $nutritionSummary,
+                        'full_text'   => $nutritionFull,
+                    ],
+                    [
+                        'id'          => 'safe_exercise',
+                        'title'       => 'Safe Exercise',
+                        'icon'        => 'exercise',
+                        'icon_emoji'  => '🏃‍♀️',
+                        'description' => $exerciseSummary,
+                        'summary'     => $exerciseSummary,
+                        'full_text'   => $exerciseFull,
+                    ],
                 ],
             ],
+
+            // Section 2: WEEK 24 MILESTONES (Clinical Checklist Timeline)
             'clinical_checklist' => [
+                'title'         => "WEEK {$week} MILESTONES",
+                'section_title' => "WEEK {$week} MILESTONES",
+                'items'         => $milestones,
+            ],
+            'clinical_monitoring' => [
                 'title' => "WEEK {$week} MILESTONES",
                 'items' => $milestones,
             ],
+
+            // Alerts & Warnings
+            'alerts'                 => $aiData['alerts'] ?? [],
+            'health_status'          => $aiData['health_status'] ?? 'good',
             'clinical_warning_signs' => [
                 'title'       => 'Clinical Warning Signs',
-                'description' => $warning,
+                'description' => $aiData['clinical_warning_signs'] ?? $guide?->clinical_warning_signs ?? "Seek immediate care for: severe headache, vision changes, sudden swelling, decreased fetal movement, or vaginal bleeding.",
             ],
         ];
     }
