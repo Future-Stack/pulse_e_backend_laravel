@@ -117,8 +117,16 @@ Route::prefix('v1')->group(function () {
     Route::match(['get', 'post'], '/perimenopause/export', [MenopauseController::class, 'export']);
 
     Route::post('/perimenopause/gsm-checkin', [PerimenopauseController::class, 'saveGsmCheckin']);
-//    Route::get('/perimenopause/gsm-checkin2/{user_id}', [PerimenopauseController::class, 'getGsmCheckin']);
+    Route::get('/perimenopause/gsm-checkin/{userId}', [PerimenopauseController::class, 'getGsmCheckin']);
 
+    // Pregnancy & Postpartum
+    Route::match(['get', 'post'], '/pregnancy-postpartum/overview', [PregnancyPostpartumController::class, 'overview']);
+    Route::get('/pregnancy/overview', [PregnancyPostpartumController::class, 'overview']);
+    Route::post('/pregnancy/setup', [PregnancyPostpartumController::class, 'setup']);
+    Route::post('/pregnancy/milestones/{id}/toggle', [PregnancyPostpartumController::class, 'toggleMilestone']);
+    Route::post('/pregnancy/report-loss', [PregnancyPostpartumController::class, 'reportLoss']);
+    Route::post('/pregnancy/complete-journey', [PregnancyPostpartumController::class, 'completeJourney']);
+    Route::post('/postpartum/checkin', [PregnancyPostpartumController::class, 'checkinPostpartum']);
 
     // Perimenopause / Menopause & Vitality
     Route::match(['get', 'post'], '/perimenopause/overview', [PerimenopauseController::class, 'overview']);
@@ -178,20 +186,6 @@ Route::prefix('v1')->group(function () {
     Route::post('/apple-health/sync', [TerraWebhookController::class, 'syncDeviceData']);
 
     Route::middleware('auth:sanctum')->group(function () {
-
-        // Pregnancy & Postpartum (Secured via Sanctum Token)
-        Route::match(['get', 'post'], '/pregnancy-postpartum/overview', [PregnancyPostpartumController::class, 'overview']);
-        Route::match(['get', 'post'], '/pregnancy/overview', [PregnancyPostpartumController::class, 'overview']);
-        Route::match(['get', 'post'], '/pregnancy/summary', [PregnancyPostpartumController::class, 'summary']);
-        Route::match(['get', 'post'], '/postpartum/recovery', [PregnancyPostpartumController::class, 'recovery']);
-        Route::match(['get', 'post'], '/postpartum/overview', [PregnancyPostpartumController::class, 'recovery']);
-        Route::post('/pregnancy/setup', [PregnancyPostpartumController::class, 'setup']);
-        Route::post('/pregnancy/milestones/{id}/toggle', [PregnancyPostpartumController::class, 'toggleMilestone']);
-        Route::post('/pregnancy/report-loss', [PregnancyPostpartumController::class, 'reportLoss']);
-        Route::post('/pregnancy/complete-journey', [PregnancyPostpartumController::class, 'completeJourney']);
-        Route::post('/postpartum/checkin', [PregnancyPostpartumController::class, 'checkinPostpartum']);
-        Route::get('/pregnancy/care-communities', [PregnancyPostpartumController::class, 'getCareCommunities']);
-        Route::get('/support/insights', [PregnancyPostpartumController::class, 'getSupportInsights']);
 
     Route::post('/cycle-calendar-inputs',[CycleCalendarInputController::class, 'store']);
     Route::get('/cycle-calendar/current', [CycleCalendarInputController::class, 'current']);
