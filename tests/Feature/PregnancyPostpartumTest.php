@@ -178,20 +178,19 @@ class PregnancyPostpartumTest extends TestCase
         $this->assertNotEmpty($preg['alerts']);
         $this->assertArrayHasKey('clinical_warning_signs', $preg);
 
-        // Exact AI response keys directly on data
-        $data = $response->json('data');
-        $this->assertTrue($data['is_pregnant']);
-        $this->assertEquals(24, $data['current_week']);
-        $this->assertEquals('Second', $data['current_trimester']);
-        $this->assertEquals('2027-01-18', $data['due_date']);
-        $this->assertEquals(109, $data['days_until_due']);
-        $this->assertStringContainsString('ear of corn', $data['baby_development']);
-        $this->assertStringContainsString('uterus', $data['your_body']);
-        $this->assertStringContainsString('iron-rich', $data['nutrition_focus']);
-        $this->assertStringContainsString('walking', $data['safe_exercises']);
-        $this->assertNotEmpty($data['clinical_monitoring']);
-        $this->assertEquals('Glucose Tolerance Test', $data['clinical_monitoring'][0]['name']);
-        $this->assertStringContainsString('vaginal bleeding', $data['clinical_warning_signs']);
+        // Exact AI response keys on pregnancy object
+        $this->assertTrue($preg['is_pregnant']);
+        $this->assertEquals(24, $preg['current_week']);
+        $this->assertEquals('Second', $preg['current_trimester']);
+        $this->assertEquals('2027-01-18', $preg['due_date']);
+        $this->assertEquals(109, $preg['days_until_due']);
+        $this->assertStringContainsString('ear of corn', $preg['baby_development']);
+        $this->assertStringContainsString('uterus', $preg['your_body']);
+        $this->assertStringContainsString('iron-rich', $preg['nutrition_focus']);
+        $this->assertStringContainsString('walking', $preg['safe_exercises']);
+        $this->assertNotEmpty($preg['clinical_monitoring']);
+        $this->assertEquals('Glucose Tolerance Test', $preg['clinical_monitoring'][0]['name']);
+        $this->assertStringContainsString('vaginal bleeding', $preg['clinical_warning_signs']);
     }
 
     public function test_postpartum_tab_returns_recovery_metrics(): void
@@ -390,8 +389,8 @@ class PregnancyPostpartumTest extends TestCase
             ->assertJson([
                 'success' => true,
                 'data' => [
-                    'user_sub_stage' => 'postpartum',
-                    'active_tab'     => 'postpartum',
+                    'current_stage' => 'postpartum',
+                    'active_tab'    => 'postpartum',
                 ],
             ]);
         $this->assertArrayHasKey('postpartum', $overviewResponse->json('data'));
@@ -493,10 +492,9 @@ class PregnancyPostpartumTest extends TestCase
             ->assertJson([
                 'success' => true,
                 'data' => [
-                    'life_stage' => 'Pregnancy & Postpartum',
+                    'life_stage'    => 'Pregnancy & Postpartum',
                     'current_stage' => 'pregnancy',
-                    'user_sub_stage' => 'pregnancy',
-                    'active_tab' => 'pregnancy',
+                    'active_tab'    => 'pregnancy',
                     'header' => [
                         'title' => 'Pregnancy & Postpartum',
                     ],
@@ -527,9 +525,8 @@ class PregnancyPostpartumTest extends TestCase
             ->assertJson([
                 'success' => true,
                 'data' => [
-                    'active_tab'  => 'pregnancy',
-                    'is_pregnant' => false,
-                    'pregnancy'   => null,
+                    'active_tab' => 'pregnancy',
+                    'pregnancy'  => null,
                     'header' => [
                         'subtitle' => null,
                     ],

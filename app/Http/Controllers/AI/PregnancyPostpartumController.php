@@ -40,9 +40,17 @@ class PregnancyPostpartumController extends Controller
         $userId = $user->id;
         $user->loadMissing(['profile.lifeJourneys']);
 
-        // 1. Sync live intelligence from AI API into Database
-        $this->syncPregnancyFromAi((int) $userId);
-        $this->syncPostpartumFromAi((int) $userId);
+        $requestedTab = strtolower($request->input('tab') ?? $request->query('tab') ?? '');
+
+        // 1. Sync live intelligence from AI API into Database only for relevant stage
+        if ($requestedTab === 'postpartum') {
+            $this->syncPostpartumFromAi((int) $userId);
+        } elseif ($requestedTab === 'pregnancy' || empty($requestedTab)) {
+            $this->syncPregnancyFromAi((int) $userId);
+        } else {
+            $this->syncPregnancyFromAi((int) $userId);
+            $this->syncPostpartumFromAi((int) $userId);
+        }
 
         $latestPregnancy = UserPregnancy::where('user_id', $userId)
             ->latest()
@@ -104,12 +112,15 @@ class PregnancyPostpartumController extends Controller
         $defaultTab = $userSubStage === 'postpartum' ? 'postpartum' : ($userSubStage === 'miscarriage' ? 'support' : 'pregnancy');
         $tab = strtolower($request->input('tab') ?? $request->query('tab') ?? $defaultTab);
 
-        // Fetch user's pregnancy record from DB or AI sync (no dummy data)
+        // Fetch user's pregnancy record from DB or AI sync (only when tab is pregnancy or all)
         $pregnancy = ($latestPregnancy && ($latestPregnancy->status === 'active' || $isMiscarriage))
             ? $latestPregnancy
-            : $this->getPregnancyRecord((int) $userId);
+            : (($tab === 'pregnancy' || $tab === 'all') ? $this->getPregnancyRecord((int) $userId) : null);
 
-        $postpartum = $this->getPostpartumRecord((int) $userId);
+        // Fetch postpartum record ONLY if requested tab is postpartum/all or user stage is postpartum
+        $postpartum = ($tab === 'postpartum' || $tab === 'all' || $userSubStage === 'postpartum')
+            ? $this->getPostpartumRecord((int) $userId)
+            : null;
 
         // Dynamic subtitle according to active stage and maternal phase
         if ($tab === 'postpartum') {
@@ -123,16 +134,11 @@ class PregnancyPostpartumController extends Controller
         $isPregnant = (bool) ($pregnancy && $pregnancy->status === 'active');
 
         $data = [
-            'life_stage'        => $lifeStageTitle,
-            'life_stages'       => $userLifeStages,
-            'user_life_stages'  => $userLifeStages,
-            'current_stage'     => $userSubStage,
-            'user_sub_stage'    => $userSubStage,
-            'active_stage'      => $tab,
-            'active_tab'        => $tab,
-            'is_pregnant'       => $isPregnant,
-            'available_tabs'    => ['pregnancy', 'postpartum', 'support'],
-            'tabs'              => [
+            'life_stage'    => $lifeStageTitle,
+            'life_stages'   => $userLifeStages,
+            'current_stage' => $userSubStage,
+            'active_tab'    => $tab,
+            'tabs'          => [
                 ['id' => 'pregnancy', 'label' => 'Pregnancy', 'is_active' => ($tab === 'pregnancy')],
                 ['id' => 'postpartum', 'label' => 'Postpartum', 'is_active' => ($tab === 'postpartum')],
                 ['id' => 'support', 'label' => 'Support', 'is_active' => ($tab === 'support')],
@@ -159,13 +165,7 @@ class PregnancyPostpartumController extends Controller
             $data['support']    = $this->formatSupportData((int) $userId);
         } else {
             // Default: pregnancy
-            $pregnancyData = $pregnancy ? $this->formatPregnancyData($pregnancy) : null;
-            $data['pregnancy'] = $pregnancyData;
-            if ($pregnancyData) {
-                // Merge direct AI response keys so client can access them at top level of data
-                $data = array_merge($data, $pregnancyData);
-                $data['pregnancy'] = $pregnancyData;
-            }
+            $data['pregnancy'] = $pregnancy ? $this->formatPregnancyData($pregnancy) : null;
         }
 
         return response()->json([
@@ -650,6 +650,15 @@ class PregnancyPostpartumController extends Controller
             return null;
         }
 
+        // Guard: Never create or sync postpartum records for an actively pregnant user
+        $hasActivePregnancy = UserPregnancy::where('user_id', $userId)
+            ->where('status', 'active')
+            ->exists();
+
+        if ($hasActivePregnancy) {
+            return null;
+        }
+
         $baseUrl = rtrim(config('services.ai.base_url', 'https://ai.fightthenumber.com'), '/');
         $aiUrl = "{$baseUrl}/api/v1/postpartum/recovery";
 
@@ -823,12 +832,21 @@ class PregnancyPostpartumController extends Controller
 
     private function getPostpartumRecord(int $userId): ?PostpartumRecovery
     {
+        // Guard: A user with an active pregnancy is pregnant, NOT in postpartum!
+        $hasActivePregnancy = UserPregnancy::where('user_id', $userId)
+            ->where('status', 'active')
+            ->exists();
+
+        if ($hasActivePregnancy) {
+            return null;
+        }
+
         $postpartum = PostpartumRecovery::where('user_id', $userId)->latest()->first();
         if ($postpartum) {
             return $postpartum;
         }
 
-        // Try syncing from AI API
+        // Try syncing from AI API only if user has no active pregnancy
         $synced = $this->syncPostpartumFromAi($userId);
         if ($synced) {
             return $synced;
@@ -1498,21 +1516,18 @@ class PregnancyPostpartumController extends Controller
 
             // Gauge / Trimester Card matching UI
             'card' => [
-                'current_week'        => $week,
-                'total_weeks'         => $totalWeeks,
-                'week_label'          => "W{$week}",
-                'week_sub_label'      => "of {$totalWeeks}",
-                'progress_percentage' => $progressPercentage,
-                'trimester'           => $trimester,
-                'baby_size_comparison'=> $babyComparison,
-                'approx_size_text'    => $approxSize,
-                'baby_size_text'      => $babySizeText,
-                'due_date'            => $dueDate->toDateString(),
-                'due_date_formatted'  => $dueDateFormatted,
-                'due_date_display'    => "Due date: {$dueDateFormatted}",
-                'days_remaining'      => $daysUntilDue,
-                'days_until_due'      => $daysUntilDue,
-                'week_circle' => [
+                'current_week'         => $week,
+                'total_weeks'          => $totalWeeks,
+                'week_label'           => "W{$week}",
+                'week_sub_label'       => "of {$totalWeeks}",
+                'progress_percentage'  => $progressPercentage,
+                'trimester'            => $trimester,
+                'baby_size_comparison' => $babyComparison,
+                'baby_size_text'       => $babySizeText,
+                'due_date'             => $dueDate->toDateString(),
+                'due_date_display'     => "Due date: {$dueDateFormatted}",
+                'days_until_due'       => $daysUntilDue,
+                'week_circle'          => [
                     'current'    => $week,
                     'total'      => $totalWeeks,
                     'label'      => "W{$week}",
@@ -1524,9 +1539,9 @@ class PregnancyPostpartumController extends Controller
             // Action Buttons matching UI
             'action_buttons' => [
                 [
-                    'id'          => 'pregnancy_loss',
-                    'label'       => 'Pregnancy Loss',
-                    'theme'       => 'purple_filled',
+                    'id'    => 'pregnancy_loss',
+                    'label' => 'Pregnancy Loss',
+                    'theme' => 'purple_filled',
                     'modal' => [
                         'title'               => 'Have you experience a miscarriage?',
                         'description'         => "We're so sorry if you did. We can update your space to support your healing journey.",
@@ -1536,9 +1551,9 @@ class PregnancyPostpartumController extends Controller
                     ],
                 ],
                 [
-                    'id'          => 'postpartum_journey',
-                    'label'       => 'Postpartum Jouney',
-                    'theme'       => 'purple_outline',
+                    'id'    => 'postpartum_journey',
+                    'label' => 'Postpartum Jouney',
+                    'theme' => 'purple_outline',
                     'modal' => [
                         'title'               => 'Have you recently completed your pregnancy?',
                         'description'         => 'Congratulations! We can update your journey to support you through the postpartum phase.',
@@ -1548,116 +1563,85 @@ class PregnancyPostpartumController extends Controller
                     ],
                 ],
             ],
-            'action_modals' => [
-                'pregnancy_loss' => [
-                    'label'               => 'Pregnancy Loss',
-                    'title'               => 'Have you experience a miscarriage?',
-                    'description'         => "We're so sorry if you did. We can update your space to support your healing journey.",
-                    'confirm_button_text' => 'Yes, I did',
-                    'cancel_button_text'  => 'No, continue as normal',
-                    'endpoint'            => '/api/v1/pregnancy/report-loss',
-                ],
-                'postpartum_journey' => [
-                    'label'               => 'Postpartum Jouney',
-                    'title'               => 'Have you recently completed your pregnancy?',
-                    'description'         => 'Congratulations! We can update your journey to support you through the postpartum phase.',
-                    'confirm_button_text' => 'Yes, I did',
-                    'cancel_button_text'  => 'No, continue as normal',
-                    'endpoint'            => '/api/v1/pregnancy/complete-journey',
-                ],
-            ],
 
-            // Section 1: WEEK 24 MILESTONES (Educational Cards)
+            // Section 1: WEEK MILESTONES (Educational Cards matching UI)
             'week_milestones' => [
                 'section_title' => "WEEK {$week} MILESTONES",
-                'baby_development' => [
-                    'id'         => 'baby_development',
-                    'title'      => 'Baby Development',
-                    'icon'       => 'baby',
-                    'icon_emoji' => '👶',
-                    'desc'       => $babyDevSummary,
-                    'summary'    => $babyDevSummary,
-                    'full_text'  => $babyDevFull,
-                    'ai_insight' => $babyDevFull,
-                ],
-                'your_body' => [
-                    'id'         => 'your_body',
-                    'title'      => 'Your Body',
-                    'icon'       => 'heart',
-                    'icon_emoji' => '💙',
-                    'desc'       => $yourBodySummary,
-                    'summary'    => $yourBodySummary,
-                    'full_text'  => $yourBodyFull,
-                    'ai_insight' => $yourBodyFull,
-                ],
-                'nutrition_focus' => [
-                    'id'         => 'nutrition_focus',
-                    'title'      => 'Nutrition Focus',
-                    'icon'       => 'nutrition',
-                    'icon_emoji' => '🥦',
-                    'desc'       => $nutritionSummary,
-                    'summary'    => $nutritionSummary,
-                    'full_text'  => $nutritionFull,
-                    'ai_insight' => $nutritionFull,
-                ],
-                'safe_exercise' => [
-                    'id'         => 'safe_exercise',
-                    'title'      => 'Safe Exercise',
-                    'icon'       => 'exercise',
-                    'icon_emoji' => '🏃‍♀️',
-                    'desc'       => $exerciseSummary,
-                    'summary'    => $exerciseSummary,
-                    'full_text'  => $exerciseFull,
-                    'ai_insight' => $exerciseFull,
-                ],
-                'cards' => [
+                'items' => [
                     [
                         'id'          => 'baby_development',
                         'title'       => 'Baby Development',
-                        'icon'        => 'baby',
                         'icon_emoji'  => '👶',
                         'description' => $babyDevSummary,
-                        'summary'     => $babyDevSummary,
                         'full_text'   => $babyDevFull,
                     ],
                     [
                         'id'          => 'your_body',
                         'title'       => 'Your Body',
-                        'icon'        => 'heart',
                         'icon_emoji'  => '💙',
                         'description' => $yourBodySummary,
-                        'summary'     => $yourBodySummary,
                         'full_text'   => $yourBodyFull,
                     ],
                     [
                         'id'          => 'nutrition_focus',
                         'title'       => 'Nutrition Focus',
-                        'icon'        => 'nutrition',
                         'icon_emoji'  => '🥦',
                         'description' => $nutritionSummary,
-                        'summary'     => $nutritionSummary,
                         'full_text'   => $nutritionFull,
                     ],
                     [
                         'id'          => 'safe_exercise',
                         'title'       => 'Safe Exercise',
-                        'icon'        => 'exercise',
                         'icon_emoji'  => '🏃‍♀️',
                         'description' => $exerciseSummary,
-                        'summary'     => $exerciseSummary,
                         'full_text'   => $exerciseFull,
                     ],
                 ],
+                'baby_development' => [
+                    'id'          => 'baby_development',
+                    'title'       => 'Baby Development',
+                    'icon_emoji'  => '👶',
+                    'desc'        => $babyDevSummary,
+                    'description' => $babyDevSummary,
+                    'summary'     => $babyDevSummary,
+                    'full_text'   => $babyDevFull,
+                ],
+                'your_body' => [
+                    'id'          => 'your_body',
+                    'title'       => 'Your Body',
+                    'icon_emoji'  => '💙',
+                    'desc'        => $yourBodySummary,
+                    'description' => $yourBodySummary,
+                    'summary'     => $yourBodySummary,
+                    'full_text'   => $yourBodyFull,
+                ],
+                'nutrition_focus' => [
+                    'id'          => 'nutrition_focus',
+                    'title'       => 'Nutrition Focus',
+                    'icon_emoji'  => '🥦',
+                    'desc'        => $nutritionSummary,
+                    'description' => $nutritionSummary,
+                    'summary'     => $nutritionSummary,
+                    'full_text'   => $nutritionFull,
+                ],
+                'safe_exercise' => [
+                    'id'          => 'safe_exercise',
+                    'title'       => 'Safe Exercise',
+                    'icon_emoji'  => '🏃‍♀️',
+                    'desc'        => $exerciseSummary,
+                    'description' => $exerciseSummary,
+                    'summary'     => $exerciseSummary,
+                    'full_text'   => $exerciseFull,
+                ],
             ],
 
-            // Section 2: WEEK 24 MILESTONES (Clinical Checklist Timeline)
+            // Section 2: WEEK MILESTONES (Clinical Checklist Timeline matching UI)
             'clinical_checklist' => [
-                'title'         => "WEEK {$week} MILESTONES",
                 'section_title' => "WEEK {$week} MILESTONES",
                 'items'         => $milestones,
             ],
 
-            // Warning signs
+            // Warning signs matching UI
             'warning_signs' => [
                 'title'       => 'Clinical Warning Signs',
                 'description' => "Seek immediate care for: severe headache, vision changes, sudden swelling, decreased fetal movement, or vaginal bleeding.",
@@ -1708,12 +1692,18 @@ class PregnancyPostpartumController extends Controller
         ];
 
         return [
+            'card' => [
+                'tag'        => 'Recovery Progress',
+                'week_title' => "Week {$currentWeek}",
+                'subtitle'   => "Postpartum recovery — you're doing amazing 💙",
+            ],
             'banner' => [
                 'tag'       => 'Recovery Progress',
                 'week'      => "Week {$currentWeek}",
                 'subtitle'  => "Postpartum recovery — you're doing amazing 💙",
             ],
             'recovery_metrics' => [
+                'section_title' => 'RECOVERY METRICS',
                 'items' => $metricsList,
                 'physical_recovery' => [
                     'title'           => 'Physical Recovery',

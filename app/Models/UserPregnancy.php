@@ -71,11 +71,13 @@ class UserPregnancy extends Model
             return max(1, min(42, $week));
         }
 
-        if (!empty($this->ai_data['current_week'])) {
-            return (int) $this->ai_data['current_week'];
+        if ($this->last_menstrual_period_date) {
+            $now = Carbon::now();
+            $lmp = Carbon::parse($this->last_menstrual_period_date);
+            return max(1, min(42, (int) $lmp->diffInWeeks($now)));
         }
 
-        return 24;
+        return 0;
     }
 
     /**
@@ -88,7 +90,7 @@ class UserPregnancy extends Model
         }
 
         if (!$this->due_date) {
-            return 112;
+            return 0;
         }
 
         $now = Carbon::now();
