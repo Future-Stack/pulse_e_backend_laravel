@@ -2,9 +2,11 @@
 
 namespace Tests\Feature;
 
+use App\Models\LifeJourney;
+use App\Models\PregnancyMilestone;
+use App\Models\Profile;
 use App\Models\User;
 use App\Models\UserPregnancy;
-use App\Models\PregnancyMilestone;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Laravel\Sanctum\Sanctum;
@@ -63,7 +65,7 @@ class PregnancyPostpartumTest extends TestCase
                     'energy_level_percent' => 61,
                 ],
                 'mental_health_ui' => [
-                    'title' => 'Edinburgh Postnatal Depression Scale',
+                    'title' => 'Postpartum Wellness Screening',
                     'metrics' => [
                         ['label' => 'Mood Stability', 'value' => 'Stable'],
                         ['label' => 'Anxiety Level', 'value' => 'Mild'],
@@ -175,6 +177,21 @@ class PregnancyPostpartumTest extends TestCase
         // Alerts & warning signs
         $this->assertNotEmpty($preg['alerts']);
         $this->assertArrayHasKey('clinical_warning_signs', $preg);
+
+        // Exact AI response keys directly on data
+        $data = $response->json('data');
+        $this->assertTrue($data['is_pregnant']);
+        $this->assertEquals(24, $data['current_week']);
+        $this->assertEquals('Second', $data['current_trimester']);
+        $this->assertEquals('2027-01-18', $data['due_date']);
+        $this->assertEquals(109, $data['days_until_due']);
+        $this->assertStringContainsString('ear of corn', $data['baby_development']);
+        $this->assertStringContainsString('uterus', $data['your_body']);
+        $this->assertStringContainsString('iron-rich', $data['nutrition_focus']);
+        $this->assertStringContainsString('walking', $data['safe_exercises']);
+        $this->assertNotEmpty($data['clinical_monitoring']);
+        $this->assertEquals('Glucose Tolerance Test', $data['clinical_monitoring'][0]['name']);
+        $this->assertStringContainsString('vaginal bleeding', $data['clinical_warning_signs']);
     }
 
     public function test_postpartum_tab_returns_recovery_metrics(): void
@@ -194,6 +211,41 @@ class PregnancyPostpartumTest extends TestCase
 
         $this->assertArrayHasKey('recovery_metrics', $response->json('data.postpartum'));
         $this->assertArrayHasKey('mental_health_checkin', $response->json('data.postpartum'));
+    }
+
+    public function test_postpartum_recovery_endpoint_works(): void
+    {
+        $user = User::factory()->create();
+        Sanctum::actingAs($user);
+
+        $response = $this->getJson("/api/v1/postpartum/recovery");
+
+        $response->assertStatus(200)
+            ->assertJson([
+                'success' => true,
+                'data' => [
+                    'active_tab' => 'postpartum',
+                ],
+            ]);
+
+        $postpartum = $response->json('data.postpartum');
+        $this->assertArrayHasKey('banner', $postpartum);
+        $this->assertEquals('Recovery Progress', $postpartum['banner']['tag']);
+        $this->assertStringContainsString("you're doing amazing", $postpartum['banner']['subtitle']);
+
+        // 4 Recovery Metrics matching UI
+        $this->assertArrayHasKey('recovery_metrics', $postpartum);
+        $this->assertArrayHasKey('physical_recovery', $postpartum['recovery_metrics']);
+        $this->assertArrayHasKey('hormonal_balance', $postpartum['recovery_metrics']);
+        $this->assertArrayHasKey('sleep_quality', $postpartum['recovery_metrics']);
+        $this->assertArrayHasKey('energy_levels', $postpartum['recovery_metrics']);
+        $this->assertNotEmpty($postpartum['recovery_metrics']['items']);
+
+        // Mental Health Check-In matching UI
+        $this->assertArrayHasKey('mental_health_checkin', $postpartum);
+        $this->assertEquals('Postpartum Wellness Screening', $postpartum['mental_health_checkin']['screening_name']);
+        $this->assertEquals('Stable', $postpartum['mental_health_checkin']['mood_stability']);
+        $this->assertEquals('Mild', $postpartum['mental_health_checkin']['anxiety_levels']);
     }
 
     public function test_support_tab_returns_care_community(): void
@@ -375,5 +427,177 @@ class PregnancyPostpartumTest extends TestCase
         $this->assertArrayHasKey('posts_count', $response->json('data.0'));
         $this->assertArrayHasKey('members_count', $response->json('data.0'));
         $this->assertArrayHasKey('tag', $response->json('data.0'));
+    }
+
+    public function test_pregnancy_setup_dynamically_updates_week_baby_size_and_milestones(): void
+    {
+        $user = User::factory()->create();
+        Sanctum::actingAs($user);
+
+        // 1. Initially set up pregnancy at Week 24 (due_date ~ 112 days in future)
+        $this->getJson("/api/v1/pregnancy/summary");
+
+        // 2. User updates pregnancy with due_date: 2026-12-18 (Week 28)
+        $setupResponse = $this->postJson("/api/v1/pregnancy/setup", [
+            'due_date' => '2026-12-18',
+            'last_menstrual_period_date' => '2026-03-10',
+            'conception_date' => '2026-03-24',
+        ]);
+
+        $setupResponse->assertStatus(200)
+            ->assertJson([
+                'success' => true,
+                'data' => [
+                    'card' => [
+                        'current_week' => 28,
+                        'trimester' => 'Third Trimester',
+                        'progress_percentage' => 70,
+                        'due_date' => '2026-12-18',
+                    ],
+                ],
+            ]);
+
+        $card = $setupResponse->json('data.card');
+        // Dynamic baby size for Week 28 must be eggplant, NOT ear of corn!
+        $this->assertStringContainsString('eggplant', strtolower($card['baby_size_comparison']));
+        $this->assertStringContainsString('eggplant', strtolower($card['baby_size_text']));
+
+        // Week milestones section title and cards must be Week 28
+        $milestones = $setupResponse->json('data.week_milestones');
+        $this->assertEquals('WEEK 28 MILESTONES', $milestones['section_title']);
+        $this->assertStringContainsString('blink', strtolower($milestones['baby_development']['desc']));
+
+        // Clinical checklist dates must be dynamically recalculated for the new due date
+        $items = $setupResponse->json('data.clinical_checklist.items');
+        $this->assertNotEmpty($items);
+
+        $w24 = collect($items)->firstWhere('target_week', 24);
+        $w28 = collect($items)->firstWhere('target_week', 28);
+        $w32 = collect($items)->firstWhere('target_week', 32);
+
+        $this->assertNotNull($w24);
+        $this->assertNotNull($w28);
+        $this->assertNotNull($w32);
+
+        // W28 Anti-D Injection must be current milestone
+        $this->assertTrue($w28['is_current']);
+        $this->assertStringContainsString('(Today)', $w28['date']);
+
+        // W24 Glucose Tolerance Test must NOT be current
+        $this->assertFalse($w24['is_current']);
+        $this->assertStringNotContainsString('(Today)', $w24['date']);
+
+        // 3. GET /api/v1/pregnancy/summary must return the dynamically updated week 28 state
+        $summaryResponse = $this->getJson("/api/v1/pregnancy/summary");
+        $summaryResponse->assertStatus(200)
+            ->assertJson([
+                'success' => true,
+                'data' => [
+                    'life_stage' => 'Pregnancy & Postpartum',
+                    'current_stage' => 'pregnancy',
+                    'user_sub_stage' => 'pregnancy',
+                    'active_tab' => 'pregnancy',
+                    'header' => [
+                        'title' => 'Pregnancy & Postpartum',
+                    ],
+                ],
+            ]);
+
+        $this->assertEquals(28, $summaryResponse->json('data.pregnancy.card.current_week'));
+    }
+
+    public function test_null_state_returns_null_without_dummy_data_when_user_has_no_pregnancy(): void
+    {
+        // Reset Http fake callbacks from setUp()
+        Http::swap(new \Illuminate\Http\Client\Factory());
+        Http::fake([
+            'https://ai.fightthenumber.com/api/v1/pregnancy/summary*' => Http::response([
+                'is_pregnant' => false,
+                'phase' => null,
+            ], 200),
+            'https://ai.fightthenumber.com/api/v1/postpartum/recovery*' => Http::response([], 404),
+        ]);
+
+        $user = User::factory()->create();
+        Sanctum::actingAs($user);
+
+        // 1. GET /api/v1/pregnancy/summary
+        $summaryResponse = $this->getJson('/api/v1/pregnancy/summary');
+        $summaryResponse->assertStatus(200)
+            ->assertJson([
+                'success' => true,
+                'data' => [
+                    'active_tab'  => 'pregnancy',
+                    'is_pregnant' => false,
+                    'pregnancy'   => null,
+                    'header' => [
+                        'subtitle' => null,
+                    ],
+                ],
+            ]);
+
+        // Verify NO dummy record was inserted into database
+        $this->assertDatabaseMissing('user_pregnancies', ['user_id' => $user->id]);
+        $this->assertDatabaseMissing('postpartum_recoveries', ['user_id' => $user->id]);
+
+        // 2. GET /api/v1/postpartum/recovery
+        $postpartumResponse = $this->getJson('/api/v1/postpartum/recovery');
+        $postpartumResponse->assertStatus(200)
+            ->assertJson([
+                'success' => true,
+                'data' => [
+                    'active_tab' => 'postpartum',
+                    'postpartum' => null,
+                    'header' => [
+                        'subtitle' => null,
+                    ],
+                ],
+            ]);
+
+        $this->assertDatabaseMissing('postpartum_recoveries', ['user_id' => $user->id]);
+    }
+
+    public function test_multiple_life_stages_from_life_journey_profile_resolves_correctly_without_wrong_fallback(): void
+    {
+        $user = User::factory()->create();
+        Sanctum::actingAs($user);
+
+        // Create 2 life journeys in DB: Beauty & Radiance AND Pregnancy & Postpartum
+        $beautyJourney = LifeJourney::create([
+            'id'    => 1,
+            'title' => 'Beauty & Radiance',
+        ]);
+        $pregnancyJourney = LifeJourney::create([
+            'id'    => 5,
+            'title' => 'Pregnancy & Postpartum',
+        ]);
+
+        // User has a profile, and selected MULTIPLE journeys in life_journey_profile:
+        // [Beauty & Radiance, Pregnancy & Postpartum]
+        $profile = Profile::create([
+            'user_id' => $user->id,
+        ]);
+        $profile->lifeJourneys()->attach([$beautyJourney->id, $pregnancyJourney->id]);
+
+        $response = $this->getJson('/api/v1/pregnancy-postpartum/overview');
+        $response->assertStatus(200);
+
+        // life_stage and header title must NEVER be "Beauty & Radiance"!
+        $this->assertEquals('Pregnancy & Postpartum', $response->json('data.life_stage'));
+        $this->assertEquals('Pregnancy & Postpartum', $response->json('data.header.title'));
+
+        // life_stages must contain both user life stages from life_journey_profile
+        $lifeStages = $response->json('data.life_stages');
+        $this->assertCount(2, $lifeStages);
+        $titles = collect($lifeStages)->pluck('title')->toArray();
+        $this->assertContains('Beauty & Radiance', $titles);
+        $this->assertContains('Pregnancy & Postpartum', $titles);
+
+        // The pregnancy journey must have is_current = true
+        $pregItem = collect($lifeStages)->firstWhere('title', 'Pregnancy & Postpartum');
+        $this->assertTrue($pregItem['is_current']);
+
+        $beautyItem = collect($lifeStages)->firstWhere('title', 'Beauty & Radiance');
+        $this->assertFalse($beautyItem['is_current']);
     }
 }

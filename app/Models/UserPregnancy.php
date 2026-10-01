@@ -55,23 +55,27 @@ class UserPregnancy extends Model
      */
     public function getCurrentWeekAttribute(): int
     {
+        if (!empty($this->ai_data['current_week']) && (!empty($this->ai_data['due_date']) && $this->due_date && $this->ai_data['due_date'] === $this->due_date->toDateString())) {
+            return (int) $this->ai_data['current_week'];
+        }
+
+        if ($this->due_date) {
+            $now = Carbon::now();
+            $due = Carbon::parse($this->due_date);
+            
+            // Full term = 40 weeks = 280 days
+            $daysRemaining = $now->diffInDays($due, false);
+            $daysPassed = 280 - $daysRemaining;
+            $week = (int) floor($daysPassed / 7);
+
+            return max(1, min(42, $week));
+        }
+
         if (!empty($this->ai_data['current_week'])) {
             return (int) $this->ai_data['current_week'];
         }
 
-        if (!$this->due_date) {
-            return 24;
-        }
-
-        $now = Carbon::now();
-        $due = Carbon::parse($this->due_date);
-        
-        // Full term = 40 weeks = 280 days
-        $daysRemaining = $now->diffInDays($due, false);
-        $daysPassed = 280 - $daysRemaining;
-        $week = (int) floor($daysPassed / 7);
-
-        return max(1, min(42, $week));
+        return 24;
     }
 
     /**
@@ -79,6 +83,10 @@ class UserPregnancy extends Model
      */
     public function getDaysToDueDateAttribute(): int
     {
+        if (!empty($this->ai_data['days_until_due']) && (!empty($this->ai_data['due_date']) && $this->due_date && $this->ai_data['due_date'] === $this->due_date->toDateString())) {
+            return (int) $this->ai_data['days_until_due'];
+        }
+
         if (!$this->due_date) {
             return 112;
         }
