@@ -122,6 +122,11 @@ Route::prefix('v1')->group(function () {
     // Pregnancy & Postpartum
     Route::match(['get', 'post'], '/pregnancy-postpartum/overview', [PregnancyPostpartumController::class, 'overview']);
     Route::get('/pregnancy/overview', [PregnancyPostpartumController::class, 'overview']);
+    Route::match(['get', 'post'], '/pregnancy/summary', [PregnancyPostpartumController::class, 'summary']);
+    Route::match(['get', 'post'], '/postpartum/recovery', [PregnancyPostpartumController::class, 'recovery']);
+    Route::match(['get', 'post'], '/pregnancy/sync', [PregnancyPostpartumController::class, 'syncOverview']);
+    Route::get('/support/insights', [PregnancyPostpartumController::class, 'getSupportInsights']);
+    Route::get('/pregnancy/care-communities', [PregnancyPostpartumController::class, 'getCareCommunities']);
     Route::post('/pregnancy/setup', [PregnancyPostpartumController::class, 'setup']);
     Route::post('/pregnancy/milestones/{id}/toggle', [PregnancyPostpartumController::class, 'toggleMilestone']);
     Route::post('/pregnancy/report-loss', [PregnancyPostpartumController::class, 'reportLoss']);

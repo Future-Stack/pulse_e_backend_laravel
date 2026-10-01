@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\LifeJourney;
 use App\Models\PregnancyMilestone;
+use App\Models\PregnancyWeeklyGuide;
 use App\Models\Profile;
 use App\Models\User;
 use App\Models\UserPregnancy;
@@ -437,6 +438,33 @@ class PregnancyPostpartumTest extends TestCase
         $this->getJson("/api/v1/pregnancy/summary");
 
         // 2. User updates pregnancy with due_date: 2026-12-18 (Week 28)
+        \Illuminate\Support\Facades\Http::swap(new \Illuminate\Http\Client\Factory());
+        Http::fake([
+            'https://ai.fightthenumber.com/api/v1/pregnancy/summary*' => Http::response([
+                'is_pregnant' => true,
+                'current_week' => 28,
+                'current_trimester' => 'Third',
+                'due_date' => '2026-12-18',
+                'days_until_due' => 78,
+                'health_status' => 'good',
+                'alerts' => [],
+                'baby_development' => 'At 28 weeks, your baby is about the size of an eggplant and can open and close their eyes, blink, and has eyelashes.',
+                'your_body' => 'At 28 weeks, your uterus has expanded.',
+                'nutrition_focus' => 'Iron-rich foods.',
+                'safe_exercises' => 'Walking.',
+                'clinical_monitoring' => [
+                    ['name' => 'Growth Scan', 'week' => 'W32', 'date' => 'Week 32'],
+                ],
+                'clinical_warning_signs' => 'Contact provider if warning signs appear.',
+                'pregnancy_status' => 'active_pregnancy',
+                'phase' => 'pregnancy',
+                'profile_id' => 39,
+                'journey_id' => 5,
+                'journey_title' => 'Pregnancy & Postpartum',
+                'pregnancy_id' => 7,
+            ], 200),
+        ]);
+
         $setupResponse = $this->postJson("/api/v1/pregnancy/setup", [
             'due_date' => '2026-12-18',
             'last_menstrual_period_date' => '2026-03-10',
@@ -596,5 +624,198 @@ class PregnancyPostpartumTest extends TestCase
 
         $beautyItem = collect($lifeStages)->firstWhere('title', 'Beauty & Radiance');
         $this->assertFalse($beautyItem['is_current']);
+    }
+
+    public function test_user_64_pregnancy_overview_returns_only_pregnancy_data_and_exact_ai_keys(): void
+    {
+        $user = User::factory()->create(['id' => 64]);
+        Sanctum::actingAs($user);
+
+        \Illuminate\Support\Facades\Http::swap(new \Illuminate\Http\Client\Factory());
+        Http::fake([
+            'https://ai.fightthenumber.com/api/v1/pregnancy/summary*' => Http::response([
+                'is_pregnant' => true,
+                'current_week' => 29,
+                'current_trimester' => 'Third',
+                'due_date' => '2026-12-18',
+                'days_until_due' => 78,
+                'last_prenatal_visit' => null,
+                'next_appointment' => null,
+                'health_status' => 'good',
+                'alerts' => [],
+                'baby_development' => "At 29 weeks, your little one is about the size of a butternut squash and busy packing on healthy fat, strengthening those tiny muscles, and fine-tuning their brain for all the learning ahead. You might feel more powerful kicks and stretches now — a beautiful reminder of just how strong and capable both of you are becoming. You're doing an amazing job nurturing this incredible life. 💛",
+                'your_body' => "At 29 weeks, you may notice your belly feeling tighter as your uterus expands up near your ribs, which can bring on heartburn, shortness of breath, or occasional Braxton Hicks \"practice\" contractions. You might also experience swollen ankles, varicose veins, or trouble sleeping as your body works hard to support your growing baby. Be gentle with yourself—rest when you can, stay hydrated, and remember that these changes are a sign your body is do",
+                'nutrition_focus' => "At week 29, prioritize iron-rich foods (lean red meat, lentils, spinach) paired with vitamin C sources like bell peppers or citrus to boost absorption and support your increasing blood volume. Aim for 200mg of DHA daily through salmon, sardines, or an algae-based supplement to support your baby's rapid brain development, and include calcium-rich foods like yogurt or fortified plant milk at each meal (about 1,000mg total)",
+                'safe_exercises' => "At 29 weeks, aim for 20-30 minutes of gentle, low-impact activity most days—great options include walking, prenatal yoga, swimming, or stationary cycling. Listen to your body, stay well-hydrated, and avoid exercises lying flat on your back or anything with a fall risk. You're doing an amazing job staying active for you and your baby—keep it up! 💛\n\n*Always check with your healthcare provider before starting or continuing any exercise",
+                'clinical_monitoring' => [
+                    [
+                        'name' => 'Growth Scan',
+                        'week' => 'W32',
+                        'date' => '2026-10-23',
+                    ],
+                    [
+                        'name' => 'GBS Swab + Birth Plan',
+                        'week' => 'W36',
+                        'date' => '2026-11-20',
+                    ],
+                ],
+                'clinical_warning_signs' => "# Warning Signs to Watch For at 29 Weeks\n\nContact your healthcare provider promptly if you experience **severe headaches, sudden swelling in your face or hands, vision changes, upper abdominal pain, decreased fetal movement, vaginal bleeding, fluid leakage, or regular contractions**. These can be signs of conditions like preeclampsia or preterm labor that are very treatable when caught early.\n\nTrust your instincts—if something fe",
+                'pregnancy_status' => 'active_pregnancy',
+                'requires_confirmation' => false,
+                'confirmation_needed_for' => null,
+                'confirmation_message' => null,
+                'phase' => 'pregnancy',
+                'profile_id' => 46,
+                'journey_id' => 5,
+                'journey_title' => 'Pregnancy & Postpartum',
+                'pregnancy_id' => 18,
+            ], 200),
+        ]);
+
+        $response = $this->getJson('/api/v1/pregnancy-postpartum/overview');
+        $response->assertStatus(200);
+
+        // When user is pregnant: pregnancy block exists, postpartum block is NOT present
+        $this->assertArrayHasKey('pregnancy', $response->json('data'));
+        $this->assertArrayNotHasKey('postpartum', $response->json('data'));
+
+        $this->assertEquals('pregnancy', $response->json('data.current_stage'));
+        $this->assertEquals('pregnancy', $response->json('data.active_tab'));
+
+        $preg = $response->json('data.pregnancy');
+        $this->assertTrue($preg['is_pregnant']);
+        $this->assertEquals(29, $preg['current_week']);
+        $this->assertEquals('Third', $preg['current_trimester']);
+        $this->assertEquals('2026-12-18', $preg['due_date']);
+        $this->assertEquals(78, $preg['days_until_due']);
+        $this->assertEmpty($preg['alerts']);
+        $this->assertStringContainsString('butternut squash', $preg['baby_development']);
+        $this->assertStringContainsString('butternut squash', $preg['card']['baby_size_comparison']);
+        $this->assertStringContainsString('uterus expands', $preg['your_body']);
+        $this->assertStringContainsString('iron-rich', $preg['nutrition_focus']);
+        $this->assertStringContainsString('prenatal yoga', $preg['safe_exercises']);
+        $this->assertCount(2, $preg['clinical_monitoring']);
+        $this->assertEquals('Growth Scan', $preg['clinical_monitoring'][0]['name']);
+        $this->assertStringContainsString('severe headaches', $preg['clinical_warning_signs']);
+
+        // Assert postpartum_recoveries table was NEVER touched for User 64
+        $this->assertDatabaseMissing('postpartum_recoveries', ['user_id' => 64]);
+    }
+
+    public function test_user_59_postpartum_overview_returns_only_postpartum_data_and_exact_ai_keys(): void
+    {
+        $user = User::factory()->create(['id' => 59]);
+        Sanctum::actingAs($user);
+
+        \Illuminate\Support\Facades\Http::swap(new \Illuminate\Http\Client\Factory());
+        Http::fake([
+            'https://ai.fightthenumber.com/api/v1/pregnancy/summary*' => Http::response([
+                'status' => 'delivery_completed',
+                'phase' => 'postpartum',
+                'is_pregnant' => false,
+                'pregnancy_completed' => true,
+                'delivery_completed' => true,
+                'delivery_date' => '2026-09-30',
+                'profile_id' => 41,
+                'journey_id' => 5,
+                'journey_title' => 'Pregnancy & Postpartum',
+                'redirect_to' => '/api/v1/postpartum/recovery',
+            ], 200),
+            'https://ai.fightthenumber.com/api/v1/postpartum/recovery*' => Http::response([
+                'phase' => 'postpartum',
+                'profile_id' => 41,
+                'journey_id' => 5,
+                'journey_title' => 'Pregnancy & Postpartum',
+                'delivery_date' => '2026-09-30',
+                'days_postpartum' => 1,
+                'postpartum_week' => 0,
+                'recovery_status' => 'early',
+                'delivery_method' => 'vaginal',
+                'physical_health' => [
+                    'physical_recovery_percent' => 20,
+                    'bleeding_level' => 'moderate',
+                    'incision_healing' => null,
+                    'pelvic_floor_status' => 'healing',
+                    'hormonal_balance_percent' => 30,
+                    'energy_level_percent' => 40,
+                    'sleep_quality_percent' => 45,
+                ],
+                'mental_health' => [
+                    'mood_stability' => 60,
+                    'anxiety_level' => 5,
+                    'depression_screening' => 'low_risk',
+                    'last_mood_entry' => null,
+                    'mood_trend' => 'stable',
+                    'supportive_resources' => [
+                        'Postpartum Support Group',
+                        'Mental Health Hotline',
+                    ],
+                ],
+                'mental_health_ui' => [
+                    'screening_type' => 'mental_health_check_in',
+                    'title' => 'Postpartum Wellness Screening',
+                    'week' => 0,
+                    'risk_level' => 'moderate',
+                    'trend' => 'new',
+                    'metrics' => [
+                        [
+                            'label' => 'Mood stability',
+                            'value' => 'Stable',
+                            'score' => 60,
+                            'trend_arrow' => '→',
+                        ],
+                        [
+                            'label' => 'Anxiety levels',
+                            'value' => 'Mild',
+                            'score' => 5,
+                            'warning' => false,
+                        ],
+                        [
+                            'label' => 'Depression risk',
+                            'value' => 'low_risk',
+                            'risk_increased' => false,
+                        ],
+                    ],
+                ],
+            ], 200),
+        ]);
+
+        $response = $this->getJson('/api/v1/pregnancy-postpartum/overview');
+        $response->assertStatus(200);
+
+        // When user is in postpartum: postpartum block exists, pregnancy block is NOT present
+        $this->assertArrayHasKey('postpartum', $response->json('data'));
+        $this->assertArrayNotHasKey('pregnancy', $response->json('data'));
+
+        $this->assertEquals('postpartum', $response->json('data.current_stage'));
+        $this->assertEquals('postpartum', $response->json('data.active_tab'));
+
+        $post = $response->json('data.postpartum');
+        $this->assertEquals('postpartum', $post['phase']);
+        $this->assertEquals(41, $post['profile_id']);
+        $this->assertEquals(5, $post['journey_id']);
+        $this->assertEquals('Pregnancy & Postpartum', $post['journey_title']);
+        $this->assertEquals('2026-09-30', $post['delivery_date']);
+        $this->assertEquals(1, $post['days_postpartum']);
+        $this->assertEquals(0, $post['postpartum_week']);
+        $this->assertEquals('early', $post['recovery_status']);
+        $this->assertEquals('vaginal', $post['delivery_method']);
+
+        // Physical health dynamic values
+        $this->assertEquals(20, $post['physical_health']['physical_recovery_percent']);
+        $this->assertEquals('moderate', $post['physical_health']['bleeding_level']);
+        $this->assertEquals(30, $post['physical_health']['hormonal_balance_percent']);
+        $this->assertEquals(40, $post['physical_health']['energy_level_percent']);
+        $this->assertEquals(45, $post['physical_health']['sleep_quality_percent']);
+
+        // Mental health dynamic values
+        $this->assertEquals(60, $post['mental_health']['mood_stability']);
+        $this->assertEquals(5, $post['mental_health']['anxiety_level']);
+        $this->assertEquals('low_risk', $post['mental_health']['depression_screening']);
+        $this->assertCount(2, $post['mental_health']['supportive_resources']);
+
+        // Mental health UI metrics
+        $this->assertEquals('Postpartum Wellness Screening', $post['mental_health_ui']['title']);
+        $this->assertCount(3, $post['mental_health_ui']['metrics']);
     }
 }
