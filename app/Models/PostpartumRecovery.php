@@ -27,6 +27,7 @@ class PostpartumRecovery extends Model
         'mood_stability',
         'anxiety_level',
         'notes',
+        'ai_data',
     ];
 
     protected $casts = [
@@ -37,6 +38,7 @@ class PostpartumRecovery extends Model
         'sleep_quality_percent' => 'integer',
         'sleep_change_diff' => 'integer',
         'energy_levels_percent' => 'integer',
+        'ai_data' => 'array',
     ];
 
     public function user(): BelongsTo
@@ -54,13 +56,33 @@ class PostpartumRecovery extends Model
      */
     public function getWeeksSinceDeliveryAttribute(): int
     {
+        if (isset($this->ai_data['postpartum_week'])) {
+            return (int) $this->ai_data['postpartum_week'];
+        }
+
         if (!$this->delivery_date) {
-            return $this->current_week ?: 6;
+            return (int) ($this->current_week ?? 0);
         }
 
         $delivery = Carbon::parse($this->delivery_date);
-        $weeks = (int) ceil(Carbon::now()->diffInDays($delivery) / 7);
+        $days = max(0, (int) $delivery->diffInDays(Carbon::now()));
 
-        return max(1, $weeks);
+        return (int) floor($days / 7);
+    }
+
+    /**
+     * Compute days postpartum since delivery.
+     */
+    public function getDaysPostpartumAttribute(): int
+    {
+        if (isset($this->ai_data['days_postpartum'])) {
+            return (int) $this->ai_data['days_postpartum'];
+        }
+
+        if (!$this->delivery_date) {
+            return 0;
+        }
+
+        return max(0, (int) Carbon::parse($this->delivery_date)->diffInDays(Carbon::now()));
     }
 }
