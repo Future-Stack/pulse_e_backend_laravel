@@ -22,7 +22,6 @@ yarn-error.log
 /.idea
 /.nova
 /.zed
-/.vscode
 vite.config.js
 
 branch_structure.json
