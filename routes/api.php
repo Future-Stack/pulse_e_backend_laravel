@@ -117,7 +117,7 @@ Route::prefix('v1')->group(function () {
     Route::match(['get', 'post'], '/perimenopause/export', [MenopauseController::class, 'export']);
 
     Route::post('/perimenopause/gsm-checkin', [PerimenopauseController::class, 'saveGsmCheckin']);
-//    Route::get('/perimenopause/gsm-checkin2/{user_id}', [PerimenopauseController::class, 'getGsmCheckin']);
+    Route::get('/perimenopause/gsm-checkin/{userId}', [PerimenopauseController::class, 'getGsmCheckin']);
 
     // Pregnancy & Postpartum
     Route::match(['get', 'post'], '/pregnancy-postpartum/overview', [PregnancyPostpartumController::class, 'overview']);

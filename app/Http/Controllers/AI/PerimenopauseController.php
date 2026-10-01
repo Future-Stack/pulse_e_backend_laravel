@@ -102,9 +102,8 @@ class PerimenopauseController extends Controller
      * Fetch the latest Intimate & Urinary Health (GSM) Check-in.
      * GET /api/v1/perimenopause/gsm-checkin
      */
-    public function getGsmCheckin(Request $request, string $user_id): JsonResponse
-    {
-        return $user_id;
+    public function getGsmCheckin(Request $request, string $userId){
+
 
         $log = GsmCheckinLog::where('user_id', $userId)
             ->orderByDesc('checkin_date')
