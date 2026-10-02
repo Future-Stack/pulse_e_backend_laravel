@@ -113,18 +113,20 @@ class PregnancyPostpartumTest extends TestCase
             ->assertJson([
                 'success' => true,
                 'data' => [
-                    'active_tab' => 'pregnancy',
-                    'header' => [
-                        'title' => 'Pregnancy & Postpartum',
-                    ],
+                    'is_pregnant'       => true,
+                    'current_week'      => 24,
+                    'current_trimester' => 'Second',
+                    'due_date'          => '2027-01-18',
+                    'days_until_due'    => 109,
                 ],
             ]);
 
-        $this->assertArrayHasKey('card', $response->json('data.pregnancy'));
-        $this->assertArrayHasKey('week_milestones', $response->json('data.pregnancy'));
-        $this->assertArrayHasKey('clinical_checklist', $response->json('data.pregnancy'));
-        $this->assertArrayHasKey('action_buttons', $response->json('data.pregnancy'));
-        $this->assertArrayHasKey('alerts', $response->json('data.pregnancy'));
+        $this->assertNotEmpty($response->json('data.baby_development'));
+        $this->assertNotEmpty($response->json('data.your_body'));
+        $this->assertNotEmpty($response->json('data.nutrition_focus'));
+        $this->assertNotEmpty($response->json('data.safe_exercises'));
+        $this->assertNotEmpty($response->json('data.clinical_monitoring'));
+        $this->assertArrayHasKey('alerts', $response->json('data'));
     }
 
     public function test_pregnancy_summary_endpoint_works(): void
@@ -139,47 +141,15 @@ class PregnancyPostpartumTest extends TestCase
             ->assertJson([
                 'success' => true,
                 'data' => [
-                    'active_tab' => 'pregnancy',
-                    'header' => [
-                        'title' => 'Pregnancy & Postpartum',
-                    ],
+                    'is_pregnant'       => true,
+                    'current_week'      => 24,
+                    'current_trimester' => 'Second',
+                    'due_date'          => '2027-01-18',
+                    'days_until_due'    => 109,
                 ],
             ]);
 
-        $preg = $response->json('data.pregnancy');
-        $this->assertArrayHasKey('card', $preg);
-        $this->assertEquals(24, $preg['card']['current_week']);
-        $this->assertEquals('Second Trimester', $preg['card']['trimester']);
-        $this->assertEquals(60, $preg['card']['progress_percentage']);
-        $this->assertStringContainsString('ear of corn', $preg['card']['baby_size_text']);
-        $this->assertArrayHasKey('week_circle', $preg['card']);
-
-        // Action buttons
-        $this->assertArrayHasKey('action_buttons', $preg);
-        $this->assertEquals('pregnancy_loss', $preg['action_buttons'][0]['id']);
-        $this->assertEquals('postpartum_journey', $preg['action_buttons'][1]['id']);
-
-        // 4 milestone guidance cards
-        $this->assertArrayHasKey('week_milestones', $preg);
-        $this->assertArrayHasKey('baby_development', $preg['week_milestones']);
-        $this->assertArrayHasKey('your_body', $preg['week_milestones']);
-        $this->assertArrayHasKey('nutrition_focus', $preg['week_milestones']);
-        $this->assertArrayHasKey('safe_exercise', $preg['week_milestones']);
-
-        // Clinical timeline items
-        $this->assertNotEmpty($preg['clinical_checklist']['items']);
-        $titles = collect($preg['clinical_checklist']['items'])->pluck('title')->toArray();
-        $this->assertContains('Anatomy Scan', $titles);
-        $this->assertContains('Glucose Tolerance Test', $titles);
-        $this->assertContains('Anti-D Injection', $titles);
-        $this->assertContains('Growth Scan', $titles);
-        $this->assertContains('GBS Swab + Birth Plan', $titles);
-
-        // Alerts & warning signs
-        $this->assertNotEmpty($preg['alerts']);
-        $this->assertArrayHasKey('clinical_warning_signs', $preg);
-
-        // Exact AI response keys on pregnancy object
+        $preg = $response->json('data');
         $this->assertTrue($preg['is_pregnant']);
         $this->assertEquals(24, $preg['current_week']);
         $this->assertEquals('Second', $preg['current_trimester']);
@@ -205,12 +175,13 @@ class PregnancyPostpartumTest extends TestCase
             ->assertJson([
                 'success' => true,
                 'data' => [
-                    'active_tab' => 'postpartum',
+                    'phase'           => 'postpartum',
+                    'postpartum_week' => 6,
                 ],
             ]);
 
-        $this->assertArrayHasKey('recovery_metrics', $response->json('data.postpartum'));
-        $this->assertArrayHasKey('mental_health_checkin', $response->json('data.postpartum'));
+        $this->assertArrayHasKey('physical_health', $response->json('data'));
+        $this->assertArrayHasKey('mental_health_ui', $response->json('data'));
     }
 
     public function test_postpartum_recovery_endpoint_works(): void
@@ -224,28 +195,20 @@ class PregnancyPostpartumTest extends TestCase
             ->assertJson([
                 'success' => true,
                 'data' => [
-                    'active_tab' => 'postpartum',
+                    'phase'           => 'postpartum',
+                    'postpartum_week' => 6,
                 ],
             ]);
 
-        $postpartum = $response->json('data.postpartum');
-        $this->assertArrayHasKey('banner', $postpartum);
-        $this->assertEquals('Recovery Progress', $postpartum['banner']['tag']);
-        $this->assertStringContainsString("you're doing amazing", $postpartum['banner']['subtitle']);
-
-        // 4 Recovery Metrics matching UI
-        $this->assertArrayHasKey('recovery_metrics', $postpartum);
-        $this->assertArrayHasKey('physical_recovery', $postpartum['recovery_metrics']);
-        $this->assertArrayHasKey('hormonal_balance', $postpartum['recovery_metrics']);
-        $this->assertArrayHasKey('sleep_quality', $postpartum['recovery_metrics']);
-        $this->assertArrayHasKey('energy_levels', $postpartum['recovery_metrics']);
-        $this->assertNotEmpty($postpartum['recovery_metrics']['items']);
-
-        // Mental Health Check-In matching UI
-        $this->assertArrayHasKey('mental_health_checkin', $postpartum);
-        $this->assertEquals('Postpartum Wellness Screening', $postpartum['mental_health_checkin']['screening_name']);
-        $this->assertEquals('Stable', $postpartum['mental_health_checkin']['mood_stability']);
-        $this->assertEquals('Mild', $postpartum['mental_health_checkin']['anxiety_levels']);
+        $postpartum = $response->json('data');
+        $this->assertEquals('postpartum', $postpartum['phase']);
+        $this->assertEquals(6, $postpartum['postpartum_week']);
+        $this->assertEquals(72, $postpartum['physical_health']['physical_recovery_percent']);
+        $this->assertEquals(58, $postpartum['physical_health']['hormonal_balance_percent']);
+        $this->assertEquals(45, $postpartum['physical_health']['sleep_quality_percent']);
+        $this->assertEquals(61, $postpartum['physical_health']['energy_level_percent']);
+        $this->assertEquals('Postpartum Wellness Screening', $postpartum['mental_health_ui']['title']);
+        $this->assertCount(2, $postpartum['mental_health_ui']['metrics']);
     }
 
     public function test_support_tab_returns_care_community(): void
@@ -263,8 +226,8 @@ class PregnancyPostpartumTest extends TestCase
                 ],
             ]);
 
-        $this->assertArrayHasKey('loss_support', $response->json('data.support'));
-        $this->assertArrayHasKey('care_community', $response->json('data.support'));
+        $this->assertArrayHasKey('loss_support', $response->json('data'));
+        $this->assertArrayHasKey('care_community', $response->json('data'));
     }
 
     public function test_milestone_checklist_can_be_toggled(): void
@@ -390,11 +353,10 @@ class PregnancyPostpartumTest extends TestCase
             ->assertJson([
                 'success' => true,
                 'data' => [
-                    'current_stage' => 'postpartum',
-                    'active_tab'    => 'postpartum',
+                    'phase' => 'postpartum',
                 ],
             ]);
-        $this->assertArrayHasKey('postpartum', $overviewResponse->json('data'));
+        $this->assertEquals(6, $overviewResponse->json('data.postpartum_week'));
     }
 
     public function test_support_insights_endpoint_returns_data(): void
@@ -520,16 +482,13 @@ class PregnancyPostpartumTest extends TestCase
             ->assertJson([
                 'success' => true,
                 'data' => [
-                    'life_stage'    => 'Pregnancy & Postpartum',
-                    'current_stage' => 'pregnancy',
-                    'active_tab'    => 'pregnancy',
-                    'header' => [
-                        'title' => 'Pregnancy & Postpartum',
-                    ],
+                    'current_week' => 28,
+                    'is_pregnant'  => true,
                 ],
             ]);
 
-        $this->assertEquals(28, $summaryResponse->json('data.pregnancy.card.current_week'));
+        $this->assertEquals(28, $summaryResponse->json('data.current_week'));
+        $this->assertStringContainsString('eggplant', strtolower($summaryResponse->json('data.baby_development')));
     }
 
     public function test_null_state_returns_null_without_dummy_data_when_user_has_no_pregnancy(): void
@@ -552,13 +511,7 @@ class PregnancyPostpartumTest extends TestCase
         $summaryResponse->assertStatus(200)
             ->assertJson([
                 'success' => true,
-                'data' => [
-                    'active_tab' => 'pregnancy',
-                    'pregnancy'  => null,
-                    'header' => [
-                        'subtitle' => null,
-                    ],
-                ],
+                'data'    => null,
             ]);
 
         // Verify NO dummy record was inserted into database
@@ -570,13 +523,7 @@ class PregnancyPostpartumTest extends TestCase
         $postpartumResponse->assertStatus(200)
             ->assertJson([
                 'success' => true,
-                'data' => [
-                    'active_tab' => 'postpartum',
-                    'postpartum' => null,
-                    'header' => [
-                        'subtitle' => null,
-                    ],
-                ],
+                'data'    => null,
             ]);
 
         $this->assertDatabaseMissing('postpartum_recoveries', ['user_id' => $user->id]);
@@ -604,7 +551,7 @@ class PregnancyPostpartumTest extends TestCase
         ]);
         $profile->lifeJourneys()->attach([$beautyJourney->id, $pregnancyJourney->id]);
 
-        $response = $this->getJson('/api/v1/pregnancy-postpartum/overview');
+        $response = $this->getJson('/api/v1/pregnancy-postpartum/overview?legacy=true');
         $response->assertStatus(200);
 
         // life_stage and header title must NEVER be "Beauty & Radiance"!
@@ -675,14 +622,7 @@ class PregnancyPostpartumTest extends TestCase
         $response = $this->getJson('/api/v1/pregnancy-postpartum/overview');
         $response->assertStatus(200);
 
-        // When user is pregnant: pregnancy block exists, postpartum block is NOT present
-        $this->assertArrayHasKey('pregnancy', $response->json('data'));
-        $this->assertArrayNotHasKey('postpartum', $response->json('data'));
-
-        $this->assertEquals('pregnancy', $response->json('data.current_stage'));
-        $this->assertEquals('pregnancy', $response->json('data.active_tab'));
-
-        $preg = $response->json('data.pregnancy');
+        $preg = $response->json('data');
         $this->assertTrue($preg['is_pregnant']);
         $this->assertEquals(29, $preg['current_week']);
         $this->assertEquals('Third', $preg['current_trimester']);
@@ -690,7 +630,6 @@ class PregnancyPostpartumTest extends TestCase
         $this->assertEquals(78, $preg['days_until_due']);
         $this->assertEmpty($preg['alerts']);
         $this->assertStringContainsString('butternut squash', $preg['baby_development']);
-        $this->assertStringContainsString('butternut squash', $preg['card']['baby_size_comparison']);
         $this->assertStringContainsString('uterus expands', $preg['your_body']);
         $this->assertStringContainsString('iron-rich', $preg['nutrition_focus']);
         $this->assertStringContainsString('prenatal yoga', $preg['safe_exercises']);
@@ -783,14 +722,7 @@ class PregnancyPostpartumTest extends TestCase
         $response = $this->getJson('/api/v1/pregnancy-postpartum/overview');
         $response->assertStatus(200);
 
-        // When user is in postpartum: postpartum block exists, pregnancy block is NOT present
-        $this->assertArrayHasKey('postpartum', $response->json('data'));
-        $this->assertArrayNotHasKey('pregnancy', $response->json('data'));
-
-        $this->assertEquals('postpartum', $response->json('data.current_stage'));
-        $this->assertEquals('postpartum', $response->json('data.active_tab'));
-
-        $post = $response->json('data.postpartum');
+        $post = $response->json('data');
         $this->assertEquals('postpartum', $post['phase']);
         $this->assertEquals(41, $post['profile_id']);
         $this->assertEquals(5, $post['journey_id']);
