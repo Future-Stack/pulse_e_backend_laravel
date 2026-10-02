@@ -8,6 +8,7 @@ use App\Models\MenopauseSymptomInsight;
 use App\Models\PerimenopauseProfile;
 use App\Models\User;
 use App\Models\VasomotorLog;
+use App\Services\VasomotorWearableSyncService;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -28,7 +29,7 @@ class PerimenopauseController extends Controller
         $tab = strtolower($request->input('tab') ?? $request->query('tab') ?? 'symptoms');
 
         $profile = $this->getOrCreateProfile((int) $userId);
-        $this->ensureVasomotorWeeklyLogs((int) $userId);
+        app(VasomotorWearableSyncService::class)->syncUserWeeklyVasomotor((int) $userId);
 
         $data = [
             'active_tab' => $tab,
@@ -275,7 +276,16 @@ class PerimenopauseController extends Controller
             'total'    => $l->total_episodes,
         ]);
 
-        $totalEpisodes = $logs->sum('total_episodes') ?: 30;
+        $totalEpisodes = (int) $logs->sum('total_episodes');
+        $validAvgIntensity = $logs->where('avg_intensity', '>', 0)->avg('avg_intensity');
+        $avgIntensityNum = $validAvgIntensity !== null ? round((float) $validAvgIntensity, 1) : 4.3;
+        $avgIntensityFormatted = "{$avgIntensityNum}/10";
+
+        // Find peak episode day & time
+        $peakLog = $logs->sortByDesc('total_episodes')->first();
+        $peakTime = ($peakLog && $peakLog->peak_time) ? $peakLog->peak_time : 'Thursday evening';
+
+        $summaryText = "This week: {$totalEpisodes} episodes · avg intensity {$avgIntensityFormatted} · Peak: {$peakTime}";
 
         // 2. Latest GSM Check-in
         $latestGsm = GsmCheckinLog::where('user_id', $userId)
@@ -299,9 +309,9 @@ class PerimenopauseController extends Controller
                 ],
                 'summary'       => [
                     'total_episodes'  => $totalEpisodes,
-                    'avg_intensity'   => '4.3/10',
-                    'peak'            => 'Thursday evening',
-                    'summary_text'    => "This week: {$totalEpisodes} episodes · avg intensity 4.3/10 · Peak: Thursday evening",
+                    'avg_intensity'   => $avgIntensityFormatted,
+                    'peak'            => $peakTime,
+                    'summary_text'    => $summaryText,
                 ],
             ],
             'gsm' => [
