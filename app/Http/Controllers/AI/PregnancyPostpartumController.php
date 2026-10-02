@@ -38,17 +38,140 @@ class PregnancyPostpartumController extends Controller
         }
 
         $userId = $user->id;
+
+        // If legacy format is explicitly requested:
+        if ($request->boolean('legacy') || $request->boolean('full')) {
+            return $this->legacyOverview($request, $user);
+        }
+
+        $requestedTab = strtolower($request->input('tab') ?? $request->query('tab') ?? '');
+
+        // Support tab
+        if ($requestedTab === 'support') {
+            return response()->json([
+                'success' => true,
+                'data'    => array_merge(['active_tab' => 'support'], $this->formatSupportData((int) $userId)),
+            ], 200);
+        }
+
+        // Postpartum tab
+        if ($requestedTab === 'postpartum') {
+            $this->syncPostpartumFromAi((int) $userId);
+            return response()->json([
+                'success' => true,
+                'data'    => $this->getCleanPostpartumData((int) $userId),
+            ], 200);
+        }
+
+        // Pregnancy tab
+        if ($requestedTab === 'pregnancy') {
+            $this->syncPregnancyFromAi((int) $userId);
+            return response()->json([
+                'success' => true,
+                'data'    => $this->getCleanPregnancyData((int) $userId),
+            ], 200);
+        }
+
+        // No tab provided: dynamic stage resolution
+        $latestPregnancy = UserPregnancy::where('user_id', $userId)->latest()->first();
+        $latestPostpartum = PostpartumRecovery::where('user_id', $userId)->latest()->first();
+
+        if ($latestPregnancy && $latestPregnancy->status === 'miscarriage') {
+            return response()->json([
+                'success' => true,
+                'data'    => array_merge(['active_tab' => 'support', 'status' => 'miscarriage', 'healing_mode_active' => true], $this->formatSupportData((int) $userId)),
+            ], 200);
+        }
+
+        if ($latestPregnancy && $latestPregnancy->status === 'active') {
+            $this->syncPregnancyFromAi((int) $userId);
+            $aiPreg = Cache::get("user_pregnancy_ai_{$userId}");
+            if ($aiPreg && (($aiPreg['delivery_completed'] ?? false) || ($aiPreg['phase'] ?? '') === 'postpartum')) {
+                $this->syncPostpartumFromAi((int) $userId);
+                return response()->json([
+                    'success' => true,
+                    'data'    => $this->getCleanPostpartumData((int) $userId),
+                ], 200);
+            }
+            return response()->json([
+                'success' => true,
+                'data'    => $this->getCleanPregnancyData((int) $userId, $latestPregnancy),
+            ], 200);
+        }
+
+        if ($latestPostpartum) {
+            $this->syncPostpartumFromAi((int) $userId);
+            return response()->json([
+                'success' => true,
+                'data'    => $this->getCleanPostpartumData((int) $userId, $latestPostpartum),
+            ], 200);
+        }
+
+        $syncedPregnancy = $this->syncPregnancyFromAi((int) $userId);
+        $aiPreg = Cache::get("user_pregnancy_ai_{$userId}");
+        if ($aiPreg && (($aiPreg['delivery_completed'] ?? false) || ($aiPreg['phase'] ?? '') === 'postpartum')) {
+            $this->syncPostpartumFromAi((int) $userId);
+            return response()->json([
+                'success' => true,
+                'data'    => $this->getCleanPostpartumData((int) $userId),
+            ], 200);
+        }
+
+        return response()->json([
+            'success' => true,
+            'data'    => $this->getCleanPregnancyData((int) $userId, $syncedPregnancy),
+        ], 200);
+    }
+
+    /**
+     * Dedicated Pregnancy Summary Endpoint (matches external AI route).
+     * GET/POST /api/v1/pregnancy/summary
+     */
+    public function summary(Request $request): JsonResponse
+    {
+        $user = $this->resolveUser($request);
+        if (!$user) {
+            return response()->json(['success' => false, 'message' => 'Unauthenticated.'], 401);
+        }
+        $this->syncPregnancyFromAi((int) $user->id);
+        return response()->json([
+            'success' => true,
+            'data'    => $this->getCleanPregnancyData((int) $user->id),
+        ], 200);
+    }
+
+    /**
+     * Dedicated Postpartum Recovery Endpoint (matches external AI route).
+     * GET/POST /api/v1/postpartum/recovery
+     */
+    public function recovery(Request $request): JsonResponse
+    {
+        $user = $this->resolveUser($request);
+        if (!$user) {
+            return response()->json(['success' => false, 'message' => 'Unauthenticated.'], 401);
+        }
+        $this->syncPostpartumFromAi((int) $user->id);
+        return response()->json([
+            'success' => true,
+            'data'    => $this->getCleanPostpartumData((int) $user->id),
+        ], 200);
+    }
+
+    /**
+     * Legacy Multi-Section Overview for backward-compatibility.
+     */
+    public function legacyOverview(Request $request, User $user): JsonResponse
+    {
+        $userId = $user->id;
         $user->loadMissing(['profile.lifeJourneys']);
 
         $requestedTab = strtolower($request->input('tab') ?? $request->query('tab') ?? '');
 
-        // 1. Sync live intelligence from AI API into Database only for relevant stage
         if ($requestedTab === 'postpartum') {
             $this->syncPostpartumFromAi((int) $userId);
         } elseif ($requestedTab === 'pregnancy') {
             $this->syncPregnancyFromAi((int) $userId);
         } else {
-            // When no tab is specified: dynamically detect whether user is postpartum or pregnant
             $existingPregnancy = UserPregnancy::where('user_id', $userId)->latest()->first();
             $existingPostpartum = PostpartumRecovery::where('user_id', $userId)->latest()->first();
 
@@ -65,13 +188,8 @@ class PregnancyPostpartumController extends Controller
             }
         }
 
-        $latestPregnancy = UserPregnancy::where('user_id', $userId)
-            ->latest()
-            ->first();
-
-        $postpartumRecord = PostpartumRecovery::where('user_id', $userId)
-            ->latest()
-            ->first();
+        $latestPregnancy = UserPregnancy::where('user_id', $userId)->latest()->first();
+        $postpartumRecord = PostpartumRecovery::where('user_id', $userId)->latest()->first();
 
         $isMiscarriage = $latestPregnancy && $latestPregnancy->status === 'miscarriage';
         $isActivePregnancy = $latestPregnancy && $latestPregnancy->status === 'active';
@@ -80,7 +198,6 @@ class PregnancyPostpartumController extends Controller
             || ($postpartumRecord && !$isMiscarriage)
         );
 
-        // Auto-attach Pregnancy & Postpartum to life_journey_profile if user has active pregnancy
         if ($user->profile && $isActivePregnancy) {
             $pregnancyJourney = LifeJourney::where('title', 'like', '%Pregnancy%')->first();
             if ($pregnancyJourney && !$user->profile->lifeJourneys()->where('life_journeys.id', $pregnancyJourney->id)->exists()) {
@@ -89,7 +206,6 @@ class PregnancyPostpartumController extends Controller
             }
         }
 
-        // Determine user actual sub-stage based on life stage records
         $userSubStage = 'pregnancy';
         if ($isMiscarriage) {
             $userSubStage = 'miscarriage';
@@ -97,19 +213,13 @@ class PregnancyPostpartumController extends Controller
             $userSubStage = 'postpartum';
         }
 
-        // Resolve user's life stages from life_journey_profile (many-to-many from life_journeys table)
         $userLifeJourneys = $user->profile?->lifeJourneys ?? collect();
         $matchingJourney = $userLifeJourneys->first(function ($j) {
             return str_contains(strtolower($j->title), 'pregnancy')
                 || str_contains(strtolower($j->title), 'postpartum');
         });
 
-        if ($matchingJourney) {
-            $lifeStageTitle = $matchingJourney->title;
-        } else {
-            $dbJourney = LifeJourney::where('title', 'like', '%Pregnancy%')->first();
-            $lifeStageTitle = $dbJourney ? $dbJourney->title : 'Pregnancy & Postpartum';
-        }
+        $lifeStageTitle = $matchingJourney ? $matchingJourney->title : 'Pregnancy & Postpartum';
 
         $userLifeStages = $userLifeJourneys->map(function ($journey) {
             return [
@@ -121,21 +231,17 @@ class PregnancyPostpartumController extends Controller
             ];
         })->values();
 
-        // Automatically default to user's actual current stage
         $defaultTab = $userSubStage === 'postpartum' ? 'postpartum' : ($userSubStage === 'miscarriage' ? 'support' : 'pregnancy');
         $tab = strtolower($request->input('tab') ?? $request->query('tab') ?? $defaultTab);
 
-        // Fetch user's pregnancy record from DB or AI sync (only when tab is pregnancy or all)
         $pregnancy = ($latestPregnancy && ($latestPregnancy->status === 'active' || $isMiscarriage))
             ? $latestPregnancy
             : (($tab === 'pregnancy' || $tab === 'all') ? $this->getPregnancyRecord((int) $userId) : null);
 
-        // Fetch postpartum record ONLY if requested tab is postpartum/all or user stage is postpartum (and tab is not pregnancy)
         $postpartum = ($tab === 'postpartum' || $tab === 'all' || ($userSubStage === 'postpartum' && $tab !== 'pregnancy'))
             ? $this->getPostpartumRecord((int) $userId)
             : null;
 
-        // Dynamic subtitle according to active stage and maternal phase
         if ($tab === 'postpartum') {
             $subtitle = $postpartum ? "Week {$postpartum->weeks_since_delivery} · Postpartum recovery" : null;
         } elseif ($tab === 'support' || $isMiscarriage) {
@@ -143,8 +249,6 @@ class PregnancyPostpartumController extends Controller
         } else {
             $subtitle = $pregnancy ? "Week {$pregnancy->current_week} of 40 · {$pregnancy->days_to_due_date} days to due date" : null;
         }
-
-        $isPregnant = (bool) ($pregnancy && $pregnancy->status === 'active');
 
         $data = [
             'life_stage'    => $lifeStageTitle,
@@ -177,7 +281,6 @@ class PregnancyPostpartumController extends Controller
         } elseif ($tab === 'support') {
             $data['support']    = $this->formatSupportData((int) $userId);
         } else {
-            // Default: pregnancy
             $data['pregnancy'] = $pregnancy ? $this->formatPregnancyData($pregnancy) : null;
         }
 
@@ -185,26 +288,6 @@ class PregnancyPostpartumController extends Controller
             'success' => true,
             'data'    => $data,
         ], 200);
-    }
-
-    /**
-     * Dedicated Pregnancy Summary Endpoint (matches external AI route).
-     * GET/POST /api/v1/pregnancy/summary
-     */
-    public function summary(Request $request): JsonResponse
-    {
-        $request->merge(['tab' => 'pregnancy']);
-        return $this->overview($request);
-    }
-
-    /**
-     * Dedicated Postpartum Recovery Endpoint (matches external AI route).
-     * GET/POST /api/v1/postpartum/recovery
-     */
-    public function recovery(Request $request): JsonResponse
-    {
-        $request->merge(['tab' => 'postpartum']);
-        return $this->overview($request);
     }
 
     /**
@@ -553,8 +636,8 @@ class PregnancyPostpartumController extends Controller
         $aiUrl = "{$baseUrl}/api/v1/pregnancy/summary";
 
         try {
-            $response = Http::timeout(8)
-                ->connectTimeout(4)
+            $response = Http::timeout(20)
+                ->connectTimeout(8)
                 ->acceptJson()
                 ->get($aiUrl, ['user_id' => $userId]);
 
@@ -676,8 +759,8 @@ class PregnancyPostpartumController extends Controller
         $aiUrl = "{$baseUrl}/api/v1/postpartum/recovery";
 
         try {
-            $response = Http::timeout(8)
-                ->connectTimeout(4)
+            $response = Http::timeout(20)
+                ->connectTimeout(8)
                 ->acceptJson()
                 ->get($aiUrl, ['user_id' => $userId]);
 
@@ -766,6 +849,152 @@ class PregnancyPostpartumController extends Controller
     // ==========================================
     // Internal Helper Methods
     // ==========================================
+
+    public function getCleanPregnancyData(int $userId, ?UserPregnancy $pregnancy = null): ?array
+    {
+        $pregnancy = $pregnancy ?? $this->getPregnancyRecord($userId);
+        $ai = $pregnancy?->ai_data ?? Cache::get("user_pregnancy_ai_{$userId}", []);
+
+        if (!$pregnancy && empty($ai['is_pregnant'])) {
+            return null;
+        }
+
+        $currentWeek = (int) ($ai['current_week'] ?? ($pregnancy?->current_week ?? 1));
+        $dueDate = $ai['due_date'] ?? ($pregnancy?->due_date ? Carbon::parse($pregnancy->due_date)->toDateString() : Carbon::now()->addDays(280)->toDateString());
+        $daysUntilDue = isset($ai['days_until_due']) ? (int) $ai['days_until_due'] : ($pregnancy ? $pregnancy->days_to_due_date : 280);
+
+        $trimester = $ai['current_trimester'] ?? ($currentWeek <= 12 ? 'First' : ($currentWeek <= 27 ? 'Second' : 'Third'));
+        if (str_contains(strtolower($trimester), 'trimester')) {
+            $trimester = trim(str_ireplace('trimester', '', $trimester));
+        }
+
+        $guide = PregnancyWeeklyGuide::where('week_number', $currentWeek)->first();
+        $babyDev = $ai['baby_development'] ?? $guide?->baby_development;
+        $yourBody = $ai['your_body'] ?? $guide?->your_body;
+        $nutrition = $ai['nutrition_focus'] ?? $guide?->nutrition_focus;
+        $exercises = $ai['safe_exercises'] ?? $guide?->safe_exercise;
+        $warningSigns = $ai['clinical_warning_signs'] ?? $guide?->clinical_warning_signs;
+
+        $clinicalMonitoring = !empty($ai['clinical_monitoring']) && is_array($ai['clinical_monitoring'])
+            ? $ai['clinical_monitoring']
+            : [
+                ['name' => 'Anatomy Scan', 'week' => 'W20', 'date' => 'Week 20'],
+                ['name' => 'Glucose Tolerance Test', 'week' => 'W24', 'date' => 'Week 24'],
+                ['name' => 'Anti-D Injection', 'week' => 'W28', 'date' => 'Week 28'],
+                ['name' => 'Growth Scan', 'week' => 'W32', 'date' => 'Week 32'],
+                ['name' => 'GBS Swab + Birth Plan', 'week' => 'W36', 'date' => 'Week 36'],
+            ];
+
+        $user = User::with('profile')->find($userId);
+        $profileId = $ai['profile_id'] ?? ($user?->profile?->id ?? null);
+
+        return [
+            'is_pregnant'             => true,
+            'current_week'            => $currentWeek,
+            'current_trimester'       => $trimester,
+            'due_date'                => $dueDate,
+            'days_until_due'          => $daysUntilDue,
+            'last_prenatal_visit'     => $ai['last_prenatal_visit'] ?? null,
+            'next_appointment'        => $ai['next_appointment'] ?? null,
+            'health_status'           => $ai['health_status'] ?? 'good',
+            'alerts'                  => $ai['alerts'] ?? [],
+            'baby_development'        => $babyDev,
+            'your_body'               => $yourBody,
+            'nutrition_focus'         => $nutrition,
+            'safe_exercises'          => $exercises,
+            'clinical_monitoring'     => $clinicalMonitoring,
+            'clinical_warning_signs'  => $warningSigns,
+            'pregnancy_status'        => $ai['pregnancy_status'] ?? 'active_pregnancy',
+            'requires_confirmation'   => (bool) ($ai['requires_confirmation'] ?? false),
+            'confirmation_needed_for' => $ai['confirmation_needed_for'] ?? null,
+            'confirmation_message'    => $ai['confirmation_message'] ?? null,
+            'phase'                   => $ai['phase'] ?? 'pregnancy',
+            'profile_id'              => $profileId,
+            'journey_id'              => $ai['journey_id'] ?? 5,
+            'journey_title'           => $ai['journey_title'] ?? 'Pregnancy & Postpartum',
+            'pregnancy_id'            => $ai['pregnancy_id'] ?? ($pregnancy?->id ?? null),
+        ];
+    }
+
+    public function getCleanPostpartumData(int $userId, ?PostpartumRecovery $postpartum = null): ?array
+    {
+        $postpartum = $postpartum ?? $this->getPostpartumRecord($userId);
+        $ai = $postpartum?->ai_data ?? Cache::get("user_postpartum_ai_{$userId}", []);
+
+        if (!$postpartum && empty($ai['phase'])) {
+            return null;
+        }
+
+        $user = User::with('profile')->find($userId);
+        $profileId = $ai['profile_id'] ?? ($user?->profile?->id ?? null);
+        $deliveryDate = $ai['delivery_date'] ?? ($postpartum?->delivery_date ? $postpartum->delivery_date->toDateString() : null);
+        $daysPostpartum = isset($ai['days_postpartum']) ? (int) $ai['days_postpartum'] : ($postpartum ? $postpartum->days_postpartum : 0);
+        $postpartumWeek = isset($ai['postpartum_week']) ? (int) $ai['postpartum_week'] : ($postpartum ? $postpartum->weeks_since_delivery : 0);
+
+        $physical = $ai['physical_health'] ?? [
+            'physical_recovery_percent' => (int) ($postpartum?->physical_recovery_percent ?? 20),
+            'bleeding_level'            => 'moderate',
+            'incision_healing'          => null,
+            'pelvic_floor_status'       => 'healing',
+            'hormonal_balance_percent'  => (int) ($postpartum?->hormonal_balance_percent ?? 30),
+            'energy_level_percent'      => (int) ($postpartum?->energy_levels_percent ?? 40),
+            'sleep_quality_percent'     => (int) ($postpartum?->sleep_quality_percent ?? 45),
+        ];
+
+        $mental = $ai['mental_health'] ?? [
+            'mood_stability'       => 60,
+            'anxiety_level'        => 5,
+            'depression_screening' => 'low_risk',
+            'last_mood_entry'      => null,
+            'mood_trend'           => 'stable',
+            'supportive_resources' => [
+                'Postpartum Support Group',
+                'Mental Health Hotline',
+            ],
+        ];
+
+        $mentalUi = $ai['mental_health_ui'] ?? [
+            'screening_type' => 'mental_health_check_in',
+            'title'          => $postpartum?->screening_name ?? 'Postpartum Wellness Screening',
+            'week'           => $postpartumWeek,
+            'risk_level'     => 'moderate',
+            'trend'          => 'new',
+            'metrics'        => [
+                [
+                    'label'       => 'Mood stability',
+                    'value'       => $postpartum?->mood_stability ?? 'Stable',
+                    'score'       => 60,
+                    'trend_arrow' => '→',
+                ],
+                [
+                    'label'   => 'Anxiety levels',
+                    'value'   => $postpartum?->anxiety_level ?? 'Mild',
+                    'score'   => 5,
+                    'warning' => false,
+                ],
+                [
+                    'label'          => 'Depression risk',
+                    'value'          => 'low_risk',
+                    'risk_increased' => false,
+                ],
+            ],
+        ];
+
+        return [
+            'phase'            => 'postpartum',
+            'profile_id'       => $profileId,
+            'journey_id'       => $ai['journey_id'] ?? 5,
+            'journey_title'    => $ai['journey_title'] ?? 'Pregnancy & Postpartum',
+            'delivery_date'    => $deliveryDate,
+            'days_postpartum'  => $daysPostpartum,
+            'postpartum_week'  => $postpartumWeek,
+            'recovery_status'  => $ai['recovery_status'] ?? 'early',
+            'delivery_method'  => $ai['delivery_method'] ?? 'vaginal',
+            'physical_health'  => $physical,
+            'mental_health'    => $mental,
+            'mental_health_ui' => $mentalUi,
+        ];
+    }
 
     private function getPregnancyRecord(int $userId): ?UserPregnancy
     {
@@ -1501,8 +1730,8 @@ class PregnancyPostpartumController extends Controller
         $aiUrl = "{$baseUrl}/api/v1/support/insights";
 
         try {
-            $response = Http::timeout(8)
-                ->connectTimeout(4)
+            $response = Http::timeout(20)
+                ->connectTimeout(8)
                 ->acceptJson()
                 ->get($aiUrl, [
                     'user_id' => $userId,
