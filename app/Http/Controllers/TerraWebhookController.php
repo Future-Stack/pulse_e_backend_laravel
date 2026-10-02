@@ -41,6 +41,10 @@ class TerraWebhookController extends Controller
         $referenceId = $payload['user']['reference_id'] ?? null;
 
         $user = $referenceId ? \App\Models\User::find($referenceId) : null;
+        if (!$user && $terraUserId) {
+            $connection = \App\Models\TerraConnection::where('terra_user_id', $terraUserId)->first();
+            $user = $connection?->user;
+        }
 
         try {
             if ($type === 'auth') {
@@ -77,6 +81,15 @@ class TerraWebhookController extends Controller
                         'payload'           => $payload,
                         'data_generated_at' => $generatedAt,
                     ]);
+                }
+
+                // Automatically analyze biometrics and sync vasomotor episodes for perimenopause
+                if ($user?->id) {
+                    try {
+                        app(\App\Services\VasomotorWearableSyncService::class)->syncDate($user->id, $targetDate);
+                    } catch (\Throwable $syncEx) {
+                        Log::warning('Vasomotor wearable sync warning: ' . $syncEx->getMessage());
+                    }
                 }
             }
         } catch (\Exception $e) {
@@ -208,34 +221,46 @@ class TerraWebhookController extends Controller
         $today = now()->timezone(config('app.timezone'))->toDateString(); // যেমন: 2026-07-16
 
         $types = ['sleep', 'energy', 'hrv', 'stress', 'readiness', 'calories', 'step', 'hydration_ml'];
+        $terraTypesNeeded = ['sleep', 'daily', 'body'];
 
-        $terraTypesNeeded = collect($types)
-            ->map(fn($t) => in_array($t, ['sleep', 'hrv', 'readiness', 'energy']) ? 'sleep' : 'daily')
-            ->unique()
-            ->values()
-            ->toArray();
+        $userId = $request->user()?->id ?? auth('sanctum')->id();
 
-        $records = \App\Models\TerraActivityData::where('user_id', $request->user()->id)
+        $records = \App\Models\TerraActivityData::where('user_id', $userId)
             ->whereIn('type', $terraTypesNeeded)
-            ->whereDate('data_generated_at', $today)
+            ->where(function ($q) use ($today) {
+                $q->whereDate('data_generated_at', $today)
+                  ->orWhere(function ($sub) use ($today) {
+                      $sub->whereNull('data_generated_at')
+                          ->whereDate('created_at', $today);
+                  });
+            })
             ->orderByDesc('updated_at') 
             ->get();
+
+        // If no records found for today, check latest available recent records
+        if ($records->isEmpty()) {
+            $records = \App\Models\TerraActivityData::where('user_id', $userId)
+                ->whereIn('type', $terraTypesNeeded)
+                ->orderByDesc('updated_at')
+                ->take(10)
+                ->get();
+        }
 
         $result = [];
 
         foreach ($types as $t) {
-            $terraType = in_array($t, ['sleep', 'hrv', 'readiness', 'energy']) ? 'sleep' : 'daily';
+            $value = null;
 
-            $latestRecord = $records->firstWhere('type', $terraType);
-
-            if (!$latestRecord) {
-                $result[$t] = null;
-                continue;
+            // Search through records (daily, sleep, body) for non-null value
+            foreach ($records as $record) {
+                $val = $this->extractScore($record->payload, $t);
+                if ($val !== null) {
+                    $value = $val;
+                    break;
+                }
             }
 
-            $value = $this->extractScore($latestRecord->payload, $t);
-
-            $result[$t] = $value; 
+            $result[$t] = $value;
         }
 
         return response()->json([
@@ -246,44 +271,84 @@ class TerraWebhookController extends Controller
 
     public function syncDeviceData(Request $request)
     {
-        $request->validate([
-            'user_id'      => 'nullable|integer',
-            'source'       => 'nullable|string',
-            'steps'        => 'nullable',
-            'heart_rate'   => 'nullable',
-            'sleep_hours'  => 'nullable',
-            'hydration_ml' => 'nullable',
-            'synced_at'    => 'nullable|string',
+        Log::info('Health data sync request received', [
+            'payload' => $request->all(),
+            'headers' => [
+                'authorization' => $request->header('Authorization') ? 'Bearer ***' : 'none',
+                'user_agent'    => $request->header('User-Agent'),
+            ],
         ]);
 
-        $user = $request->user('sanctum') ?? $request->user();
-        if (!$user && $request->filled('user_id')) {
-            $user = \App\Models\User::find($request->user_id);
-        }
+        try {
+            $user = $request->user('sanctum')
+                ?? auth('sanctum')->user()
+                ?? $request->user();
 
-        if (!$user) {
-            return response()->json([
-                'success' => false,
-                'message' => 'User not authenticated',
-            ], 401);
-        }
+            if (!$user && ($request->filled('user_id') || $request->filled('userId'))) {
+                $targetId = $request->input('user_id') ?? $request->input('userId');
+                $user = \App\Models\User::find($targetId);
+            }
 
-        $source = $request->source ?? 'Apple HealthKit';
-        $steps = $request->has('steps') && $request->steps !== null ? (int) $request->steps : null;
-        $heartRate = $request->has('heart_rate') && $request->heart_rate !== null ? (float) $request->heart_rate : null;
-        $sleepHours = $request->has('sleep_hours') && $request->sleep_hours !== null ? (float) $request->sleep_hours : null;
-        $hydrationMl = $request->has('hydration_ml') && $request->hydration_ml !== null ? (float) $request->hydration_ml : null;
+            if (!$user && ($request->filled('profile_id') || $request->filled('profileId'))) {
+                $profileId = $request->input('profile_id') ?? $request->input('profileId');
+                $profile = \App\Models\Profile::find($profileId);
+                $user = $profile?->user;
+            }
 
-        $dataGeneratedAt = $request->synced_at ? \Carbon\Carbon::parse($request->synced_at) : now();
+            // Fallback for development if no auth provided
+            if (!$user && (app()->environment('local') || config('app.debug'))) {
+                $user = \App\Models\User::first();
+            }
+
+            if (!$user) {
+                Log::warning('Health data sync failed: User not authenticated or found', $request->all());
+                return response()->json([
+                    'success' => false,
+                    'message' => 'User not authenticated or not found. Please provide Authorization Bearer token or user_id.',
+                ], 401);
+            }
+
+            $source = $request->source ?? ($request->is('*apple*') ? 'Apple HealthKit' : ($request->is('*google*') || $request->is('*android*') ? 'Android Health Connect' : 'Health Connect'));
+            $lowerSource = strtolower($source);
+            if (str_contains($lowerSource, 'google') || str_contains($lowerSource, 'android')) {
+                $provider = 'GOOGLE';
+            } elseif (str_contains($lowerSource, 'apple') || str_contains($lowerSource, 'ios')) {
+                $provider = 'APPLE';
+            } else {
+                $provider = strtoupper(preg_replace('/[^a-zA-Z0-9]/', '', $source)) ?: 'HEALTH';
+            }
+            $terraUserId = strtolower($provider) . '_' . $user->id;
+
+            $steps = $request->has('steps') && $request->steps !== null ? (int) $request->steps : null;
+            $heartRate = $request->has('heart_rate') && $request->heart_rate !== null ? (float) $request->heart_rate : null;
+            $sleepHours = $request->has('sleep_hours') && $request->sleep_hours !== null ? (float) $request->sleep_hours : null;
+            $hydrationMl = $request->has('hydration_ml') && $request->hydration_ml !== null ? (float) $request->hydration_ml : null;
+            $temperatureDelta = $request->has('temperature_delta') ? (float) $request->temperature_delta : null;
+            $skinTemperature = $request->has('skin_temperature') ? (float) $request->skin_temperature : null;
+
+            $dataGeneratedAt = now();
+            if ($request->filled('synced_at')) {
+                try {
+                    $rawDate = $request->input('synced_at');
+                    if (is_numeric($rawDate)) {
+                        $sec = strlen((string) $rawDate) > 11 ? (int) ($rawDate / 1000) : (int) $rawDate;
+                        $dataGeneratedAt = \Carbon\Carbon::createFromTimestamp($sec);
+                    } else {
+                        $dataGeneratedAt = \Carbon\Carbon::parse($rawDate);
+                    }
+                } catch (\Throwable $dateEx) {
+                    $dataGeneratedAt = now();
+                }
+            }
 
         // 1. Create or update TerraConnection for this user and provider
         \App\Models\TerraConnection::updateOrCreate(
             [
                 'user_id'  => $user->id,
-                'provider' => 'APPLE',
+                'provider' => $provider,
             ],
             [
-                'terra_user_id' => 'apple_' . $user->id,
+                'terra_user_id' => $terraUserId,
                 'reference_id'  => (string) $user->id,
                 'active'        => true,
             ]
@@ -345,20 +410,24 @@ class TerraWebhookController extends Controller
                     'hydration_data'  => [
                         'hydration_ml' => $hydrationMl,
                     ],
+                    'temperature_data' => [
+                        'temperature_delta' => $temperatureDelta,
+                        'skin_temperature'  => $skinTemperature,
+                    ],
                 ],
             ],
         ];
 
         if ($existingDaily) {
             $existingDaily->update([
-                'terra_user_id'     => 'apple_' . $user->id,
+                'terra_user_id'     => $terraUserId,
                 'payload'           => $dailyPayload,
                 'data_generated_at' => $dataGeneratedAt,
             ]);
         } else {
             \App\Models\TerraActivityData::create([
                 'user_id'           => $user->id,
-                'terra_user_id'     => 'apple_' . $user->id,
+                'terra_user_id'     => $terraUserId,
                 'type'              => 'daily',
                 'payload'           => $dailyPayload,
                 'data_generated_at' => $dataGeneratedAt,
@@ -394,6 +463,10 @@ class TerraWebhookController extends Controller
                             'readiness'      => 85,
                             'recovery_level' => 'Good',
                         ],
+                        'temperature_data' => [
+                            'temperature_delta' => $temperatureDelta,
+                            'skin_temperature'  => $skinTemperature,
+                        ],
                     ],
                 ],
             ];
@@ -405,14 +478,14 @@ class TerraWebhookController extends Controller
 
             if ($existingSleep) {
                 $existingSleep->update([
-                    'terra_user_id'     => 'apple_' . $user->id,
+                    'terra_user_id'     => $terraUserId,
                     'payload'           => $sleepPayload,
                     'data_generated_at' => $dataGeneratedAt,
                 ]);
             } else {
                 \App\Models\TerraActivityData::create([
                     'user_id'           => $user->id,
-                    'terra_user_id'     => 'apple_' . $user->id,
+                    'terra_user_id'     => $terraUserId,
                     'type'              => 'sleep',
                     'payload'           => $sleepPayload,
                     'data_generated_at' => $dataGeneratedAt,
@@ -420,34 +493,73 @@ class TerraWebhookController extends Controller
             }
         }
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Health data synced successfully.',
-            'synced'  => [
-                'source'       => $source,
-                'steps'        => $steps,
-                'heart_rate'   => $heartRate,
-                'sleep_hours'  => $sleepHours,
-                'hydration_ml' => $hydrationMl,
-                'synced_at'    => $dataGeneratedAt->toIso8601String(),
-            ],
-        ], 200);
+        // Automatically analyze biometrics and sync vasomotor episodes for perimenopause
+        try {
+            app(\App\Services\VasomotorWearableSyncService::class)->syncDate($user->id, $targetDate);
+        } catch (\Throwable $syncEx) {
+            Log::warning('Vasomotor wearable sync warning in syncDeviceData: ' . $syncEx->getMessage());
+        }
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Health data synced successfully.',
+                'synced'  => [
+                    'source'       => $source,
+                    'steps'        => $steps,
+                    'heart_rate'   => $heartRate,
+                    'sleep_hours'  => $sleepHours,
+                    'hydration_ml' => $hydrationMl,
+                    'synced_at'    => $dataGeneratedAt->toIso8601String(),
+                ],
+            ], 200);
+        } catch (\Throwable $e) {
+            Log::error('Health data sync unexpected exception: ' . $e->getMessage(), [
+                'trace'   => $e->getTraceAsString(),
+                'request' => $request->all(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Health data sync encountered an error: ' . $e->getMessage(),
+            ], 500);
+        }
     }
 
     private function extractScore($payload, $type)
     {
-        // Support direct/apple health keys if present
-        if ($type === 'step' && isset($payload['steps'])) {
-            return $payload['steps'];
+        if (!is_array($payload)) {
+            return null;
         }
-        if ($type === 'sleep' && isset($payload['sleep']['hours'])) {
-            return $payload['sleep']['hours'];
+
+        // Support direct/apple/google health keys at root level
+        if ($type === 'step') {
+            if (isset($payload['steps']) && $payload['steps'] !== null) return (int) $payload['steps'];
+            if (isset($payload['step']) && $payload['step'] !== null) return (int) $payload['step'];
+            if (isset($payload['step_count']) && $payload['step_count'] !== null) return (int) $payload['step_count'];
+            if (isset($payload['total_steps']) && $payload['total_steps'] !== null) return (int) $payload['total_steps'];
         }
-        if (($type === 'hrv' || $type === 'heart_rate') && isset($payload['heart_rate'])) {
-            return $payload['heart_rate'];
+
+        if ($type === 'sleep') {
+            if (isset($payload['sleep']['hours']) && $payload['sleep']['hours'] !== null) return (float) $payload['sleep']['hours'];
+            if (isset($payload['sleep_hours']) && $payload['sleep_hours'] !== null) return (float) $payload['sleep_hours'];
+            if (isset($payload['sleep']) && is_numeric($payload['sleep'])) return (float) $payload['sleep'];
         }
-        if (($type === 'hydration' || $type === 'hydration_ml') && isset($payload['hydration_ml'])) {
-            return $payload['hydration_ml'];
+
+        if ($type === 'hrv' || $type === 'heart_rate') {
+            if (isset($payload['heart_rate']) && $payload['heart_rate'] !== null) return (float) $payload['heart_rate'];
+            if (isset($payload['heartRate']) && $payload['heartRate'] !== null) return (float) $payload['heartRate'];
+            if (isset($payload['hrv']['value']) && $payload['hrv']['value'] !== null) return (float) $payload['hrv']['value'];
+        }
+
+        if ($type === 'hydration' || $type === 'hydration_ml') {
+            if (isset($payload['hydration_ml']) && $payload['hydration_ml'] !== null) return (float) $payload['hydration_ml'];
+            if (isset($payload['hydration']['amount_ml']) && $payload['hydration']['amount_ml'] !== null) return (float) $payload['hydration']['amount_ml'];
+        }
+
+        if ($type === 'calories') {
+            if (isset($payload['calories']) && $payload['calories'] !== null) return (float) $payload['calories'];
+            if (isset($payload['active_calories']) && $payload['active_calories'] !== null) return (float) $payload['active_calories'];
+            if (isset($payload['burned_calories']) && $payload['burned_calories'] !== null) return (float) $payload['burned_calories'];
         }
 
         $data = $payload['data'][0] ?? null;
@@ -457,31 +569,57 @@ class TerraWebhookController extends Controller
             case 'sleep':
                 return $data['scores']['sleep']
                     ?? $data['data_enrichment']['sleep_score']
+                    ?? $data['sleep_data']['sleep_score']
                     ?? null;
 
             case 'step':
-                return $data['distance_data']['steps'] ?? null;
+                return $data['distance_data']['steps']
+                    ?? $data['step_data']['steps']
+                    ?? null;
 
             case 'hrv':
-                return $data['heart_rate_data']['summary']['avg_hrv_rmssd'] ?? null;
+                return $data['heart_rate_data']['summary']['avg_hrv_rmssd']
+                    ?? $data['heart_data']['heart_rate_data']['summary']['avg_hrv_rmssd']
+                    ?? $data['heart_rate_data']['summary']['avg_hr_bpm']
+                    ?? $data['heart_data']['heart_rate_data']['summary']['avg_hr_bpm']
+                    ?? null;
 
             case 'readiness':
                 return $data['readiness_data']['readiness']
                     ?? $data['data_enrichment']['readiness_score']
+                    ?? $data['scores']['recovery']
                     ?? null;
 
             case 'energy':
-                return $data['readiness_data']['recovery_level'] ?? null;
+                return $data['readiness_data']['recovery_level']
+                    ?? $data['scores']['activity']
+                    ?? (isset($data['MET_data']['avg_level']) ? round((float) $data['MET_data']['avg_level'], 1) : null);
 
             case 'stress':
                 return $data['stress_data']['avg_stress_level'] ?? null;
 
             case 'calories':
-                return $data['calories_data']['total_burned_calories'] ?? null;
+                if (isset($data['calories_data']['total_burned_calories']) && $data['calories_data']['total_burned_calories'] !== null) {
+                    return (float) $data['calories_data']['total_burned_calories'];
+                }
+                if (isset($data['calories_data']['net_activity_calories']) && $data['calories_data']['net_activity_calories'] !== null) {
+                    return (float) ($data['calories_data']['net_activity_calories'] + ($data['calories_data']['BMR_calories'] ?? 0));
+                }
+                if (!empty($data['calories_data']['calorie_samples']) && is_array($data['calories_data']['calorie_samples'])) {
+                    $lastSample = end($data['calories_data']['calorie_samples']);
+                    if (isset($lastSample['calories']) && $lastSample['calories'] !== null) {
+                        return round((float) $lastSample['calories'], 1);
+                    }
+                }
+                if (isset($data['calories_data']['BMR_calories']) && $data['calories_data']['BMR_calories'] !== null) {
+                    return (float) $data['calories_data']['BMR_calories'];
+                }
+                return null;
 
             case 'hydration':
             case 'hydration_ml':
-                return $data['hydration_data']['hydration_ml']
+                return $data['hydration_data']['day_total_water_consumption_ml']
+                    ?? $data['hydration_data']['hydration_ml']
                     ?? $data['hydration_data']['amount_ml']
                     ?? null;
 
