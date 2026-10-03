@@ -110,11 +110,11 @@ Route::prefix('v1')->group(function () {
 
     // Menopause & Perimenopause (Symptoms, Insights, Export)
     Route::match(['get', 'post'], '/menopause/symptoms', [MenopauseController::class, 'symptoms']);
-    Route::match(['get', 'post'], '/perimenopause/symptoms', [MenopauseController::class, 'symptoms']);
+    Route::match(['get', 'post'], '/perimenopause/symptoms', [PerimenopauseController::class, 'symptoms']);
     Route::match(['get', 'post'], '/menopause/insights', [MenopauseController::class, 'insights']);
-    Route::match(['get', 'post'], '/perimenopause/insights', [MenopauseController::class, 'insights']);
+    Route::match(['get', 'post'], '/perimenopause/insights', [PerimenopauseController::class, 'insights']);
     Route::match(['get', 'post'], '/menopause/export', [MenopauseController::class, 'export']);
-    Route::match(['get', 'post'], '/perimenopause/export', [MenopauseController::class, 'export']);
+    Route::match(['get', 'post'], '/perimenopause/export', [PerimenopauseController::class, 'export']);
 
     Route::post('/perimenopause/gsm-checkin', [PerimenopauseController::class, 'saveGsmCheckin']);
     Route::get('/perimenopause/gsm-checkin/{userId}', [PerimenopauseController::class, 'getGsmCheckin']);

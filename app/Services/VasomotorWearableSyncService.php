@@ -32,11 +32,9 @@ class VasomotorWearableSyncService
         if (!$hasWearableData) {
             $anyWearable = TerraActivityData::where('user_id', $userId)->exists();
             if (!$anyWearable) {
-                // Ensure default baseline logs if nothing exists
-                $this->ensureBaselineFallback($userId, $startOfWeek);
                 return VasomotorLog::where('user_id', $userId)
+                    ->whereBetween('log_date', [$startOfWeek->toDateString(), $endOfWeek->toDateString()])
                     ->orderBy('log_date', 'asc')
-                    ->limit(7)
                     ->get();
             }
         }
@@ -323,13 +321,6 @@ class VasomotorWearableSyncService
      */
     private function deriveFromCoarseData(Collection $activities): array
     {
-        $hasSleep = $activities->contains(fn($a) => strtolower($a->type) === 'sleep');
-        $hasDaily = $activities->contains(fn($a) => strtolower($a->type) === 'daily');
-
-        if ($hasSleep || $hasDaily) {
-            return ['mild' => 2, 'moderate' => 2, 'intense' => 1];
-        }
-
         return ['mild' => 0, 'moderate' => 0, 'intense' => 0];
     }
 
@@ -355,42 +346,6 @@ class VasomotorWearableSyncService
             }
         } catch (\Throwable $e) {
             return 'evening';
-        }
-    }
-
-    /**
-     * Fallback baseline seeded logs if no user data exists at all.
-     */
-    private function ensureBaselineFallback(int $userId, Carbon $startOfWeek): void
-    {
-        $count = VasomotorLog::where('user_id', $userId)->count();
-        if ($count > 0) {
-            return;
-        }
-
-        $days = [
-            ['day' => 'Mon', 'mild' => 2, 'mod' => 3, 'intense' => 1, 'total' => 6, 'peak' => null],
-            ['day' => 'Tue', 'mild' => 1, 'mod' => 2, 'intense' => 0, 'total' => 3, 'peak' => null],
-            ['day' => 'Wed', 'mild' => 3, 'mod' => 4, 'intense' => 1, 'total' => 8, 'peak' => null],
-            ['day' => 'Thu', 'mild' => 2, 'mod' => 5, 'intense' => 4, 'total' => 11, 'peak' => 'Thursday evening'],
-            ['day' => 'Fri', 'mild' => 1, 'mod' => 2, 'intense' => 1, 'total' => 4, 'peak' => null],
-            ['day' => 'Sat', 'mild' => 2, 'mod' => 3, 'intense' => 2, 'total' => 7, 'peak' => null],
-            ['day' => 'Sun', 'mild' => 1, 'mod' => 1, 'intense' => 0, 'total' => 2, 'peak' => null],
-        ];
-
-        foreach ($days as $index => $item) {
-            $logDate = $startOfWeek->copy()->addDays($index)->toDateString();
-            VasomotorLog::create([
-                'user_id'        => $userId,
-                'log_date'       => $logDate,
-                'day_of_week'    => $item['day'],
-                'mild_count'     => $item['mild'],
-                'moderate_count' => $item['mod'],
-                'intense_count'  => $item['intense'],
-                'total_episodes' => $item['total'],
-                'avg_intensity'  => 4.3,
-                'peak_time'      => $item['peak'],
-            ]);
         }
     }
 }
