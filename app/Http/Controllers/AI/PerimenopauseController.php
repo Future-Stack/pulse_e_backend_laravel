@@ -47,7 +47,8 @@ class PerimenopauseController extends Controller
 
         $userId = (int) $userId;
         $tab = strtolower($request->input('tab') ?? $request->query('tab') ?? 'symptoms');
-        $period = (string) ($request->input('period') ?? $request->query('period') ?? '7d');
+        $defaultPeriod = ($tab === 'insights') ? '90d' : '7d';
+        $period = (string) ($request->input('period') ?? $request->query('period') ?? $defaultPeriod);
         $forceRefresh = $request->boolean('refresh') || $request->boolean('sync');
 
         $profile = $this->getOrCreateProfile($userId);
@@ -441,11 +442,16 @@ class PerimenopauseController extends Controller
                 $correlations = $payload['symptom_matrix']['symptom_correlations'] ?? [];
                 if (!empty($correlations) && is_array($correlations)) {
                     foreach ($correlations as $index => $item) {
-                        if (!empty($item['title'])) {
+                        $title = !empty($item['title'])
+                            ? $item['title']
+                            : ((!empty($item['from']) && !empty($item['to'])) ? "{$item['from']} → {$item['to']}" : null);
+
+                        if ($title) {
+                            $pct = (int) ($item['percentage'] ?? $item['link_percentage'] ?? $item['correlation_percentage'] ?? 0);
                             MenopauseSymptomInsight::updateOrCreate(
-                                ['title' => $item['title']],
+                                ['title' => $title],
                                 [
-                                    'link_percentage' => (int) ($item['link_percentage'] ?? $item['correlation_percentage'] ?? 75),
+                                    'link_percentage' => $pct,
                                     'description'     => $item['description'] ?? '',
                                     'category'        => 'symptom_matrix',
                                     'display_order'   => $index + 1,
@@ -848,10 +854,14 @@ class PerimenopauseController extends Controller
 
         if (!empty($snapshotCorrelations) && is_array($snapshotCorrelations)) {
             $items = collect($snapshotCorrelations)->map(function ($corr, $idx) {
-                $pct = (int) ($corr['link_percentage'] ?? $corr['correlation_percentage'] ?? 75);
+                $pct = (int) ($corr['percentage'] ?? $corr['link_percentage'] ?? $corr['correlation_percentage'] ?? 0);
+                $title = !empty($corr['title'])
+                    ? $corr['title']
+                    : ((!empty($corr['from']) && !empty($corr['to'])) ? "{$corr['from']} → {$corr['to']}" : 'Symptom Correlation');
+
                 return [
                     'id'              => $idx + 1,
-                    'title'           => $corr['title'] ?? 'Symptom Correlation',
+                    'title'           => $title,
                     'link_percentage' => "{$pct}% link",
                     'description'     => $corr['description'] ?? '',
                     'progress'        => $pct,
