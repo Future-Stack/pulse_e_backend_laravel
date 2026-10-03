@@ -47,6 +47,60 @@ class PerimenopauseTest extends TestCase
         $this->assertArrayHasKey('items', $response->json('data.insights'));
     }
 
+    public function test_insights_tab_formats_ai_correlation_with_from_to_and_real_percentages(): void
+    {
+        $user = User::factory()->create();
+
+        \App\Models\MenopauseInsightSnapshot::create([
+            'user_id'       => $user->id,
+            'snapshot_date' => today()->toDateString(),
+            'period'        => '90d',
+            'symptom_matrix' => [
+                'symptom_correlations' => [
+                    [
+                        'from'        => 'Mood',
+                        'to'          => 'Energy Level',
+                        'percentage'  => 100,
+                        'description' => 'Mood and Energy Level occur together.',
+                    ],
+                    [
+                        'from'        => 'Mood',
+                        'to'          => 'Fatigue',
+                        'percentage'  => 50,
+                        'description' => 'Mood and Fatigue occur together.',
+                    ],
+                    [
+                        'from'        => 'Mood',
+                        'to'          => 'Cramps',
+                        'percentage'  => 16,
+                        'description' => 'Mood and Cramps occur together.',
+                    ],
+                ],
+            ],
+            'period_selected' => '90d',
+            'tabs'            => ['Insights'],
+            'journey_active'  => true,
+        ]);
+
+        $response = $this->getJson("/api/v1/perimenopause/insights?user_id={$user->id}&period=90d");
+
+        $response->assertStatus(200);
+        $items = $response->json('data.insights.items');
+        $this->assertCount(3, $items);
+
+        $this->assertEquals('Mood → Energy Level', $items[0]['title']);
+        $this->assertEquals('100% link', $items[0]['link_percentage']);
+        $this->assertEquals(100, $items[0]['progress']);
+
+        $this->assertEquals('Mood → Fatigue', $items[1]['title']);
+        $this->assertEquals('50% link', $items[1]['link_percentage']);
+        $this->assertEquals(50, $items[1]['progress']);
+
+        $this->assertEquals('Mood → Cramps', $items[2]['title']);
+        $this->assertEquals('16% link', $items[2]['link_percentage']);
+        $this->assertEquals(16, $items[2]['progress']);
+    }
+
     public function test_perimenopause_overview_export_tab(): void
     {
         $user = User::first() ?? User::factory()->create();
