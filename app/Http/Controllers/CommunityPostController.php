@@ -57,6 +57,61 @@ class CommunityPostController extends Controller
     }
 
     /**
+     * GET /api/posts/my-journeys
+     * List approved posts matching the authenticated user's life journeys.
+     */
+    public function myJourneyPosts(Request $request)
+    {
+        $user = Auth::user();
+        $profile = $user?->profile;
+
+        $journeyIds = collect();
+        if ($profile) {
+            $journeyIds = $profile->lifeJourneys()->pluck('life_journeys.id');
+            if ($profile->life_stage_id && !$journeyIds->contains($profile->life_stage_id)) {
+                $journeyIds->push($profile->life_stage_id);
+            }
+        }
+
+        $query = CommunityPost::query()
+            ->where('is_approved', true)
+            ->whereDoesntHave('reports', fn ($q) => $q->where('is_active', true))
+            ->with([
+                'user:id,full_name',
+                'lifeJourneys' => fn ($q) => $q->withCount('profiles as members_count'),
+            ])
+            ->withCount(['likes', 'comments', 'reports'])
+            ->latest('posted_at');
+
+        if ($journeyIds->isEmpty()) {
+            return response()->json([]);
+        }
+
+        $query->whereHas('lifeJourneys', function ($q) use ($journeyIds) {
+            $q->whereIn('life_journeys.id', $journeyIds);
+        });
+
+        if ($request->filled('tag')) {
+            $query->whereJsonContains('tags', $request->string('tag')->value());
+        }
+
+        $posts = $query->get();
+
+        $userId = Auth::id();
+
+        $posts->transform(function ($post) use ($userId) {
+            $post->is_liked = $post->isLikedBy($userId);
+            // Hide author info when the post was made anonymously
+            if ($post->is_anonymous) {
+                $post->setRelation('user', null);
+            }
+            return $post;
+        });
+
+        return response()->json($posts);
+    }
+
+    /**
      * POST /api/community/posts
      */
     public function store(Request $request)

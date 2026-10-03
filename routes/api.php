@@ -189,6 +189,8 @@ Route::prefix('v1')->group(function () {
     // Health data sync (supports user_id in body/query or token)
     Route::post('/health-data/sync', [TerraWebhookController::class, 'syncDeviceData']);
     Route::post('/apple-health/sync', [TerraWebhookController::class, 'syncDeviceData']);
+    Route::post('/google-health/sync', [TerraWebhookController::class, 'syncDeviceData']);
+    Route::post('/android-health/sync', [TerraWebhookController::class, 'syncDeviceData']);
 
     Route::middleware('auth:sanctum')->group(function () {
 
@@ -331,6 +333,7 @@ Route::prefix('v1')->group(function () {
 
         // Community Post
 
+        Route::get('/posts/my-journeys', [CommunityPostController::class, 'myJourneyPosts']);
         Route::get('/posts', [CommunityPostController::class, 'index']);
         Route::post('/posts', [CommunityPostController::class, 'store']);
         Route::get('/posts/{post}', [CommunityPostController::class, 'show']);

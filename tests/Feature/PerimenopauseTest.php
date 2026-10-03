@@ -82,4 +82,53 @@ class PerimenopauseTest extends TestCase
                 'message' => 'GSM check-in saved successfully.',
             ]);
     }
+
+    public function test_vasomotor_logs_are_automatically_synced_from_terra_activity_data(): void
+    {
+        $user = User::factory()->create();
+
+        // Simulate wearable data with skin temperature elevation and night awake events
+        \App\Models\TerraActivityData::create([
+            'user_id'           => $user->id,
+            'terra_user_id'     => 'terra_user_1',
+            'type'              => 'sleep',
+            'payload'           => [
+                'data' => [
+                    [
+                        'metadata' => [
+                            'start_time' => now()->startOfWeek()->addHours(23)->toIso8601String(),
+                        ],
+                        'temperature_data' => [
+                            'temperature_delta' => 1.2, // Intense hot flash spike
+                        ],
+                        'heart_rate_data' => [
+                            'summary' => [
+                                'resting_hr_bpm' => 62,
+                                'max_hr_bpm'     => 92, // +30 bpm surge
+                            ],
+                        ],
+                        'sleep_durations_data' => [
+                            'awake' => [
+                                'num_awake_events' => 3,
+                                'duration_seconds' => 2000,
+                            ],
+                        ],
+                    ],
+                ],
+            ],
+            'data_generated_at' => now()->startOfWeek()->toDateString(),
+        ]);
+
+        $response = $this->getJson("/api/v1/perimenopause/overview?user_id={$user->id}&tab=symptoms");
+
+        $response->assertStatus(200);
+        $chart = $response->json('data.symptoms.vasomotor_tracker.chart');
+        $this->assertNotEmpty($chart);
+
+        // Verify that the first day has detected episodes
+        $mondayLog = collect($chart)->firstWhere('date', now()->startOfWeek()->toDateString());
+        $this->assertNotNull($mondayLog);
+        $this->assertGreaterThan(0, $mondayLog['total']);
+        $this->assertGreaterThan(0, $mondayLog['intense']);
+    }
 }
