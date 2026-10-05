@@ -7,6 +7,8 @@ use App\Models\NumeraInsight;
 use App\Jobs\FetchNumeraInsightJob;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 
 
 class NumeraInsightController extends Controller
@@ -28,29 +30,75 @@ class NumeraInsightController extends Controller
         }
 
 
-        // Force refresh: invalidate today's completed insight and generate a new one
+        // Force refresh: call AI synchronously and return fresh data
         if ($request->boolean('refresh')) {
 
-            NumeraInsight::where('user_id', $userId)
-                ->whereDate('created_at', today())
-                ->whereIn('status', ['completed', 'failed'])
-                ->update(['status' => 'failed']);
+            try {
 
-            $insight = NumeraInsight::create([
-                'user_id' => $userId,
-                'status'  => 'pending',
-            ]);
+                $url = config('services.ai.base_url') . '/api/numera-insight';
 
-            FetchNumeraInsightJob::dispatch($insight->id);
+                $response = Http::retry(3, 2000)
+                    ->withoutVerifying()
+                    ->acceptJson()
+                    ->timeout(300)
+                    ->get($url, ['user_id' => $userId]);
 
-            return response()->json([
-                'success' => true,
-                'message' => 'Numera insight refresh started.',
-                'data'    => [
-                    'id'     => $insight->id,
-                    'status' => 'pending',
-                ],
-            ], 202);
+                if (!$response->successful()) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'AI service error: ' . $response->status(),
+                    ], 502);
+                }
+
+                $data = $response->json();
+
+                if (!isset($data['numera_insight'])) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Invalid AI response.',
+                    ], 502);
+                }
+
+                $result = $data['numera_insight'];
+
+                // Invalidate old records
+                NumeraInsight::where('user_id', $userId)
+                    ->whereDate('created_at', today())
+                    ->whereIn('status', ['completed', 'failed'])
+                    ->update(['status' => 'failed']);
+
+                // Save fresh insight directly as completed
+                $insight = NumeraInsight::create([
+                    'user_id'     => $userId,
+                    'title'       => $result['title'] ?? null,
+                    'tag'         => $result['tag'] ?? null,
+                    'eyebrow'     => $result['eyebrow'] ?? null,
+                    'headline'    => $result['headline'] ?? null,
+                    'description' => $result['description'] ?? null,
+                    'cycle_day'   => $result['cycle_day'] ?? null,
+                    'theme'       => $result['theme'] ?? null,
+                    'priority'    => $result['priority'] ?? null,
+                    'status'      => 'completed',
+                ]);
+
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Numera insight refreshed successfully.',
+                    'data'    => $insight,
+                ]);
+
+            } catch (\Throwable $e) {
+
+                Log::error('Numera Insight refresh failed.', [
+                    'user_id' => $userId,
+                    'message' => $e->getMessage(),
+                ]);
+
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Failed to refresh insight.',
+                ], 500);
+            }
         }
 
 
