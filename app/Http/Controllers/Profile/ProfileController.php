@@ -88,7 +88,7 @@ class ProfileController extends Controller
         }
 
         $request->validate([
-            'full_name'      => 'required|string|max:255',
+            'full_name'      => 'nullable|string|max:255',
             'age'            => 'nullable|integer|min:1',
             'height'         => 'nullable|numeric|min:0',
             'weight'         => 'nullable|numeric|min:0',
