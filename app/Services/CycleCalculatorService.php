@@ -598,5 +598,123 @@ class CycleCalculatorService
             'phases' => $phases,
         ];
     }
+
+    /**
+     * Calculate Fertile Window Prediction block for UI cards.
+     *
+     * Window Opens: Day 11 (start_date + 10 days)
+     * Peak Day: Day 14 (start_date + 13 days)
+     * Window Closes: Day 17 (start_date + 16 days)
+     * Span: 7 days
+     */
+    public static function calculateFertilePrediction(
+        Carbon|string $startDate,
+        ?int $cycleLength = 28,
+        int $fertileStartDay = 11,
+        int $fertileEndDay = 17,
+        int $peakDay = 14
+    ): array {
+        $start = $startDate instanceof Carbon ? $startDate->copy()->startOfDay() : Carbon::parse($startDate)->startOfDay();
+        $cycleLength = $cycleLength ?: 28;
+
+        $windowOpensDate  = $start->copy()->addDays($fertileStartDay - 1);
+        $peakDate         = $start->copy()->addDays($peakDay - 1);
+        $windowClosesDate = $start->copy()->addDays($fertileEndDay - 1);
+        $spanDays         = max(1, ($fertileEndDay - $fertileStartDay + 1));
+
+        return [
+            'title' => 'FERTILE WINDOW PREDICTION',
+            'heading' => 'FERTILE WINDOW PREDICTION',
+            'start_date' => $start->toDateString(),
+            'cycle_length' => $cycleLength,
+            'span_days' => $spanDays,
+            'description' => "Range-based prediction model — avoids single-day assumptions. Your window spans {$spanDays} days for maximum accuracy.",
+
+            // Flat keys for direct access / backward compatibility
+            'window_opens_day' => $fertileStartDay,
+            'window_opens_label' => "Day {$fertileStartDay}",
+            'window_opens_date' => $windowOpensDate->format('M d'),
+            'window_opens_formatted' => $windowOpensDate->format('M j'),
+            'window_opens_full' => $windowOpensDate->toDateString(),
+
+            'peak_day' => $peakDay,
+            'peak_day_label' => "Day {$peakDay}",
+            'peak_date' => $peakDate->format('M d'),
+            'peak_date_formatted' => $peakDate->format('M j'),
+            'peak_date_full' => $peakDate->toDateString(),
+
+            'window_closes_day' => $fertileEndDay,
+            'window_closes_label' => "Day {$fertileEndDay}",
+            'window_closes_date' => $windowClosesDate->format('M d'),
+            'window_closes_formatted' => $windowClosesDate->format('M j'),
+            'window_closes_full' => $windowClosesDate->toDateString(),
+
+            // Card objects matching UI cards
+            'window_opens' => [
+                'key' => 'window_opens',
+                'title' => 'Window Opens',
+                'day' => "Day {$fertileStartDay}",
+                'day_number' => $fertileStartDay,
+                'date' => $windowOpensDate->format('M d'),
+                'date_formatted' => $windowOpensDate->format('M j'),
+                'full_date' => $windowOpensDate->toDateString(),
+                'is_peak' => false,
+            ],
+            'peak_day_info' => [
+                'key' => 'peak_day',
+                'title' => 'Peak Day',
+                'day' => "Day {$peakDay}",
+                'day_number' => $peakDay,
+                'date' => $peakDate->format('M d'),
+                'date_formatted' => $peakDate->format('M j'),
+                'full_date' => $peakDate->toDateString(),
+                'is_peak' => true,
+            ],
+            'window_closes' => [
+                'key' => 'window_closes',
+                'title' => 'Window Closes',
+                'day' => "Day {$fertileEndDay}",
+                'day_number' => $fertileEndDay,
+                'date' => $windowClosesDate->format('M d'),
+                'date_formatted' => $windowClosesDate->format('M j'),
+                'full_date' => $windowClosesDate->toDateString(),
+                'is_peak' => false,
+            ],
+
+            // Cards array for list rendering
+            'cards' => [
+                [
+                    'key' => 'window_opens',
+                    'title' => 'Window Opens',
+                    'day' => "Day {$fertileStartDay}",
+                    'day_number' => $fertileStartDay,
+                    'date' => $windowOpensDate->format('M d'),
+                    'date_formatted' => $windowOpensDate->format('M j'),
+                    'full_date' => $windowOpensDate->toDateString(),
+                    'is_peak' => false,
+                ],
+                [
+                    'key' => 'peak_day',
+                    'title' => 'Peak Day',
+                    'day' => "Day {$peakDay}",
+                    'day_number' => $peakDay,
+                    'date' => $peakDate->format('M d'),
+                    'date_formatted' => $peakDate->format('M j'),
+                    'full_date' => $peakDate->toDateString(),
+                    'is_peak' => true,
+                ],
+                [
+                    'key' => 'window_closes',
+                    'title' => 'Window Closes',
+                    'day' => "Day {$fertileEndDay}",
+                    'day_number' => $fertileEndDay,
+                    'date' => $windowClosesDate->format('M d'),
+                    'date_formatted' => $windowClosesDate->format('M j'),
+                    'full_date' => $windowClosesDate->toDateString(),
+                    'is_peak' => false,
+                ],
+            ],
+        ];
+    }
 }
 

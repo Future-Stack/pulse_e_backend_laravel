@@ -366,8 +366,74 @@ public function current(Request $request): JsonResponse
     ]);
 }
 
+    /**
+     * Get Fertile Window Prediction for authenticated user via token.
+     *
+     * Window Opens: Day 11 (start_date + 10 days)
+     * Peak Day: Day 14 (start_date + 13 days)
+     * Window Closes: Day 17 (start_date + 16 days)
+     *
+     * GET /api/v1/cycle-calendar/fertile-window-prediction
+     * GET /api/v1/fertile-window-prediction
+     */
+    public function fertilePrediction(Request $request): JsonResponse
+    {
+        $user = $request->user();
 
+        if (!$user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthenticated.',
+                'data' => null,
+            ], 401);
+        }
 
+        $calendarInput = CycleCalendarInput::where('user_id', $user->id)
+            ->whereNotNull('start_date')
+            ->latest('start_date')
+            ->first();
+
+        $startDateStr = $request->query('start_date') ?? $calendarInput?->start_date;
+
+        if (!$startDateStr) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No cycle calendar input found for this user.',
+                'data' => null,
+            ], 404);
+        }
+
+        $startDate = $startDateStr instanceof \DateTimeInterface
+            ? Carbon::instance($startDateStr)->startOfDay()
+            : Carbon::parse($startDateStr)->startOfDay();
+
+        $windowOpens = $startDate->copy()->addDays(10);
+        $peakDay = $startDate->copy()->addDays(13);
+        $windowCloses = $startDate->copy()->addDays(16);
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'title' => 'FERTILE WINDOW PREDICTION',
+                'window_opens' => [
+                    'label' => 'Window Opens',
+                    'day' => 'Day 11',
+                    'date' => $windowOpens->format('M d'),
+                ],
+                'peak_day' => [
+                    'label' => 'Peak Day',
+                    'day' => 'Day 14',
+                    'date' => $peakDay->format('M d'),
+                ],
+                'window_closes' => [
+                    'label' => 'Window Closes',
+                    'day' => 'Day 17',
+                    'date' => $windowCloses->format('M d'),
+                ],
+                'description' => 'Range-based prediction model — avoids single-day assumptions. Your window spans 7 days for maximum accuracy.',
+            ],
+        ]);
+    }
 
     /**
      * Show cycle calendar inputs for a user.

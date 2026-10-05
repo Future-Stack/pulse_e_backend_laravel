@@ -196,6 +196,8 @@ Route::prefix('v1')->group(function () {
 
     Route::post('/cycle-calendar-inputs',[CycleCalendarInputController::class, 'store']);
     Route::get('/cycle-calendar/current', [CycleCalendarInputController::class, 'current']);
+    Route::get('/cycle-calendar/fertile-window-prediction', [CycleCalendarInputController::class, 'fertilePrediction']);
+    Route::get('/fertile-window-prediction', [CycleCalendarInputController::class, 'fertilePrediction']);
 
         //user health log
         Route::apiResource('health-logs', HealthLogController::class);
@@ -464,5 +466,8 @@ Route::prefix('v1')->group(function () {
 
 
 });
+
+// Root API fallbacks without v1 prefix
+Route::get('/cycle-overview', [CycleFertilityController::class, 'overview']);
 
 require __DIR__ . '/marketplace_api.php';
