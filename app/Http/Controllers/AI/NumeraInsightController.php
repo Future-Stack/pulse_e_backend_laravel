@@ -6,12 +6,13 @@ use App\Models\User;
 use App\Models\NumeraInsight;
 use App\Jobs\FetchNumeraInsightJob;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 
 
 class NumeraInsightController extends Controller
 {
 
-    public function show(int $userId): JsonResponse
+    public function show(Request $request, int $userId): JsonResponse
     {
 
         $user = User::find($userId);
@@ -26,6 +27,31 @@ class NumeraInsightController extends Controller
 
         }
 
+
+        // Force refresh: invalidate today's completed insight and generate a new one
+        if ($request->boolean('refresh')) {
+
+            NumeraInsight::where('user_id', $userId)
+                ->whereDate('created_at', today())
+                ->whereIn('status', ['completed', 'failed'])
+                ->update(['status' => 'failed']);
+
+            $insight = NumeraInsight::create([
+                'user_id' => $userId,
+                'status'  => 'pending',
+            ]);
+
+            FetchNumeraInsightJob::dispatch($insight->id);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Numera insight refresh started.',
+                'data'    => [
+                    'id'     => $insight->id,
+                    'status' => 'pending',
+                ],
+            ], 202);
+        }
 
 
         $insight = NumeraInsight::where('user_id',$userId)
