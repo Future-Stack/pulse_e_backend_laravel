@@ -120,10 +120,15 @@ class ProfileController extends Controller
         try {
             DB::beginTransaction();
 
-            // Update user basic info
-            User::where('id', $user_id)->update([
-                'full_name' => $request->full_name,
-            ]);
+            // Update user basic info only if full_name is present in the request
+            $userUpdateData = [];
+            if ($request->filled('full_name')) {
+                $userUpdateData['full_name'] = $request->full_name;
+            }
+
+            if (!empty($userUpdateData)) {
+                User::where('id', $user_id)->update($userUpdateData);
+            }
 
             // Handle image upload
             $imagePath = null;
