@@ -600,6 +600,50 @@ class CycleCalculatorService
     }
 
     /**
+     * Generate day-by-day calendar with phase and color for each cycle day.
+     */
+    public static function generateCalendarDays(
+        Carbon $startDate,
+        array $phases
+    ): array {
+        $cycleLength = $phases['cycle_length'];
+        $days = [];
+
+        $phaseMap = [
+            'menstrual'  => ['name' => 'Menstrual Phase',  'key' => 'menstrual',  'color' => 'red',    'icon' => '🔴'],
+            'follicular' => ['name' => 'Follicular Phase', 'key' => 'follicular', 'color' => 'green',  'icon' => '🟢'],
+            'ovulatory'  => ['name' => 'Ovulatory Phase',  'key' => 'ovulatory',  'color' => 'yellow', 'icon' => '🟡'],
+            'luteal'     => ['name' => 'Luteal Phase',     'key' => 'luteal',     'color' => 'blue',   'icon' => '🔵'],
+        ];
+
+        for ($day = 1; $day <= $cycleLength; $day++) {
+            if ($day <= $phases['menstrual_end']) {
+                $phase = $phaseMap['menstrual'];
+            } elseif ($day <= $phases['follicular_end']) {
+                $phase = $phaseMap['follicular'];
+            } elseif ($day <= $phases['ovulatory_end']) {
+                $phase = $phaseMap['ovulatory'];
+            } else {
+                $phase = $phaseMap['luteal'];
+            }
+
+            $date = $startDate->copy()->addDays($day - 1);
+
+            $days[] = [
+                'day'    => $day,
+                'date'   => $date->format('Y-m-d'),
+                'phase'  => $phase['key'],
+                'color'  => $phase['color'],
+                'icon'   => $phase['icon'],
+                'is_fertile' => $day >= $phases['fertile_start'] && $day <= $phases['fertile_end'],
+                'is_ovulation' => $day === $phases['ovulation_day'],
+            ];
+        }
+
+        return $days;
+    }
+
+    /**
      * Calculate Fertile Window Prediction block for UI cards.
      *
      * Window Opens: Day 11 (start_date + 10 days)

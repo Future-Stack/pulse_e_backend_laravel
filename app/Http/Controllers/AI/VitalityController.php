@@ -739,7 +739,7 @@ class VitalityController extends Controller
             'dimensions'     => [
                 [
                     'name'        => 'Mobility & Strength',
-                    'score'       => 70,
+                    'score'       => 0,
                     'status'      => 'strong',
                     'trend'       => 'stable',
                     'last_updated'=> null,
@@ -747,7 +747,7 @@ class VitalityController extends Controller
                 ],
                 [
                     'name'        => 'Cardiovascular Health',
-                    'score'       => 60,
+                    'score'       => 0,
                     'status'      => 'moderate',
                     'trend'       => 'stable',
                     'last_updated'=> null,
@@ -755,7 +755,7 @@ class VitalityController extends Controller
                 ],
                 [
                     'name'        => 'Cognitive Wellness',
-                    'score'       => 60,
+                    'score'       => 0,
                     'status'      => 'moderate',
                     'trend'       => 'stable',
                     'last_updated'=> null,
@@ -763,7 +763,7 @@ class VitalityController extends Controller
                 ],
                 [
                     'name'        => 'Sleep Quality',
-                    'score'       => 65,
+                    'score'       => 0,
                     'status'      => 'moderate',
                     'trend'       => 'stable',
                     'last_updated'=> null,
@@ -771,7 +771,7 @@ class VitalityController extends Controller
                 ],
                 [
                     'name'        => 'Emotional Wellbeing',
-                    'score'       => 60,
+                    'score'       => 0,
                     'status'      => 'moderate',
                     'trend'       => 'stable',
                     'last_updated'=> null,
@@ -779,7 +779,7 @@ class VitalityController extends Controller
                 ],
                 [
                     'name'        => 'Metabolic Health',
-                    'score'       => 60,
+                    'score'       => 0,
                     'status'      => 'moderate',
                     'trend'       => 'stable',
                     'last_updated'=> null,
@@ -787,7 +787,7 @@ class VitalityController extends Controller
                 ],
                 [
                     'name'        => 'Reproductive Health',
-                    'score'       => 70,
+                    'score'       => 0,
                     'status'      => 'strong',
                     'trend'       => 'stable',
                     'last_updated'=> null,
