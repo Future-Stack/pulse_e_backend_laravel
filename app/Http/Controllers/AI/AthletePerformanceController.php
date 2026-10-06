@@ -316,30 +316,30 @@ class AthletePerformanceController extends Controller
 
         return [
             'date'            => today()->toDateString(),
-            'readiness_score' => 84,
+            'readiness_score' => 0,
             'readiness_level' => 'Peak Ready',
             'hrv'             => [
-                'value'  => 68,
+                'value'  => 0,
                 'unit'   => 'ms',
                 'trend'  => 4,
                 'status' => 'good',
             ],
             'recovery'        => [
-                'percentage' => 74,
+                'percentage' => 0,
                 'trend'      => 5,
                 'status'     => 'moderate',
             ],
             'training_load'   => [
-                'value'  => 185.5,
+                'value'  => 0,
                 'unit'   => 'AU',
                 'trend'  => 12,
                 'status' => 'moderate',
             ],
             'metrics'         => [
-                'hrv'           => ['value' => 68, 'unit' => 'ms', 'trend' => 4, 'status' => 'good'],
-                'sleep'         => ['percentage' => 95, 'trend' => 3, 'status' => 'good'],
-                'recovery'      => ['percentage' => 74, 'trend' => 5, 'status' => 'moderate'],
-                'training_load' => ['value' => 185.5, 'unit' => 'AU', 'trend' => 12, 'status' => 'moderate'],
+                'hrv'           => ['value' => 0, 'unit' => 'ms', 'trend' => 4, 'status' => 'good'],
+                'sleep'         => ['percentage' => 0, 'trend' => 3, 'status' => 'good'],
+                'recovery'      => ['percentage' => 0, 'trend' => 5, 'status' => 'moderate'],
+                'training_load' => ['value' => 0, 'unit' => 'AU', 'trend' => 12, 'status' => 'moderate'],
             ],
             'fatigue_alerts'  => [
                 ['type' => 'overtraining_risk', 'level' => 'low', 'message' => ''],
