@@ -18,11 +18,25 @@ class SlateRequest extends FormRequest
 
     public function rules(): array
     {
+        $hasAuthJourney = false;
+        $user = $this->user('sanctum') ?? auth('sanctum')->user() ?? auth()->user();
+        if ($user && $user->profile && $user->profile->lifeJourneys()->exists()) {
+            $hasAuthJourney = true;
+        }
+
+        $categoryRule = $hasAuthJourney
+            ? ['nullable', 'string', 'exists:provider_categories,slug']
+            : ['required_without_all:life_journey_id,journey_id,life_stage', 'nullable', 'string', 'exists:provider_categories,slug'];
+
         return [
-            'category' => ['required', 'string', 'exists:provider_categories,slug'],
-            'zip' => ['required_without:metro_id', 'nullable', 'digits:5'],
-            'metro_id' => ['required_without:zip', 'nullable', 'integer', 'exists:metros,id'],
-            'life_stage' => ['nullable', 'string', 'exists:marketplace_life_stages,slug'],
+            'category' => $categoryRule,
+            'life_journey_id' => ['nullable'],
+            'journey_id' => ['nullable'],
+            'life_stage' => ['nullable', 'string'],
+            'zip' => ['required_without_all:metro_id,lat', 'nullable', 'digits:5'],
+            'metro_id' => ['required_without_all:zip,lat', 'nullable', 'integer', 'exists:metros,id'],
+            'lat' => ['required_without_all:zip,metro_id', 'required_with:lng', 'nullable', 'numeric', 'between:-90,90'],
+            'lng' => ['required_with:lat', 'nullable', 'numeric', 'between:-180,180'],
             'limit' => ['nullable', 'integer', 'min:1', 'max:5'],
         ];
     }

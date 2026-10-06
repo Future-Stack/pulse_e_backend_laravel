@@ -17,5 +17,15 @@ class LifeJourney extends Model
     {
         return $this->hasMany(LifeJourneyFeature::class);
     }
-    
+
+    public function marketplaceLifeStage(): ?MarketplaceLifeStage
+    {
+        return MarketplaceLifeStage::find($this->id)
+            ?? MarketplaceLifeStage::where('slug', \Illuminate\Support\Str::slug($this->title))->first();
+    }
+
+    public function providerCategories()
+    {
+        return $this->marketplaceLifeStage()?->categories();
+    }
 }

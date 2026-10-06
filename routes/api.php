@@ -469,5 +469,6 @@ Route::prefix('v1')->group(function () {
 
 // Root API fallbacks without v1 prefix
 Route::get('/cycle-overview', [CycleFertilityController::class, 'overview']);
+Route::get('/athlete/unified-performance', [AthletePerformanceController::class, 'unifiedPerformance']);
 
 require __DIR__ . '/marketplace_api.php';

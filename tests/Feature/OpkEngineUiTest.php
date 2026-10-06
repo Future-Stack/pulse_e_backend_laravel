@@ -171,7 +171,7 @@ class OpkEngineUiTest extends TestCase
         ];
 
         \Illuminate\Support\Facades\Http::fake([
-            'https://ai.fightthenumber.com/api/v1/cycle-engine/engine/overview*' => \Illuminate\Support\Facades\Http::response($fakeOverviewResponse, 200),
+            '*' => \Illuminate\Support\Facades\Http::response($fakeOverviewResponse, 200),
         ]);
 
         $user = User::factory()->create();

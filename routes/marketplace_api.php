@@ -20,6 +20,7 @@ use Illuminate\Support\Facades\Route;
 */
 
 Route::prefix('v1/marketplace')->middleware('throttle:60,1')->name('marketplace.')->group(function () {
+    Route::get('/categories', [MarketplaceController::class, 'categories'])->name('categories');
     Route::get('/slate', [MarketplaceController::class, 'slate'])->name('slate');
     Route::post('/events', [MarketplaceEventController::class, 'store'])->name('events.store');
 });

@@ -205,7 +205,12 @@ class CycleSummaryController extends Controller
                 $periodLength
             );
 
-            $summaryData['cycle_summary']['current_phase'] = $dayInfo['phase']['key'];
+            $rawPhase = strtolower((string) ($summaryData['cycle_summary']['current_phase'] ?? ''));
+            if (!empty($rawPhase) && !in_array($rawPhase, ['menstrual', 'follicular', 'ovulatory', 'luteal'])) {
+                $summaryData['cycle_summary']['current_phase'] = null;
+            } elseif (!empty($rawPhase)) {
+                $summaryData['cycle_summary']['current_phase'] = $dayInfo['phase']['key'];
+            }
 
             if (isset($summaryData['fertile_window'])) {
                 if (($summaryData['fertile_window']['peak_source'] ?? 'calendar') === 'calendar') {

@@ -14,7 +14,7 @@ class MarketplaceSlateService
 {
     private const BAYESIAN_PRIOR_WEIGHT = 20; // ~20-review weight
 
-    public function buildSlate(ProviderCategory $category, Metro $metro, int $limit = 3): Collection
+    public function buildSlate(ProviderCategory $category, Metro $metro, int $limit = 3, ?array $userCoords = null): Collection
     {
         $cacheKey = "slate:{$metro->id}:{$category->id}";
 
@@ -51,7 +51,7 @@ class MarketplaceSlateService
         foreach ($sponsored as $slot) {
             $slate->push([
                 'provider' => $slot->provider,
-                'distance_km' => $this->distanceKm($metro, $slot->provider),
+                'distance_km' => $this->distanceKm($metro, $slot->provider, $userCoords),
                 'sponsored' => true,
                 'position' => $position++,
             ]);
@@ -63,7 +63,7 @@ class MarketplaceSlateService
             }
             $slate->push([
                 'provider' => $provider,
-                'distance_km' => $this->distanceKm($metro, $provider),
+                'distance_km' => $this->distanceKm($metro, $provider, $userCoords),
                 'sponsored' => false,
                 'position' => $position++,
             ]);
@@ -121,15 +121,22 @@ class MarketplaceSlateService
             ->values();
     }
 
-    private function distanceKm(Metro $metro, Provider $provider): float
+    private function distanceKm(Metro $metro, Provider $provider, ?array $userCoords = null): float
     {
-        if (! $provider->location || ! $metro->centroid) {
+        if (! $provider->location) {
             return 0.0;
         }
 
-        // Haversine distance
-        $lat1 = deg2rad($metro->centroid->latitude);
-        $lon1 = deg2rad($metro->centroid->longitude);
+        if ($userCoords && isset($userCoords['lat'], $userCoords['lng'])) {
+            $lat1 = deg2rad((float) $userCoords['lat']);
+            $lon1 = deg2rad((float) $userCoords['lng']);
+        } elseif ($metro->centroid) {
+            $lat1 = deg2rad($metro->centroid->latitude);
+            $lon1 = deg2rad($metro->centroid->longitude);
+        } else {
+            return 0.0;
+        }
+
         $lat2 = deg2rad($provider->location->latitude);
         $lon2 = deg2rad($provider->location->longitude);
 
