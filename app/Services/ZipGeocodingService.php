@@ -30,17 +30,29 @@ class ZipGeocodingService
 
     public function resolveMetro(string $zip): ?Metro
     {
+        return $this->resolveMetroWithCoords($zip)['metro'];
+    }
+
+    public function resolveMetroWithCoords(string $zip): array
+    {
         $coords = $this->geocodeZip($zip);
 
         if (! $coords) {
-            return null;
+            return ['metro' => null, 'coords' => null];
         }
 
+        $metro = $this->resolveMetroFromCoords($coords['lat'], $coords['lng']);
+
+        return ['metro' => $metro, 'coords' => $coords];
+    }
+
+    public function resolveMetroFromCoords(float $lat, float $lng): ?Metro
+    {
         return Metro::where('active', true)
             ->get()
-            ->map(function (Metro $metro) use ($coords) {
+            ->map(function (Metro $metro) use ($lat, $lng) {
                 $metro->setAttribute('_distance_km', $this->haversineKm(
-                    $coords['lat'], $coords['lng'],
+                    $lat, $lng,
                     $metro->centroid->latitude, $metro->centroid->longitude
                 ));
 
