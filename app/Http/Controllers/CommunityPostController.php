@@ -78,6 +78,7 @@ class CommunityPostController extends Controller
             ->whereDoesntHave('reports', fn ($q) => $q->where('is_active', true))
             ->with([
                 'user:id,full_name',
+                'user.profile:user_id,profile_img', 
                 'lifeJourneys' => fn ($q) => $q->withCount('profiles as members_count'),
             ])
             ->withCount(['likes', 'comments', 'reports'])
