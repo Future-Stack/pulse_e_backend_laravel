@@ -25,6 +25,7 @@ class CommunityPostController extends Controller
             ->whereDoesntHave('reports', fn ($q) => $q->where('is_active', true))
             ->with([
                 'user:id,full_name',
+                'user.profile:id,user_id,profile_img',
                 'lifeJourneys' => fn ($q) => $q->withCount('profiles as members_count'),
             ])
             ->withCount(['likes', 'comments', 'reports'])
@@ -49,6 +50,8 @@ class CommunityPostController extends Controller
             // Hide author info when the post was made anonymously
             if ($post->is_anonymous) {
                 $post->setRelation('user', null);
+            } elseif ($post->user) {
+                $post->user->profile_img = $post->user->profile?->profile_img;
             }
             return $post;
         });
@@ -78,7 +81,7 @@ class CommunityPostController extends Controller
             ->whereDoesntHave('reports', fn ($q) => $q->where('is_active', true))
             ->with([
                 'user:id,full_name',
-                'user.profile:user_id,profile_img', 
+                'user.profile:id,user_id,profile_img', 
                 'lifeJourneys' => fn ($q) => $q->withCount('profiles as members_count'),
             ])
             ->withCount(['likes', 'comments', 'reports'])
@@ -105,6 +108,8 @@ class CommunityPostController extends Controller
             // Hide author info when the post was made anonymously
             if ($post->is_anonymous) {
                 $post->setRelation('user', null);
+            } elseif ($post->user) {
+                $post->user->profile_img = $post->user->profile?->profile_img;
             }
             return $post;
         });
@@ -163,9 +168,21 @@ class CommunityPostController extends Controller
             ]));
         }
 
+        $post->load([
+            'lifeJourneys',
+            'user:id,full_name',
+            'user.profile:id,user_id,profile_img',
+        ]);
+
+        if ($post->is_anonymous) {
+            $post->setRelation('user', null);
+        } elseif ($post->user) {
+            $post->user->profile_img = $post->user->profile?->profile_img;
+        }
+
         return response()->json([
             'message' => 'Post created successfully.',
-            'post' => $post->load('lifeJourneys'),
+            'post' => $post,
         ], 201);
     }
 
@@ -180,15 +197,30 @@ class CommunityPostController extends Controller
 
         $post->load([
             'lifeJourneys',
-            'comments' => fn($q) => $q->latest()->with('user:id,full_name'),
+            'comments' => fn($q) => $q->latest()->with([
+                'user:id,full_name',
+                'user.profile:id,user_id,profile_img',
+            ]),
         ])->loadCount(['likes', 'comments']);
+
+        $post->comments->each(function ($comment) {
+            if ($comment->user) {
+                $comment->user->profile_img = $comment->user->profile?->profile_img;
+            }
+        });
 
         $post->is_liked = $post->isLikedBy(Auth::id());
 
         if ($post->is_anonymous) {
             $post->setRelation('user', null);
         } else {
-            $post->load('user:id,full_name');
+            $post->load([
+                'user:id,full_name',
+                'user.profile:id,user_id,profile_img',
+            ]);
+            if ($post->user) {
+                $post->user->profile_img = $post->user->profile?->profile_img;
+            }
         }
 
         return response()->json($post);
@@ -218,9 +250,21 @@ class CommunityPostController extends Controller
             $post->lifeJourneys()->sync($validated['life_journey_ids']);
         }
 
+        $post->load([
+            'lifeJourneys',
+            'user:id,full_name',
+            'user.profile:id,user_id,profile_img',
+        ]);
+
+        if ($post->is_anonymous) {
+            $post->setRelation('user', null);
+        } elseif ($post->user) {
+            $post->user->profile_img = $post->user->profile?->profile_img;
+        }
+
         return response()->json([
             'message' => 'Post updated successfully.',
-            'post' => $post->fresh('lifeJourneys'),
+            'post' => $post,
         ]);
     }
 
