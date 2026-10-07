@@ -111,13 +111,23 @@ class CycleSummaryController extends Controller
             $phase = $dayInfo['phase']['key'];
             $phases = $dayInfo['phases'];
 
-            $todayBbt = \App\Models\BbtLog::where('user_id', $user->id)
+            $todayBbtLog = \App\Models\BbtLog::where('user_id', $user->id)
                 ->whereDate('log_date', today())
-                ->exists();
+                ->latest('id')
+                ->first();
+            $todayBbt = (bool) $todayBbtLog;
 
-            $todayOpk = \App\Models\OpkLog::whereHas('cycle', fn($q) => $q->where('user_id', $user->id))
+            $todayOpkLog = \App\Models\OpkLog::whereHas('cycle', fn($q) => $q->where('user_id', $user->id))
                 ->whereDate('log_date', today())
-                ->exists();
+                ->latest('id')
+                ->first();
+            $todayOpk = (bool) $todayOpkLog;
+
+            $todayMucusLog = \App\Models\CervicalMucusLog::where('user_id', $user->id)
+                ->whereDate('log_date', today())
+                ->latest('id')
+                ->first();
+            $todayMucus = (bool) $todayMucusLog;
 
             $todayCalendar = (bool) $calendarInput;
 
@@ -160,12 +170,49 @@ class CycleSummaryController extends Controller
 
             $summary = $summaryData;
 
+            // Build rich OPK status text
+            if ($todayOpkLog) {
+                $opkResult = ucfirst($todayOpkLog->result ?? 'unknown');
+                $opkStatusText = "{$opkResult} LH result logged";
+                if ($todayOpkLog->lh_value) {
+                    $opkStatusText .= " ({$todayOpkLog->lh_value} mIU/mL)";
+                }
+            } else {
+                $opkStatusText = 'No LH test logged';
+            }
+
+            // Build rich BBT status text
+            if ($todayBbtLog) {
+                $temp = $todayBbtLog->temperature ?? null;
+                $unit = $todayBbtLog->unit ?? '°F';
+                $flags = [];
+                if ($todayBbtLog->illness) { $flags[] = 'illness flagged'; }
+                if ($todayBbtLog->poor_sleep) { $flags[] = 'poor sleep'; }
+                if ($todayBbtLog->alcohol) { $flags[] = 'alcohol'; }
+                if ($todayBbtLog->travel) { $flags[] = 'travel'; }
+                if ($todayBbtLog->late_wakeup) { $flags[] = 'late wakeup'; }
+                $bbtStatusText = $temp ? "{$temp}{$unit} logged" : 'BBT logged today';
+                if (!empty($flags)) {
+                    $bbtStatusText .= ' (' . implode(', ', $flags) . ')';
+                }
+            } else {
+                $bbtStatusText = 'No BBT logged today';
+            }
+
+            // Build rich Mucus status text
+            if ($todayMucusLog) {
+                $mucusLabel = ucfirst($todayMucusLog->consistency ?? 'unknown');
+                $mucusStatusText = "{$mucusLabel} mucus logged";
+            } else {
+                $mucusStatusText = 'No mucus logged';
+            }
+
             $signal = [
                 'signals' => [
                     ['signal' => 'Calendar', 'logged_today' => $todayCalendar, 'status_text' => "Cycle Day {$currentCycleDay} · " . ucfirst($phase) . " phase"],
-                    ['signal' => 'OPK / LH', 'logged_today' => $todayOpk, 'status_text' => $todayOpk ? 'OPK logged today' : 'No LH test logged'],
-                    ['signal' => 'BBT', 'logged_today' => $todayBbt, 'status_text' => $todayBbt ? 'BBT logged today' : 'No BBT logged today'],
-                    ['signal' => 'Mucus', 'logged_today' => false, 'status_text' => 'No mucus logged'],
+                    ['signal' => 'OPK / LH', 'logged_today' => $todayOpk, 'status_text' => $opkStatusText],
+                    ['signal' => 'BBT', 'logged_today' => $todayBbt, 'status_text' => $bbtStatusText],
+                    ['signal' => 'Mucus', 'logged_today' => $todayMucus, 'status_text' => $mucusStatusText],
                 ],
                 'ai_generated' => false,
                 'ai_cached' => false,
