@@ -16,9 +16,19 @@ class CommunityCommentController extends Controller
     public function index(CommunityPost $post)
     {
         $comments = $post->comments()
-            ->with('user:id,full_name')
+            ->with([
+                'user:id,full_name',
+                'user.profile:id,user_id,profile_img',
+            ])
             ->latest()
             ->paginate(20);
+
+        $comments->getCollection()->transform(function ($comment) {
+            if ($comment->user) {
+                $comment->user->profile_img = $comment->user->profile?->profile_img;
+            }
+            return $comment;
+        });
 
         return response()->json($comments);
     }
@@ -38,7 +48,14 @@ class CommunityCommentController extends Controller
             'content' => $validated['content'],
         ]);
 
-        $comment->load('user:id,full_name');
+        $comment->load([
+            'user:id,full_name',
+            'user.profile:id,user_id,profile_img',
+        ]);
+
+        if ($comment->user) {
+            $comment->user->profile_img = $comment->user->profile?->profile_img;
+        }
 
         return response()->json([
             'message' => 'Comment added successfully.',
