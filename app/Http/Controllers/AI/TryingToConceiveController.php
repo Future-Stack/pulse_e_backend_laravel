@@ -55,8 +55,8 @@ class TryingToConceiveController extends Controller
                 'cycle_id' => $cycle->id,
             ]);
 
-            $response = Http::timeout(90)
-                ->connectTimeout(30)
+            $response = Http::timeout(10)
+                ->connectTimeout(5)
                 ->acceptJson()
                 ->get("{$baseUrl}/api/v1/cycle-engine/ttc/overview", [
                     'user_id' => $user->id,

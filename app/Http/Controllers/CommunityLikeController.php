@@ -17,12 +17,11 @@ class CommunityLikeController extends Controller
     {
         $userId = Auth::id();
 
-        $like = CommunityLike::where('post_id', $post->id)
+        $deleted = CommunityLike::where('post_id', $post->id)
             ->where('user_id', $userId)
-            ->first();
+            ->delete();
 
-        if ($like) {
-            $like->delete();
+        if ($deleted) {
             $liked = false;
         } else {
             CommunityLike::create([
@@ -35,7 +34,7 @@ class CommunityLikeController extends Controller
 
         return response()->json([
             'liked'       => $liked,
-            'likes_count' => $post->likes()->count(),
+            'likes_count' => CommunityLike::where('post_id', $post->id)->count(),
         ]);
     }
 }

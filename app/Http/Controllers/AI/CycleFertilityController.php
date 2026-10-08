@@ -419,8 +419,7 @@ class CycleFertilityController extends Controller
     protected function cachePrediction(int $userId, array $data, string $mode, bool $includeBbt): void
     {
         try {
-            $user = User::find($userId);
-            if (!$user) {
+            if (!User::where('id', $userId)->exists()) {
                 return;
             }
 

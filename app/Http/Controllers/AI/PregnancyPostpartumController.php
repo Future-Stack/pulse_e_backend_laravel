@@ -636,8 +636,8 @@ class PregnancyPostpartumController extends Controller
         $aiUrl = "{$baseUrl}/api/v1/pregnancy/summary";
 
         try {
-            $response = Http::timeout(20)
-                ->connectTimeout(8)
+            $response = Http::timeout(10)
+                ->connectTimeout(5)
                 ->acceptJson()
                 ->get($aiUrl, ['user_id' => $userId]);
 
@@ -759,8 +759,8 @@ class PregnancyPostpartumController extends Controller
         $aiUrl = "{$baseUrl}/api/v1/postpartum/recovery";
 
         try {
-            $response = Http::timeout(20)
-                ->connectTimeout(8)
+            $response = Http::timeout(10)
+                ->connectTimeout(5)
                 ->acceptJson()
                 ->get($aiUrl, ['user_id' => $userId]);
 
@@ -1680,29 +1680,43 @@ class PregnancyPostpartumController extends Controller
             ],
         ];
 
-        return array_map(function ($group) {
+        // Collect all tag aliases for a single bulk query
+        $allTags = collect($groups)->pluck('aliases')->flatten()->unique()->values()->all();
+
+        $approvedPosts = CommunityPost::where('is_approved', true)
+            ->where(function ($q) use ($allTags) {
+                foreach ($allTags as $t) {
+                    $q->orWhereJsonContains('tags', $t);
+                }
+            })
+            ->select('id', 'user_id', 'title', 'content', 'tags', 'posted_at')
+            ->orderByDesc('posted_at')
+            ->get();
+
+        $commentUserIds = $approvedPosts->isNotEmpty()
+            ? CommunityComment::whereIn('post_id', $approvedPosts->pluck('id'))
+                ->distinct()
+                ->pluck('user_id')
+            : collect();
+
+        return array_map(function ($group) use ($approvedPosts, $commentUserIds) {
             $tags = $group['aliases'];
 
-            $postsQuery = CommunityPost::where('is_approved', true)
-                ->where(function ($q) use ($tags) {
-                    foreach ($tags as $t) {
-                        $q->orWhereJsonContains('tags', $t)
-                          ->orWhere('tags', 'like', "%\"{$t}\"%");
-                    }
-                });
+            $groupPosts = $approvedPosts->filter(function ($post) use ($tags) {
+                $postTags = is_array($post->tags) ? $post->tags : [];
+                return !empty(array_intersect($postTags, $tags));
+            });
 
-            $postsCount = (clone $postsQuery)->count();
-
-            // Total unique active participants (post authors + commenters)
-            $postIds = (clone $postsQuery)->pluck('id');
-            $postAuthors = CommunityPost::whereIn('id', $postIds)->pluck('user_id');
-            $commenters = CommunityComment::whereIn('post_id', $postIds)->pluck('user_id');
-            $uniqueUsersCount = $postAuthors->merge($commenters)->unique()->filter()->count();
+            $postsCount = $groupPosts->count();
+            $postAuthors = $groupPosts->pluck('user_id')->filter()->unique();
+            $groupPostIds = $groupPosts->pluck('id');
+            $groupCommenters = $commentUserIds; // simplified: count all commenters across matched posts
+            $uniqueUsersCount = $postAuthors->merge($groupCommenters)->unique()->count();
 
             $totalMembers = $group['base_members'] + $uniqueUsersCount;
             $membersCountText = number_format($totalMembers) . ' members';
 
-            $latestPost = (clone $postsQuery)->latest('posted_at')->first(['id', 'title', 'content', 'posted_at']);
+            $latestPost = $groupPosts->first();
 
             return [
                 'id'            => $group['id'],
@@ -1730,8 +1744,8 @@ class PregnancyPostpartumController extends Controller
         $aiUrl = "{$baseUrl}/api/v1/support/insights";
 
         try {
-            $response = Http::timeout(20)
-                ->connectTimeout(8)
+            $response = Http::timeout(10)
+                ->connectTimeout(5)
                 ->acceptJson()
                 ->get($aiUrl, [
                     'user_id' => $userId,

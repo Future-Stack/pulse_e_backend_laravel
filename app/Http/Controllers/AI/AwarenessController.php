@@ -69,8 +69,8 @@ class AwarenessController extends Controller
 
             $aiUrl = "{$baseUrl}/api/cycle-awareness";
 
-            $response = Http::timeout(90)
-                ->connectTimeout(30)
+            $response = Http::timeout(10)
+                ->connectTimeout(5)
                 ->acceptJson()
                 ->get($aiUrl, [
                     'user_id' => $user->id,

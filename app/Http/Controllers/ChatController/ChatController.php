@@ -99,7 +99,7 @@ class ChatController extends Controller
 
         $messages = ChatMessage::where('session_id', $sessionId)
             ->where('user_id', $userId)
-            ->oldest() // 'created_at' asc
+            ->oldest()
             ->get();
 
         return response()->json([

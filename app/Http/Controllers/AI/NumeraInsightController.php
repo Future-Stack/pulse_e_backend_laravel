@@ -37,10 +37,11 @@ class NumeraInsightController extends Controller
 
                 $url = config('services.ai.base_url') . '/api/numera-insight';
 
-                $response = Http::retry(3, 2000)
+                $response = Http::retry(2, 500)
                     ->withoutVerifying()
                     ->acceptJson()
-                    ->timeout(300)
+                    ->timeout(10)
+                    ->connectTimeout(5)
                     ->get($url, ['user_id' => $userId]);
 
                 if (!$response->successful()) {

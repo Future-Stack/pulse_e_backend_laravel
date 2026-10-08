@@ -234,13 +234,15 @@ class TerraWebhookController extends Controller
                           ->whereDate('created_at', $today);
                   });
             })
-            ->orderByDesc('updated_at') 
+            ->select('id', 'user_id', 'type', 'payload', 'data_generated_at', 'created_at', 'updated_at')
+            ->orderByDesc('updated_at')
             ->get();
 
         // If no records found for today, check latest available recent records
         if ($records->isEmpty()) {
             $records = \App\Models\TerraActivityData::where('user_id', $userId)
                 ->whereIn('type', $terraTypesNeeded)
+                ->select('id', 'user_id', 'type', 'payload', 'data_generated_at', 'created_at', 'updated_at')
                 ->orderByDesc('updated_at')
                 ->take(10)
                 ->get();

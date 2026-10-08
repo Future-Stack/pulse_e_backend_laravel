@@ -44,9 +44,16 @@ class CommunityPostController extends Controller
 
         $userId = Auth::id();
 
-        $posts->getCollection()->transform(function ($post) use ($userId) {
-            $post->is_liked = $post->isLikedBy($userId);
-            // Hide author info when the post was made anonymously
+        // Batch-load liked status to avoid N+1 queries
+        $likedPostIds = $userId
+            ? \App\Models\CommunityLike::where('user_id', $userId)
+                ->whereIn('post_id', $posts->pluck('id'))
+                ->pluck('post_id')
+                ->flip()
+            : collect();
+
+        $posts->getCollection()->transform(function ($post) use ($likedPostIds) {
+            $post->is_liked = $likedPostIds->has($post->id);
             if ($post->is_anonymous) {
                 $post->setRelation('user', null);
             }
@@ -99,9 +106,16 @@ class CommunityPostController extends Controller
 
         $userId = Auth::id();
 
-        $posts->transform(function ($post) use ($userId) {
-            $post->is_liked = $post->isLikedBy($userId);
-            // Hide author info when the post was made anonymously
+        // Batch-load liked status to avoid N+1 queries
+        $likedPostIds = $userId
+            ? \App\Models\CommunityLike::where('user_id', $userId)
+                ->whereIn('post_id', $posts->pluck('id'))
+                ->pluck('post_id')
+                ->flip()
+            : collect();
+
+        $posts->transform(function ($post) use ($likedPostIds) {
+            $post->is_liked = $likedPostIds->has($post->id);
             if ($post->is_anonymous) {
                 $post->setRelation('user', null);
             }
@@ -150,8 +164,6 @@ class CommunityPostController extends Controller
         $post->lifeJourneys()->attach($validated['life_journey_id']);
 
         $user = Auth::user();
-
-        $user = User::where('id', $user->id)->first();
 
         if ($user) {
             Notification::send($user, new PlatformNotification([

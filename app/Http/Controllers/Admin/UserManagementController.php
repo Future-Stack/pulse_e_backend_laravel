@@ -203,20 +203,25 @@ public function subscriptions(): JsonResponse
         $communityPosts = CommunityPost::count();
 
         // ==========================
-        // Weekly Revenue
+        // Weekly Revenue (single query instead of 7)
         // ==========================
 
+        $weekStart = now()->startOfWeek();
+        $weekEnd = now()->startOfWeek()->addDays(6)->endOfDay();
+
+        $weeklyRevenueRaw = Payment::where('status', 'paid')
+            ->whereBetween('created_at', [$weekStart, $weekEnd])
+            ->selectRaw('DATE(created_at) as date, SUM(amount) as total')
+            ->groupByRaw('DATE(created_at)')
+            ->pluck('total', 'date');
+
         $weeklyRevenue = [];
-
         foreach (range(0, 6) as $day) {
-
             $date = now()->startOfWeek()->addDays($day);
-
+            $dateStr = $date->format('Y-m-d');
             $weeklyRevenue[] = [
                 'day' => $date->format('D'),
-                'amount' => (float) Payment::where('status', 'paid')
-                    ->whereDate('created_at', $date)
-                    ->sum('amount'),
+                'amount' => (float) ($weeklyRevenueRaw[$dateStr] ?? 0),
             ];
         }
 
@@ -251,17 +256,18 @@ public function subscriptions(): JsonResponse
                 ];
             });
                     // ==========================
-        // Recent Activity
+        // Recent Activity (select only needed columns)
         // ==========================
 
         $activities = collect();
 
-        // New Users
-        foreach (User::where('id', '!=', 1)
+        $recentUsers = User::where('id', '!=', 1)
+            ->select('id', 'full_name', 'created_at')
             ->latest()
             ->take(5)
-            ->get() as $user) {
+            ->get();
 
+        foreach ($recentUsers as $user) {
             $activities->push([
                 'title' => $user->full_name . ' signed up',
                 'time' => $user->created_at->diffForHumans(),
@@ -269,16 +275,15 @@ public function subscriptions(): JsonResponse
             ]);
         }
 
-        // Subscription Purchases
-        foreach (
-            Payment::with(['user', 'subscriptionPlan'])
-                ->where('type', 'subscription')
-                ->where('status', 'paid')
-                ->latest()
-                ->take(5)
-                ->get() as $payment
-        ) {
+        $recentPayments = Payment::with(['user:id,full_name', 'subscriptionPlan:id,name'])
+            ->select('id', 'user_id', 'subscription_plan_id', 'created_at')
+            ->where('type', 'subscription')
+            ->where('status', 'paid')
+            ->latest()
+            ->take(5)
+            ->get();
 
+        foreach ($recentPayments as $payment) {
             $activities->push([
                 'title' => $payment->user?->full_name . ' subscribed to ' . ($payment->subscriptionPlan?->name ?? 'Plan'),
                 'time' => $payment->created_at->diffForHumans(),
@@ -286,14 +291,13 @@ public function subscriptions(): JsonResponse
             ]);
         }
 
-        // Lab Reports
-        foreach (
-            LabReport::with('user')
-                ->latest()
-                ->take(5)
-                ->get() as $report
-        ) {
+        $recentReports = LabReport::with('user:id,full_name')
+            ->select('id', 'user_id', 'created_at')
+            ->latest()
+            ->take(5)
+            ->get();
 
+        foreach ($recentReports as $report) {
             $activities->push([
                 'title' => $report->user?->full_name . ' uploaded a lab report',
                 'time' => $report->created_at->diffForHumans(),
@@ -301,14 +305,13 @@ public function subscriptions(): JsonResponse
             ]);
         }
 
-        // Community Posts
-        foreach (
-            CommunityPost::with('user')
-                ->latest()
-                ->take(5)
-                ->get() as $post
-        ) {
+        $recentPosts = CommunityPost::with('user:id,full_name')
+            ->select('id', 'user_id', 'created_at')
+            ->latest()
+            ->take(5)
+            ->get();
 
+        foreach ($recentPosts as $post) {
             $activities->push([
                 'title' => $post->user?->full_name . ' created a community post',
                 'time' => $post->created_at->diffForHumans(),
@@ -498,72 +501,42 @@ public function subscriptions(): JsonResponse
 
             /*
             |--------------------------------------------------------------------------
-            | Health Logs
+            | Health Logs (count in DB instead of loading all records)
             |--------------------------------------------------------------------------
             */
 
-            $logs = HealthLog::when($fromDate, function ($query) use ($fromDate) {
+            $fatigueCount = HealthLog::when($fromDate, function ($query) use ($fromDate) {
                     $query->where('created_at', '>=', $fromDate);
                 })
                 ->whereNotNull('energy_level')
-                ->get();
+                ->where('energy_level', '!=', '')
+                ->count();
 
-            foreach ($logs as $log) {
-
-                $energy = trim($log->energy_level);
-
-                if (!empty($energy)) {
-                    $healthCounts['Fatigue / Low Energy'] =
-                        ($healthCounts['Fatigue / Low Energy'] ?? 0) + 1;
-                }
+            if ($fatigueCount > 0) {
+                $healthCounts['Fatigue / Low Energy'] = $fatigueCount;
             }
 
             /*
             |--------------------------------------------------------------------------
-            | Terra Activity Data
+            | Terra Activity Data (count with JSON conditions in DB)
             |--------------------------------------------------------------------------
             */
 
-            $terraActivities = TerraActivityData::when($fromDate, function ($query) use ($fromDate) {
-                    $query->where('created_at', '>=', $fromDate);
-                })
-                ->get();
+            $terraBaseQuery = TerraActivityData::when($fromDate, function ($query) use ($fromDate) {
+                $query->where('created_at', '>=', $fromDate);
+            });
 
-            foreach ($terraActivities as $activity) {
+            $sleepCount = (clone $terraBaseQuery)->whereRaw("JSON_EXTRACT(payload, '$.sleep') IS NOT NULL")->count();
+            $hrvCount = (clone $terraBaseQuery)->whereRaw("JSON_EXTRACT(payload, '$.hrv') IS NOT NULL")->count();
+            $stressCount = (clone $terraBaseQuery)->whereRaw("JSON_EXTRACT(payload, '$.stress') IS NOT NULL")->count();
+            $readinessCount = (clone $terraBaseQuery)->whereRaw("JSON_EXTRACT(payload, '$.readiness') IS NOT NULL")->count();
+            $skinCount = (clone $terraBaseQuery)->whereRaw("JSON_EXTRACT(payload, '$.skin') IS NOT NULL")->count();
 
-                $payload = is_array($activity->payload)
-                    ? $activity->payload
-                    : json_decode($activity->payload, true);
-
-                if (!is_array($payload)) {
-                    continue;
-                }
-
-                if (isset($payload['sleep'])) {
-                    $healthCounts['Sleep Disruption'] =
-                        ($healthCounts['Sleep Disruption'] ?? 0) + 1;
-                }
-
-                if (isset($payload['hrv'])) {
-                    $healthCounts['HRV'] =
-                        ($healthCounts['HRV'] ?? 0) + 1;
-                }
-
-                if (isset($payload['stress'])) {
-                    $healthCounts['Stress'] =
-                        ($healthCounts['Stress'] ?? 0) + 1;
-                }
-
-                if (isset($payload['readiness'])) {
-                    $healthCounts['Readiness'] =
-                        ($healthCounts['Readiness'] ?? 0) + 1;
-                }
-
-                if (isset($payload['skin'])) {
-                    $healthCounts['Skin Redness / Breakout'] =
-                        ($healthCounts['Skin Redness / Breakout'] ?? 0) + 1;
-                }
-            }
+            if ($sleepCount > 0) $healthCounts['Sleep Disruption'] = $sleepCount;
+            if ($hrvCount > 0) $healthCounts['HRV'] = $hrvCount;
+            if ($stressCount > 0) $healthCounts['Stress'] = $stressCount;
+            if ($readinessCount > 0) $healthCounts['Readiness'] = $readinessCount;
+            if ($skinCount > 0) $healthCounts['Skin Redness / Breakout'] = $skinCount;
 
             /*
             |--------------------------------------------------------------------------
