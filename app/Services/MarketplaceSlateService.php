@@ -14,7 +14,7 @@ class MarketplaceSlateService
 {
     private const BAYESIAN_PRIOR_WEIGHT = 20; // ~20-review weight
 
-    public function buildSlate(ProviderCategory $category, Metro $metro, int $limit = 3, ?array $userCoords = null): Collection
+    public function buildSlate(ProviderCategory $category, Metro $metro, int $limit = 5, ?array $userCoords = null): Collection
     {
         $cacheKey = "slate:{$metro->id}:{$category->id}";
 
