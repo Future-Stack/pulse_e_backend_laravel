@@ -263,4 +263,31 @@ class MarketplaceSlateEndpointTest extends TestCase
         $obgynResponse->assertJsonPath('data.0.id', $obgynProvider->id);
         $obgynResponse->assertJsonPath('meta.life_stage', 'pregnancy-postpartum');
     }
+
+    public function test_slate_endpoint_accepts_all_as_category_and_defaults_gracefully(): void
+    {
+        $metro = Metro::factory()->create([
+            'centroid' => new Point(37.7749, -122.4194),
+            'radius_km' => 50,
+        ]);
+        $stage = MarketplaceLifeStage::create(['slug' => 'cycle-fertility', 'name' => 'Cycle & Fertility']);
+        $cat = ProviderCategory::factory()->create(['slug' => 'obgyn', 'active' => true]);
+        $stage->categories()->attach($cat->id, ['display_priority' => 1]);
+
+        $provider = Provider::factory()->create([
+            'metro_id' => $metro->id,
+            'location' => new Point(37.78, -122.42),
+            'status' => 'active',
+        ]);
+        $provider->categories()->attach($cat->id, ['source' => 'manual']);
+
+        $response = $this->getJson(route('marketplace.slate', [
+            'category' => 'all',
+            'life_stage' => 'cycle-fertility',
+            'metro_id' => $metro->id,
+        ]));
+
+        $response->assertOk();
+        $response->assertJsonPath('meta.category', 'obgyn');
+    }
 }

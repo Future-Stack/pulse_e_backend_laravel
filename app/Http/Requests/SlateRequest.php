@@ -16,6 +16,22 @@ class SlateRequest extends FormRequest
         return true;
     }
 
+    protected function prepareForValidation(): void
+    {
+        $category = $this->input('category');
+        if (is_string($category)) {
+            $catTrim = strtolower(trim($category));
+            if ($catTrim === 'all' || $catTrim === '') {
+                $this->merge(['category' => null]);
+            } elseif (\App\Models\MarketplaceLifeStage::where('slug', $catTrim)->exists()) {
+                if (! $this->filled('life_stage')) {
+                    $this->merge(['life_stage' => $catTrim]);
+                }
+                $this->merge(['category' => null]);
+            }
+        }
+    }
+
     public function rules(): array
     {
         $hasAuthJourney = false;
