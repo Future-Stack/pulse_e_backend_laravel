@@ -478,31 +478,45 @@ class PregnancyPostpartumController extends Controller
             ->latest()
             ->first();
 
-        if (!$pregnancy) {
-            return response()->json([
-                'success' => false,
-                'message' => 'No active pregnancy found to complete journey.',
-            ], 422);
-        }
-
         $deliveryDate = $request->input('delivery_date') ?? now()->toDateString();
+        $deliveryCarbon = Carbon::parse($deliveryDate);
+        $daysDiff = max(0, (int) $deliveryCarbon->diffInDays(now()));
+        $currentWeek = max(1, (int) ceil($daysDiff / 7));
 
-        $pregnancy->status = 'completed';
-        $pregnancy->delivery_date = $deliveryDate;
-        $pregnancy->save();
+        if ($pregnancy) {
+            $pregnancy->status = 'completed';
+            $pregnancy->delivery_date = $deliveryDate;
+            $pregnancy->save();
+        }
 
         $postpartum = PostpartumRecovery::updateOrCreate(
             ['user_id' => $userId],
             [
-                'pregnancy_id'  => $pregnancy->id,
+                'pregnancy_id'  => $pregnancy?->id,
                 'delivery_date' => $deliveryDate,
-                'current_week'  => 1,
+                'current_week'  => $currentWeek,
             ]
         );
+
+        // Ensure user's profile includes Pregnancy & Postpartum life journey if profile exists
+        if ($user->profile) {
+            $ppJourney = LifeJourney::where('slug', 'pregnancy-postpartum')
+                ->orWhere('title', 'like', '%Pregnancy%')
+                ->first();
+            if ($ppJourney && !$user->profile->lifeJourneys()->where('life_journeys.id', $ppJourney->id)->exists()) {
+                $user->profile->lifeJourneys()->attach($ppJourney->id);
+            }
+        }
 
         // Fetch fresh postpartum recovery intelligence from AI into DB
         $this->syncPostpartumFromAi((int) $userId);
         $postpartum->refresh();
+
+        if ($request->filled('delivery_date') && $postpartum->delivery_date?->toDateString() !== $deliveryDate) {
+            $postpartum->delivery_date = $deliveryDate;
+            $postpartum->current_week = $currentWeek;
+            $postpartum->save();
+        }
 
         return response()->json([
             'success' => true,
