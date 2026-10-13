@@ -473,6 +473,12 @@ class PregnancyPostpartumController extends Controller
         }
         $userId = $user->id;
 
+        $request->validate([
+            'delivery_date' => 'nullable|date|before_or_equal:today',
+        ], [
+            'delivery_date.before_or_equal' => 'Delivery date cannot be in the future.',
+        ]);
+
         $pregnancy = UserPregnancy::where('user_id', $userId)
             ->where('status', 'active')
             ->latest()
@@ -500,8 +506,8 @@ class PregnancyPostpartumController extends Controller
 
         // Ensure user's profile includes Pregnancy & Postpartum life journey if profile exists
         if ($user->profile) {
-            $ppJourney = LifeJourney::where('slug', 'pregnancy-postpartum')
-                ->orWhere('title', 'like', '%Pregnancy%')
+            $ppJourney = LifeJourney::where('title', 'like', '%Pregnancy%')
+                ->orWhere('title', 'like', '%Postpartum%')
                 ->first();
             if ($ppJourney && !$user->profile->lifeJourneys()->where('life_journeys.id', $ppJourney->id)->exists()) {
                 $user->profile->lifeJourneys()->attach($ppJourney->id);
