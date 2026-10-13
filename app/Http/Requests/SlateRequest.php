@@ -21,6 +21,19 @@ class SlateRequest extends FormRequest
         $category = $this->input('category');
         if (is_string($category)) {
             $catTrim = strtolower(trim($category));
+            $aliases = [
+                'beauty' => 'dermatology',
+                'pregnancy' => 'obgyn',
+                'fertility' => 'reproductive-endocrinology-infertility',
+                'beauty & radiance' => 'dermatology',
+                'cycle & fertility' => 'obgyn',
+                'pregnancy & birth' => 'obgyn',
+            ];
+            if (isset($aliases[$catTrim])) {
+                $catTrim = $aliases[$catTrim];
+                $this->merge(['category' => $catTrim]);
+            }
+
             if ($catTrim === 'all' || $catTrim === '') {
                 $this->merge(['category' => null]);
             } elseif (\App\Models\MarketplaceLifeStage::where('slug', $catTrim)->exists()) {
@@ -53,7 +66,7 @@ class SlateRequest extends FormRequest
             'metro_id' => ['required_without_all:zip,lat', 'nullable', 'integer', 'exists:metros,id'],
             'lat' => ['required_without_all:zip,metro_id', 'required_with:lng', 'nullable', 'numeric', 'between:-90,90'],
             'lng' => ['required_with:lat', 'nullable', 'numeric', 'between:-180,180'],
-            'limit' => ['nullable', 'integer', 'min:1', 'max:5'],
+            'limit' => ['nullable', 'integer', 'min:1', 'max:20'],
         ];
     }
 }

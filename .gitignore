@@ -23,7 +23,7 @@ yarn-error.log
 /.nova
 /.zed
 vite.config.js
-
+pulsee.sql
 branch_structure.json
 temp_auto_push.bat
 temp_interactive_push.bat

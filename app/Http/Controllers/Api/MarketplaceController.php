@@ -190,7 +190,7 @@ class MarketplaceController extends Controller
             }
         }
 
-        $limit = $data['limit'] ?? 3;
+        $limit = $data['limit'] ?? 5;
 
         $slate = $this->slateService->buildSlate($category, $metro, $limit, $userCoords);
 
