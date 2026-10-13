@@ -299,7 +299,8 @@ class PregnancyPostpartumTest extends TestCase
         $user = User::factory()->create();
         Sanctum::actingAs($user);
 
-        // User has NO prior pregnancy logged
+        // User has a profile and NO prior pregnancy logged
+        \App\Models\Profile::create(['user_id' => $user->id]);
         UserPregnancy::where('user_id', $user->id)->delete();
 
         $response = $this->postJson("/api/v1/pregnancy/complete-journey", [
