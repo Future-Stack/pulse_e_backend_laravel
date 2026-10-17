@@ -6,6 +6,7 @@ use App\Models\CycleCalendarInput;
 use App\Models\CycleSetting;
 use App\Models\CycleStatistic;
 use App\Models\MenstrualCycle;
+use App\Models\PeriodLog;
 use App\Models\User;
 use Carbon\Carbon;
 
@@ -600,20 +601,52 @@ class CycleCalculatorService
     }
 
     /**
-     * Generate day-by-day calendar with phase and color for each cycle day.
+     * Generate day-by-day calendar with phase, color, and spotting indicator for each cycle day.
+     *
+     * @param Carbon $startDate
+     * @param array $phases
+     * @param int|User|array|null $userOrSpotting Optional User, user_id, or array of spotting dates (Y-m-d)
+     * @return array
      */
     public static function generateCalendarDays(
         Carbon $startDate,
-        array $phases
+        array $phases,
+        int|User|array|null $userOrSpotting = null
     ): array {
         $cycleLength = $phases['cycle_length'];
         $days = [];
 
+        // Preload logged spotting dates if user is provided
+        $spottingLookup = [];
+        if ($userOrSpotting instanceof User || (is_numeric($userOrSpotting) && $userOrSpotting > 0)) {
+            $userId = $userOrSpotting instanceof User ? $userOrSpotting->id : (int) $userOrSpotting;
+            $cycleEndDate = $startDate->copy()->addDays($cycleLength);
+
+            $spottingLogs = PeriodLog::where('user_id', $userId)
+                ->where('flow', 'spotting')
+                ->whereBetween('log_date', [$startDate->toDateString(), $cycleEndDate->toDateString()])
+                ->pluck('log_date');
+
+            foreach ($spottingLogs as $logDate) {
+                $dateKey = $logDate instanceof \DateTimeInterface
+                    ? $logDate->format('Y-m-d')
+                    : Carbon::parse($logDate)->format('Y-m-d');
+                $spottingLookup[$dateKey] = true;
+            }
+        } elseif (is_array($userOrSpotting)) {
+            foreach ($userOrSpotting as $key => $val) {
+                $dateKey = is_string($key) && strlen($key) >= 10 ? $key : (is_string($val) ? $val : null);
+                if ($dateKey) {
+                    $spottingLookup[$dateKey] = true;
+                }
+            }
+        }
+
         $phaseMap = [
             'menstrual'  => ['name' => 'Menstrual Phase',  'key' => 'menstrual',  'color' => 'red',    'icon' => '🔴'],
             'follicular' => ['name' => 'Follicular Phase', 'key' => 'follicular', 'color' => 'green',  'icon' => '🟢'],
-            'ovulatory'  => ['name' => 'Ovulatory Phase',  'key' => 'ovulatory',  'color' => 'yellow', 'icon' => '🟡'],
-            'luteal'     => ['name' => 'Luteal Phase',     'key' => 'luteal',     'color' => 'blue',   'icon' => '🔵'],
+            'ovulatory'  => ['name' => 'Ovulatory Phase',  'key' => 'ovulatory',  'color' => 'teal',   'icon' => '🟡'],
+            'luteal'     => ['name' => 'Luteal Phase',     'key' => 'luteal',     'color' => 'orange', 'icon' => '🟠'],
         ];
 
         for ($day = 1; $day <= $cycleLength; $day++) {
@@ -628,15 +661,24 @@ class CycleCalculatorService
             }
 
             $date = $startDate->copy()->addDays($day - 1);
+            $dateStr = $date->format('Y-m-d');
+
+            // Spotting indicator is tracked in all phases OTHER than menstrual
+            $isMenstrual = ($phase['key'] === 'menstrual');
+            $hasSpotting = ! $isMenstrual && isset($spottingLookup[$dateStr]);
 
             $days[] = [
-                'day'    => $day,
-                'date'   => $date->format('Y-m-d'),
-                'phase'  => $phase['key'],
-                'color'  => $phase['color'],
-                'icon'   => $phase['icon'],
-                'is_fertile' => $day >= $phases['fertile_start'] && $day <= $phases['fertile_end'],
+                'day'          => $day,
+                'date'         => $dateStr,
+                'phase'        => $phase['key'],
+                'phase_name'   => $phase['name'],
+                'color'        => $phase['color'],
+                'icon'         => $phase['icon'],
+                'is_fertile'   => $day >= $phases['fertile_start'] && $day <= $phases['fertile_end'],
                 'is_ovulation' => $day === $phases['ovulation_day'],
+                'has_spotting' => $hasSpotting,
+                'spotting'     => $hasSpotting,
+                'can_spot'     => ! $isMenstrual,
             ];
         }
 

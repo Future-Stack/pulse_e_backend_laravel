@@ -199,6 +199,11 @@ Route::prefix('v1')->group(function () {
     Route::get('/cycle-calendar/fertile-window-prediction', [CycleCalendarInputController::class, 'fertilePrediction']);
     Route::get('/fertile-window-prediction', [CycleCalendarInputController::class, 'fertilePrediction']);
 
+    // Period / Spotting logging
+    Route::post('/period/log', [CycleCalendarInputController::class, 'logPeriod']);
+    Route::post('/cycle-engine/period/log', [CycleCalendarInputController::class, 'logPeriod']);
+    Route::post('/period-logs', [CycleCalendarInputController::class, 'logPeriod']);
+
         //user health log
         Route::apiResource('health-logs', HealthLogController::class);
         Route::get('/health-log/today', [HealthLogController::class, 'today']);
