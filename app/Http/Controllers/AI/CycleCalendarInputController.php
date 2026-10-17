@@ -256,7 +256,8 @@ public function current(Request $request): JsonResponse
     */
     $calendarDays = CycleCalculatorService::generateCalendarDays(
         $startDate,
-        $dayInfo['phases']
+        $dayInfo['phases'],
+        $user
     );
 
     /*
@@ -486,5 +487,69 @@ public function current(Request $request): JsonResponse
             'success' =>true,
             'data' => $cycleCalendarInputs,
         ]);
+    }
+
+    /**
+     * Log daily period or spotting entry.
+     *
+     * POST /api/v1/period/log
+     * POST /api/v1/cycle-engine/period/log
+     * POST /api/v1/period-logs
+     */
+    public function logPeriod(Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        $validated = $request->validate([
+            'log_date'   => ['required', 'date'],
+            'flow'       => ['required', 'string', 'in:spotting,light,medium,heavy'],
+            'clotting'   => ['nullable', 'boolean'],
+            'cramps'     => ['nullable', 'boolean'],
+            'headache'   => ['nullable', 'boolean'],
+            'fatigue'    => ['nullable', 'boolean'],
+            'pain_level' => ['nullable', 'integer', 'min:0', 'max:10'],
+            'notes'      => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        $logDate = Carbon::parse($validated['log_date'])->toDateString();
+
+        // 1. Get or create active MenstrualCycle
+        $cycle = \App\Models\MenstrualCycle::where('user_id', $user->id)
+            ->where('is_completed', false)
+            ->latest('period_start_date')
+            ->first();
+
+        if (! $cycle) {
+            $cycle = \App\Models\MenstrualCycle::create([
+                'user_id'           => $user->id,
+                'period_start_date' => $logDate,
+                'is_completed'      => false,
+                'prediction_source' => 'calendar',
+            ]);
+        }
+
+        // 2. Update or create PeriodLog
+        $periodLog = \App\Models\PeriodLog::updateOrCreate(
+            [
+                'user_id'  => $user->id,
+                'cycle_id' => $cycle->id,
+                'log_date' => $logDate,
+            ],
+            [
+                'flow'       => $validated['flow'],
+                'clotting'   => $validated['clotting'] ?? false,
+                'cramps'     => $validated['cramps'] ?? false,
+                'headache'   => $validated['headache'] ?? false,
+                'fatigue'    => $validated['fatigue'] ?? false,
+                'pain_level' => $validated['pain_level'] ?? null,
+                'notes'      => $validated['notes'] ?? null,
+            ]
+        );
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Period/spotting log saved successfully.',
+            'data'    => $periodLog,
+        ], 201);
     }
 }
