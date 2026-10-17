@@ -14,7 +14,7 @@ class MarketplaceSlateService
 {
     private const BAYESIAN_PRIOR_WEIGHT = 20; // ~20-review weight
 
-    public function buildSlate(ProviderCategory $category, Metro $metro, int $limit = 3, ?array $userCoords = null): Collection
+    public function buildSlate(ProviderCategory $category, Metro $metro, int $limit = 5, ?array $userCoords = null): Collection
     {
         $cacheKey = "slate:{$metro->id}:{$category->id}";
 
@@ -44,6 +44,23 @@ class MarketplaceSlateService
             ->get()
             ->sortBy(fn ($provider) => array_search($provider->id, $remainingIds))
             ->values();
+
+        if ($userCoords && isset($userCoords['lat'], $userCoords['lng'])) {
+            $organicProviders = $organicProviders->sortBy(function ($provider) use ($metro, $userCoords) {
+                $isCentroid = $metro->centroid
+                    && $provider->location
+                    && abs($provider->location->latitude - $metro->centroid->latitude) < 0.0001
+                    && abs($provider->location->longitude - $metro->centroid->longitude) < 0.0001;
+
+                $hasRealLocation = ! empty($provider->google_place_id) || ! $isCentroid;
+                $distance = $this->distanceKm($metro, $provider, $userCoords);
+
+                return [
+                    $hasRealLocation ? 0 : 1,
+                    $distance,
+                ];
+            })->values();
+        }
 
         $slate = collect();
         $position = 1;

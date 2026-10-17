@@ -294,6 +294,33 @@ class PregnancyPostpartumTest extends TestCase
             ]);
     }
 
+    public function test_complete_journey_modal_allows_postpartum_without_prior_pregnancy(): void
+    {
+        $user = User::factory()->create();
+        Sanctum::actingAs($user);
+
+        // User has a profile and NO prior pregnancy logged
+        \App\Models\Profile::create(['user_id' => $user->id]);
+        UserPregnancy::where('user_id', $user->id)->delete();
+
+        $response = $this->postJson("/api/v1/pregnancy/complete-journey", [
+            'delivery_date' => now()->subWeeks(2)->toDateString(),
+        ]);
+
+        $response->assertStatus(200)
+            ->assertJson([
+                'success' => true,
+                'data' => [
+                    'active_tab' => 'postpartum',
+                ],
+            ]);
+
+        $this->assertDatabaseHas('postpartum_recoveries', [
+            'user_id' => $user->id,
+            'current_week' => 2,
+        ]);
+    }
+
     public function test_report_loss_fails_without_active_pregnancy(): void
     {
         $user = User::factory()->create();

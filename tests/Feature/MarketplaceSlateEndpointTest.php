@@ -263,4 +263,69 @@ class MarketplaceSlateEndpointTest extends TestCase
         $obgynResponse->assertJsonPath('data.0.id', $obgynProvider->id);
         $obgynResponse->assertJsonPath('meta.life_stage', 'pregnancy-postpartum');
     }
+
+    public function test_slate_endpoint_accepts_all_as_category_and_defaults_gracefully(): void
+    {
+        $metro = Metro::factory()->create([
+            'centroid' => new Point(37.7749, -122.4194),
+            'radius_km' => 50,
+        ]);
+        $stage = MarketplaceLifeStage::create(['slug' => 'cycle-fertility', 'name' => 'Cycle & Fertility']);
+        $cat = ProviderCategory::factory()->create(['slug' => 'obgyn', 'active' => true]);
+        $stage->categories()->attach($cat->id, ['display_priority' => 1]);
+
+        $provider = Provider::factory()->create([
+            'metro_id' => $metro->id,
+            'location' => new Point(37.78, -122.42),
+            'status' => 'active',
+        ]);
+        $provider->categories()->attach($cat->id, ['source' => 'manual']);
+
+        $response = $this->getJson(route('marketplace.slate', [
+            'category' => 'all',
+            'life_stage' => 'cycle-fertility',
+            'metro_id' => $metro->id,
+        ]));
+
+        $response->assertOk();
+        $response->assertJsonPath('meta.category', 'obgyn');
+    }
+
+    public function test_slate_endpoint_prioritizes_verified_places_over_centroid_placeholders_when_coords_provided(): void
+    {
+        $metro = Metro::factory()->create([
+            'centroid' => new Point(37.7749, -122.4194),
+            'radius_km' => 50,
+            'active' => true,
+        ]);
+        $category = ProviderCategory::factory()->create(['slug' => 'obgyn', 'active' => true]);
+
+        // Centroid dummy placeholder (no google_place_id)
+        $centroidProvider = Provider::factory()->create([
+            'metro_id' => $metro->id,
+            'location' => new Point(37.7749, -122.4194),
+            'google_place_id' => null,
+            'status' => 'candidate',
+        ]);
+        $centroidProvider->categories()->attach($category->id, ['source' => 'nppes_taxonomy']);
+
+        // Real verified provider with Google place coordinates
+        $realProvider = Provider::factory()->create([
+            'metro_id' => $metro->id,
+            'location' => new Point(37.6900, -122.4700),
+            'google_place_id' => 'ChIJ_real_google_place',
+            'status' => 'candidate',
+        ]);
+        $realProvider->categories()->attach($category->id, ['source' => 'places_match']);
+
+        $response = $this->getJson(route('marketplace.slate', [
+            'category' => 'obgyn',
+            'lat' => 37.6879,
+            'lng' => -122.4702,
+        ]));
+
+        $response->assertOk();
+        $this->assertEquals($realProvider->id, $response->json('data.0.id'));
+        $this->assertLessThan(2.0, $response->json('data.0.distance_miles'));
+    }
 }
