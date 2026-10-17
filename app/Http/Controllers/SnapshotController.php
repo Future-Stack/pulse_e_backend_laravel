@@ -12,11 +12,7 @@ class SnapshotController extends Controller
      */
     public function snapshot($userId): JsonResponse
     {
-        $user = User::with([
-            'terraActivities',
-            'healthLogs',
-            'skinAnalyses',
-        ])->find($userId);
+        $user = User::select('id')->find($userId);
 
         if (!$user) {
             return response()->json([
@@ -26,8 +22,8 @@ class SnapshotController extends Controller
         }
 
         $terra = $user->terraActivities()->latest()->first();
-        $health = $user->healthLogs()->latest()->first();
-        $skin = $user->skinAnalyses()->latest()->first();
+        $health = $user->healthLogs()->select('id', 'user_id', 'energy_level', 'log_date')->latest()->first();
+        $skin = $user->skinAnalyses()->select('id', 'user_id', 'overall_score', 'hydration_status', 'neumera_insight')->latest()->first();
 
         $payload = $terra?->payload ?? [];
 

@@ -238,9 +238,11 @@ class SkinScanController extends Controller
             }
 
             // Calculate score change, comparison text, and status label vs previous scan
-            $previousScan = SkinScan::where('user_id', $user->id)->latest('created_at')->first();
+            $previousScore = SkinScan::where('user_id', $user->id)
+                ->latest('created_at')
+                ->value('overall_score');
             $currentScore = (int) ($scanData['overall_score'] ?? 0);
-            $scoreDiff = $previousScan ? ($currentScore - (int) $previousScan->overall_score) : 0;
+            $scoreDiff = $previousScore !== null ? ($currentScore - (int) $previousScore) : 0;
             $comparisonText = ($scoreDiff >= 0 ? "+{$scoreDiff}" : "{$scoreDiff}") . 'pts vs last scan';
             $statusLabel = $this->deriveStatusLabel($currentScore);
 
@@ -251,9 +253,7 @@ class SkinScanController extends Controller
             // Save skin scan and decrement quota within a database transaction
             $skinScan = DB::transaction(function () use ($scanData, $userLimit) {
                 $skinScan = SkinScan::create($scanData);
-                $skinScan->update([
-                    'findings' => $this->deriveDefaultFindings($skinScan),
-                ]);
+                $skinScan->update(['findings' => $this->deriveDefaultFindings($skinScan)]);
 
                 if ($userLimit->skin_scans_limit > 0) {
                     $userLimit->decrement('skin_scans_limit');
@@ -700,10 +700,10 @@ class SkinScanController extends Controller
      */
     private function buildCorrelations(int $userId, $scans, SkinScan $latestScan): array
     {
-        $recent7Scans = SkinScan::where('user_id', $userId)
-            ->where('created_at', '>=', now()->subDays(7)->startOfDay())
-            ->orderBy('created_at', 'asc')
-            ->get();
+        // Reuse already-loaded scans filtered to last 7 days instead of a separate query
+        $recent7Scans = $scans->filter(function ($scan) {
+            return $scan->created_at->gte(now()->subDays(7)->startOfDay());
+        })->sortBy('created_at')->values();
 
         $chartData = [];
         foreach ($recent7Scans as $scan) {

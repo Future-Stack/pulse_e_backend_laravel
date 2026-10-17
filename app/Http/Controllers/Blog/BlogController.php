@@ -13,15 +13,14 @@ class BlogController extends Controller
     public function index(Request $request)
     {
         try {
-            $blogs = Blog::with('blogCategory')->orderByDesc('published_at');
+            $query = Blog::with('blogCategory')
+                ->orderByDesc('published_at');
 
-            $category_id = $request->query('category_id');
-            if ($category_id) {
-                $blogs = $blogs->where('blog_category_id', $category_id)->get();
+            if ($request->filled('category_id')) {
+                $query->where('blog_category_id', $request->query('category_id'));
             }
-            else{
-                $blogs = $blogs->get();
-            }
+
+            $blogs = $query->get();
 
             return response()->json([
                 'success' => true,
@@ -136,7 +135,7 @@ class BlogController extends Controller
 
             $blog = Blog::where('slug', $slug)->firstOrFail();
 
-            $blog->update([
+            $updateData = [
                 'blog_category_id' => $validated['blog_category_id'],
                 'title' => $validated['title'],
                 'short_desc' => $validated['short_desc'] ?? $blog->short_desc,
@@ -147,17 +146,14 @@ class BlogController extends Controller
                 'tags' => $validated['tags'] ?? $blog->tags,
                 'is_featured' => $validated['is_featured'] ?? $blog->is_featured,
                 'is_published' => $validated['is_published'] ?? $blog->is_published,
-            ]);
+            ];
 
-            $imagePath = '';
             if ($request->hasFile('cover_image')) {
                 $storedPath = $request->file('cover_image')->store('blogs', 'public');
-                $imagePath  = asset('storage/' . $storedPath); // ✅ full URL
+                $updateData['cover_image'] = asset('storage/' . $storedPath);
             }
 
-            $blog->update([
-                'cover_image' => $imagePath,
-            ]);
+            $blog->update($updateData);
 
             return response()->json([
                 'success' => true,

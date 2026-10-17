@@ -64,8 +64,7 @@ class NotificationController extends Controller
                     DB::raw('JSON_UNQUOTE(JSON_EXTRACT(data, "$.type")) as type'),
                     DB::raw('JSON_UNQUOTE(JSON_EXTRACT(data, "$.sent_to_label")) as sent_to'),
                     DB::raw('COUNT(*) as recipients'),
-                    DB::raw('MAX(read_at) as read_at') // ✅ include read_at
-
+                    DB::raw('MAX(read_at) as read_at')
                 )
                 ->where('type','App\Notifications\AdminIconNotification')
                 ->groupByRaw('JSON_UNQUOTE(JSON_EXTRACT(data, "$.title")),
@@ -83,7 +82,7 @@ class NotificationController extends Controller
                         'recipients'  => $n->recipients,
                         'sent_to'     => $n->sent_to ?? 'All Users',
                         'sent_at'     => $n->sent_at ? Carbon::parse($n->sent_at)->diffForHumans()  : null,
-                        'read_at'     => $n->read_at ? $n->read_at : null, // ✅ show read_at
+                        'read_at'     => $n->read_at ? $n->read_at : null,
                         'status'      => 'delivered',
                     ];
                 });
@@ -117,7 +116,7 @@ class NotificationController extends Controller
                     DB::raw('COUNT(*) as recipients')
                 )
                 ->where('type','App\Notifications\AdminIconNotification')
-                ->whereNotNull('read_at') // ✅ only read notifications
+                ->whereNotNull('read_at')
                 ->groupByRaw('JSON_UNQUOTE(JSON_EXTRACT(data, "$.title")),
                   JSON_UNQUOTE(JSON_EXTRACT(data, "$.message")),
                   JSON_UNQUOTE(JSON_EXTRACT(data, "$.type")),
