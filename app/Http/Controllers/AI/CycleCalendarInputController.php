@@ -93,14 +93,16 @@ class CycleCalendarInputController extends Controller
             );
         }
 
-        // 3. Trigger AI Engine cycle sync if available
-        try {
-            if (class_exists(\App\Http\Controllers\AI\CycleSummaryController::class)) {
-                app(\App\Http\Controllers\AI\CycleSummaryController::class)->sync();
+        // 3. Trigger AI Engine cycle sync in background without blocking response
+        defer(function () {
+            try {
+                if (class_exists(\App\Http\Controllers\AI\CycleSummaryController::class)) {
+                    app(\App\Http\Controllers\AI\CycleSummaryController::class)->sync();
+                }
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning("Failed to auto-sync AI engine after calendar input: " . $e->getMessage());
             }
-        } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\Log::warning("Failed to auto-sync AI engine after calendar input: " . $e->getMessage());
-        }
+        });
 
         return response()->json([
             'success' => true,
@@ -272,6 +274,22 @@ public function current(Request $request): JsonResponse
 
     /*
     |--------------------------------------------------------------------------
+    | Check Spotting for Selected Date
+    |--------------------------------------------------------------------------
+    */
+    $selectedSpotting = \App\Models\PeriodLog::where('user_id', $user->id)
+        ->where('flow', 'spotting')
+        ->whereDate('log_date', $selectedDate->toDateString())
+        ->first();
+
+    $calendarStatus = array_merge($dayInfo['calendar_status'], [
+        'has_spotting' => (bool) $selectedSpotting,
+        'spotting' => (bool) $selectedSpotting,
+        'spotting_color' => $selectedSpotting?->color,
+    ]);
+
+    /*
+    |--------------------------------------------------------------------------
     | Day-by-Day Calendar with Phase Colors
     |--------------------------------------------------------------------------
     */
@@ -381,7 +399,7 @@ public function current(Request $request): JsonResponse
             | Calendar Status
             |--------------------------------------------------------------------------
             */
-            'calendar_status' => $dayInfo['calendar_status'],
+            'calendar_status' => $calendarStatus,
 
             /*
             |--------------------------------------------------------------------------
