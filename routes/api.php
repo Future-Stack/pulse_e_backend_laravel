@@ -46,6 +46,7 @@ use App\Http\Controllers\AI\OpkLogController;
 use App\Http\Controllers\AI\TryingToConceiveController;
 use App\Http\Controllers\AI\AwarenessController;
 use App\Http\Controllers\AI\CycleCalendarInputController;
+use App\Http\Controllers\AI\PeriodLogController;
 use App\Http\Controllers\AI\CervicalMucusLogController;
 use App\Http\Controllers\AI\CycleFertilityController;
 use App\Http\Controllers\AI\AthletePerformanceController;
@@ -199,10 +200,23 @@ Route::prefix('v1')->group(function () {
     Route::get('/cycle-calendar/fertile-window-prediction', [CycleCalendarInputController::class, 'fertilePrediction']);
     Route::get('/fertile-window-prediction', [CycleCalendarInputController::class, 'fertilePrediction']);
 
-    // Period / Spotting logging
-    Route::post('/period/log', [CycleCalendarInputController::class, 'logPeriod']);
-    Route::post('/cycle-engine/period/log', [CycleCalendarInputController::class, 'logPeriod']);
-    Route::post('/period-logs', [CycleCalendarInputController::class, 'logPeriod']);
+    // Period & Spotting logging (Store or Update, Get, Delete)
+    Route::match(['post', 'put'], '/period/log', [PeriodLogController::class, 'storeOrUpdate']);
+    Route::match(['post', 'put'], '/cycle-engine/period/log', [PeriodLogController::class, 'storeOrUpdate']);
+    Route::match(['post', 'put'], '/period-logs', [PeriodLogController::class, 'storeOrUpdate']);
+    Route::match(['post', 'put'], '/cycle-engine/spotting/log', [PeriodLogController::class, 'storeOrUpdate']);
+
+    Route::get('/period/log', [PeriodLogController::class, 'getLog']);
+    Route::get('/cycle-engine/period/log', [PeriodLogController::class, 'getLog']);
+    Route::get('/cycle-engine/spotting/log', [PeriodLogController::class, 'getLog']);
+    Route::get('/period-logs', [PeriodLogController::class, 'getLog']);
+    Route::get('/period-logs/{id}', [PeriodLogController::class, 'show']);
+
+    Route::delete('/period/log', [PeriodLogController::class, 'destroy']);
+    Route::delete('/cycle-engine/period/log', [PeriodLogController::class, 'destroy']);
+    Route::delete('/period-logs/{id}', [PeriodLogController::class, 'destroy']);
+    Route::delete('/period-logs', [PeriodLogController::class, 'destroy']);
+    Route::post('/period/log/delete', [PeriodLogController::class, 'destroy']);
 
         //user health log
         Route::apiResource('health-logs', HealthLogController::class);

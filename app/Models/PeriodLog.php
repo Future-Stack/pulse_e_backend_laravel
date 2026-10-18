@@ -12,6 +12,7 @@ class PeriodLog extends Model
         'cycle_id',
         'log_date',
         'flow',
+        'color',
         'clotting',
         'pain_level',
         'cramps',
@@ -20,16 +21,28 @@ class PeriodLog extends Model
         'notes',
     ];
 
+    protected $appends = [
+        'has_spotting',
+    ];
+
     protected function casts(): array
     {
         return [
-            'log_date'   => 'date',
+            'log_date'   => 'date:Y-m-d',
             'clotting'   => 'boolean',
             'cramps'     => 'boolean',
             'headache'   => 'boolean',
             'fatigue'    => 'boolean',
             'pain_level' => 'integer',
         ];
+    }
+
+    /**
+     * Check if flow is spotting.
+     */
+    public function getHasSpottingAttribute(): bool
+    {
+        return $this->flow === 'spotting';
     }
 
     /**

@@ -404,8 +404,16 @@ class CycleCalculatorService
         |--------------------------------------------------------------------------
         | Follicular Phase
         |--------------------------------------------------------------------------
+        |
+        | Medical science definition: The follicular phase begins on Cycle Day 1
+        | (the first day of menstruation) and continues until ovulation.
+        | Menstrual bleeding occurs during the early days of the follicular phase.
+        |
+        | Previously this was set to $periodLength + 1, which only counted the
+        | non-bleeding days as follicular — inconsistent with clinical standards.
+        |--------------------------------------------------------------------------
         */
-        $follicularStart = $periodLength + 1;
+        $follicularStart = 1; // Cycle Day 1 = Period Start Date (medical definition)
 
         $follicularEnd = max(
             $follicularStart,
@@ -540,9 +548,27 @@ class CycleCalculatorService
 
             $phaseKey = 'luteal';
 
-            $color = 'blue';
+            $color = 'orange';
 
-            $icon = '🔵';
+            $icon = '🟠';
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Clinical Phase (Medical Definition)
+        |--------------------------------------------------------------------------
+        |
+        | Follicular phase begins on Cycle Day 1 (first day of menstruation)
+        | and continues until ovulation — per WHO / ACOG clinical standard.
+        | This differs from the display phase, where bleeding days show as red.
+        |--------------------------------------------------------------------------
+        */
+        if ($cycleDay <= $phases['follicular_end']) {
+            $clinicalPhase = 'follicular';
+        } elseif ($cycleDay <= $phases['ovulatory_end']) {
+            $clinicalPhase = 'ovulatory';
+        } else {
+            $clinicalPhase = 'luteal';
         }
 
         /*
@@ -588,11 +614,14 @@ class CycleCalculatorService
         return [
 
             'phase' => [
-                'name' => $phaseName,
-                'key' => $phaseKey,
+                'name'  => $phaseName,
+                'key'   => $phaseKey,
                 'color' => $color,
-                'icon' => $icon,
+                'icon'  => $icon,
             ],
+
+            // Clinical phase per medical definition (Follicular starts Day 1)
+            'clinical_phase' => $clinicalPhase,
 
             'calendar_status' => $calendarStatus,
 
@@ -620,24 +649,28 @@ class CycleCalculatorService
         $spottingLookup = [];
         if ($userOrSpotting instanceof User || (is_numeric($userOrSpotting) && $userOrSpotting > 0)) {
             $userId = $userOrSpotting instanceof User ? $userOrSpotting->id : (int) $userOrSpotting;
-            $cycleEndDate = $startDate->copy()->addDays($cycleLength);
+            $cycleEndDate = $startDate->copy()->addDays($cycleLength - 1); // Day cycleLength = last day of cycle
 
             $spottingLogs = PeriodLog::where('user_id', $userId)
                 ->where('flow', 'spotting')
                 ->whereBetween('log_date', [$startDate->toDateString(), $cycleEndDate->toDateString()])
-                ->pluck('log_date');
+                ->get(['log_date', 'color']);
 
-            foreach ($spottingLogs as $logDate) {
-                $dateKey = $logDate instanceof \DateTimeInterface
-                    ? $logDate->format('Y-m-d')
-                    : Carbon::parse($logDate)->format('Y-m-d');
-                $spottingLookup[$dateKey] = true;
+            foreach ($spottingLogs as $log) {
+                $dateKey = $log->log_date instanceof \DateTimeInterface
+                    ? $log->log_date->format('Y-m-d')
+                    : Carbon::parse($log->log_date)->format('Y-m-d');
+                $spottingLookup[$dateKey] = [
+                    'color' => $log->color ?? 'pink',
+                ];
             }
         } elseif (is_array($userOrSpotting)) {
             foreach ($userOrSpotting as $key => $val) {
                 $dateKey = is_string($key) && strlen($key) >= 10 ? $key : (is_string($val) ? $val : null);
                 if ($dateKey) {
-                    $spottingLookup[$dateKey] = true;
+                    $spottingLookup[$dateKey] = [
+                        'color' => is_array($val) ? ($val['color'] ?? 'pink') : 'pink',
+                    ];
                 }
             }
         }
@@ -645,11 +678,15 @@ class CycleCalculatorService
         $phaseMap = [
             'menstrual'  => ['name' => 'Menstrual Phase',  'key' => 'menstrual',  'color' => 'red',    'icon' => '🔴'],
             'follicular' => ['name' => 'Follicular Phase', 'key' => 'follicular', 'color' => 'green',  'icon' => '🟢'],
-            'ovulatory'  => ['name' => 'Ovulatory Phase',  'key' => 'ovulatory',  'color' => 'teal',   'icon' => '🟡'],
+            'ovulatory'  => ['name' => 'Ovulatory Phase',  'key' => 'ovulatory',  'color' => 'yellow', 'icon' => '🟡'],
             'luteal'     => ['name' => 'Luteal Phase',     'key' => 'luteal',     'color' => 'orange', 'icon' => '🟠'],
         ];
 
         for ($day = 1; $day <= $cycleLength; $day++) {
+
+            // ── Display phase (calendar color) ────────────────────────────────
+            // Menstrual days are shown red even though they overlap with the
+            // clinical follicular phase. This keeps the UI intuitive.
             if ($day <= $phases['menstrual_end']) {
                 $phase = $phaseMap['menstrual'];
             } elseif ($day <= $phases['follicular_end']) {
@@ -660,25 +697,44 @@ class CycleCalculatorService
                 $phase = $phaseMap['luteal'];
             }
 
-            $date = $startDate->copy()->addDays($day - 1);
+            // ── Clinical phase (medical definition) ──────────────────────────
+            // Follicular phase begins on Cycle Day 1 (first day of menstruation)
+            // and continues until ovulation (per WHO / ACOG clinical standard).
+            if ($day <= $phases['follicular_end']) {
+                $clinicalPhase = 'follicular';
+            } elseif ($day <= $phases['ovulatory_end']) {
+                $clinicalPhase = 'ovulatory';
+            } else {
+                $clinicalPhase = 'luteal';
+            }
+
+            $date    = $startDate->copy()->addDays($day - 1);
             $dateStr = $date->format('Y-m-d');
 
             // Spotting indicator is tracked in all phases OTHER than menstrual
-            $isMenstrual = ($phase['key'] === 'menstrual');
-            $hasSpotting = ! $isMenstrual && isset($spottingLookup[$dateStr]);
+            $isMenstrual  = ($phase['key'] === 'menstrual');
+            $hasSpotting  = ! $isMenstrual && isset($spottingLookup[$dateStr]);
+            $spottingColor = $hasSpotting ? ($spottingLookup[$dateStr]['color'] ?? 'pink') : null;
 
             $days[] = [
-                'day'          => $day,
-                'date'         => $dateStr,
-                'phase'        => $phase['key'],
-                'phase_name'   => $phase['name'],
-                'color'        => $phase['color'],
-                'icon'         => $phase['icon'],
-                'is_fertile'   => $day >= $phases['fertile_start'] && $day <= $phases['fertile_end'],
-                'is_ovulation' => $day === $phases['ovulation_day'],
-                'has_spotting' => $hasSpotting,
-                'spotting'     => $hasSpotting,
-                'can_spot'     => ! $isMenstrual,
+                'day'            => $day,
+                'date'           => $dateStr,
+
+                // Display phase — drives calendar color (UI)
+                'phase'          => $phase['key'],
+                'phase_name'     => $phase['name'],
+                'color'          => $phase['color'],
+                'icon'           => $phase['icon'],
+
+                // Clinical phase — medical definition (Follicular starts Day 1)
+                'clinical_phase' => $clinicalPhase,
+
+                'is_fertile'     => $day >= $phases['fertile_start'] && $day <= $phases['fertile_end'],
+                'is_ovulation'   => $day === $phases['ovulation_day'],
+                'has_spotting'   => $hasSpotting,
+                'spotting'       => $hasSpotting,
+                'spotting_color' => $spottingColor,
+                'can_spot'       => ! $isMenstrual,
             ];
         }
 
