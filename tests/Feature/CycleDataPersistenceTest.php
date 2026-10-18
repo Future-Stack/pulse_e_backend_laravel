@@ -52,8 +52,12 @@ class CycleDataPersistenceTest extends TestCase
         $this->assertDatabaseHas('period_logs', [
             'user_id' => $user->id,
             'cycle_id' => $cycle->id,
-            'log_date' => '2026-08-01 00:00:00',
         ]);
+        $this->assertTrue(
+            PeriodLog::where('user_id', $user->id)
+                ->whereDate('log_date', '2026-08-01')
+                ->exists()
+        );
     }
 
     public function test_bbt_logging_associates_cycle_id_and_saves_bbt_log(): void

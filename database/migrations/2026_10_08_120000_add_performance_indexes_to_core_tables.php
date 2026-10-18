@@ -135,6 +135,16 @@ return new class extends Migration
 
     private function indexExists(string $table, string $indexName): bool
     {
+        try {
+            return Schema::hasIndex($table, $indexName);
+        } catch (\Throwable $e) {
+            // Fallback for older driver setups
+        }
+
+        if (DB::getDriverName() === 'sqlite') {
+            return false;
+        }
+
         $database = DB::getDatabaseName();
 
         $result = DB::selectOne(

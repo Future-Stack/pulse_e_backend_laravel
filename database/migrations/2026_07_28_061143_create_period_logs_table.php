@@ -36,6 +36,9 @@ return new class extends Migration
                 'heavy',
             ]);
 
+            // Spotting / Flow Color (pink, red, brown)
+            $table->string('color')->nullable();
+
             // Symptoms
             $table->boolean('clotting')->default(false);
             $table->boolean('cramps')->default(false);

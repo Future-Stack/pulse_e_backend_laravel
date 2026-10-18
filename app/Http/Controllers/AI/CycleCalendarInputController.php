@@ -140,14 +140,39 @@ public function current(Request $request): JsonResponse
         'date' => ['nullable', 'date'],
     ]);
 
+    $selectedDate = $request->filled('date')
+        ? Carbon::parse($request->date)
+        : Carbon::today();
+
     /*
     |--------------------------------------------------------------------------
-    | Get Latest Cycle Calendar Input
+    | Get Cycle Calendar Input
+    |--------------------------------------------------------------------------
+    |
+    | When ?date=YYYY-MM-DD is requested, find the cycle input starting on or
+    | before that date (the cycle that covers this date).
+    | If the date is before any logged cycle, fallback to the earliest cycle.
+    | When no date is requested, get the latest active cycle input.
     |--------------------------------------------------------------------------
     */
-    $calendarInput = CycleCalendarInput::where('user_id', $user->id)
-        ->latest('start_date')
-        ->first();
+    if ($request->filled('date')) {
+        $calendarInput = CycleCalendarInput::where('user_id', $user->id)
+            ->where('start_date', '<=', $selectedDate->toDateString())
+            ->orderByDesc('start_date')
+            ->orderByDesc('id')
+            ->first();
+
+        if (!$calendarInput) {
+            $calendarInput = CycleCalendarInput::where('user_id', $user->id)
+                ->orderBy('start_date')
+                ->orderBy('id')
+                ->first();
+        }
+    } else {
+        $calendarInput = CycleCalendarInput::where('user_id', $user->id)
+            ->latest('start_date')
+            ->first();
+    }
 
     if (!$calendarInput) {
         return response()->json([
@@ -167,10 +192,6 @@ public function current(Request $request): JsonResponse
     $periodEndDate = $calendarInput->end_date
         ? Carbon::parse($calendarInput->end_date)
         : $startDate->copy();
-
-    $selectedDate = $request->filled('date')
-        ? Carbon::parse($request->date)
-        : Carbon::today();
 
     /*
     |--------------------------------------------------------------------------
@@ -348,10 +369,12 @@ public function current(Request $request): JsonResponse
 
             /*
             |--------------------------------------------------------------------------
-            | Current Phase
+            | Current Phase (UI Display) & Clinical Phase (Medical Classification)
             |--------------------------------------------------------------------------
             */
             'phase' => $dayInfo['phase'],
+
+            'clinical_phase' => $dayInfo['clinical_phase'] ?? null,
 
             /*
             |--------------------------------------------------------------------------
@@ -490,7 +513,7 @@ public function current(Request $request): JsonResponse
     }
 
     /**
-     * Log daily period or spotting entry.
+     * Log daily period or spotting entry (delegated to PeriodLogController).
      *
      * POST /api/v1/period/log
      * POST /api/v1/cycle-engine/period/log
@@ -498,58 +521,6 @@ public function current(Request $request): JsonResponse
      */
     public function logPeriod(Request $request): JsonResponse
     {
-        $user = $request->user();
-
-        $validated = $request->validate([
-            'log_date'   => ['required', 'date'],
-            'flow'       => ['required', 'string', 'in:spotting,light,medium,heavy'],
-            'clotting'   => ['nullable', 'boolean'],
-            'cramps'     => ['nullable', 'boolean'],
-            'headache'   => ['nullable', 'boolean'],
-            'fatigue'    => ['nullable', 'boolean'],
-            'pain_level' => ['nullable', 'integer', 'min:0', 'max:10'],
-            'notes'      => ['nullable', 'string', 'max:1000'],
-        ]);
-
-        $logDate = Carbon::parse($validated['log_date'])->toDateString();
-
-        // 1. Get or create active MenstrualCycle
-        $cycle = \App\Models\MenstrualCycle::where('user_id', $user->id)
-            ->where('is_completed', false)
-            ->latest('period_start_date')
-            ->first();
-
-        if (! $cycle) {
-            $cycle = \App\Models\MenstrualCycle::create([
-                'user_id'           => $user->id,
-                'period_start_date' => $logDate,
-                'is_completed'      => false,
-                'prediction_source' => 'calendar',
-            ]);
-        }
-
-        // 2. Update or create PeriodLog
-        $periodLog = \App\Models\PeriodLog::updateOrCreate(
-            [
-                'user_id'  => $user->id,
-                'cycle_id' => $cycle->id,
-                'log_date' => $logDate,
-            ],
-            [
-                'flow'       => $validated['flow'],
-                'clotting'   => $validated['clotting'] ?? false,
-                'cramps'     => $validated['cramps'] ?? false,
-                'headache'   => $validated['headache'] ?? false,
-                'fatigue'    => $validated['fatigue'] ?? false,
-                'pain_level' => $validated['pain_level'] ?? null,
-                'notes'      => $validated['notes'] ?? null,
-            ]
-        );
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Period/spotting log saved successfully.',
-            'data'    => $periodLog,
-        ], 201);
+        return app(\App\Http\Controllers\AI\PeriodLogController::class)->storeOrUpdate($request);
     }
 }
