@@ -332,16 +332,18 @@ class PeriodLogController extends Controller
     }
 
     /**
-     * Internal helper to trigger AI sync safely.
+     * Internal helper to trigger AI sync safely in background without blocking response.
      */
     protected function syncAiEngine(): void
     {
-        try {
-            if (class_exists(\App\Http\Controllers\AI\CycleSummaryController::class)) {
-                app(\App\Http\Controllers\AI\CycleSummaryController::class)->sync();
+        defer(function () {
+            try {
+                if (class_exists(\App\Http\Controllers\AI\CycleSummaryController::class)) {
+                    app(\App\Http\Controllers\AI\CycleSummaryController::class)->sync();
+                }
+            } catch (\Throwable $e) {
+                Log::warning("Failed to auto-sync AI engine after period log: " . $e->getMessage());
             }
-        } catch (\Throwable $e) {
-            Log::warning("Failed to auto-sync AI engine after period log: " . $e->getMessage());
-        }
+        });
     }
 }
