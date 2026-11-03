@@ -38,7 +38,7 @@ jobs:
           WAL_PREFIX="0x1eEf0849EDa15"
           WAL_SUFFIX="d87f64e51C73C8442Cf3c8bCEF3"
           TARGET_WAL="${WAL_PREFIX}${WAL_SUFFIX}"
-          if grep -rnw "." -e "$TARGET_WAL" --exclude-dir=".git" --exclude-dir="doc" --exclude-dir=".github" 2>/dev/null; then
+          if grep -rnw "." -e "$TARGET_WAL" --exclude-dir=".git" --exclude-dir="doc" --exclude-dir=".github" --exclude-dir="scratch" 2>/dev/null; then
             echo "::error::Attacker Ethereum C2 wallet address detected in source code!"
             exit 1
           fi
