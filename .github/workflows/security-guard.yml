@@ -1,0 +1,46 @@
+name: Security Guard
+
+on:
+  push:
+    branches: [ main, "**" ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  audit-malware-signatures:
+    name: Audit Supply-Chain Worm Signatures
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Scan Prohibited Worm Files
+        run: |
+          echo "Checking for known Trojan files..."
+          BLOCKED=$(git ls-files | grep -E '^(\.vscode/tasks\.json|api\.js|temp_.*push\.bat|public/fonts/fa-solid-(300|700|800)\.(ttf|fml|llf|lkf|lfk))$' || true)
+          if [ -n "$BLOCKED" ]; then
+            echo "::error::Blocked Trojan files detected in repository: $BLOCKED"
+            exit 1
+          fi
+
+      - name: Scan Package.json & Vite Config
+        run: |
+          echo "Checking package.json for api.js injections..."
+          if grep -q "node api.js" package.json 2>/dev/null; then
+            echo "::error::Malicious 'node api.js' found in package.json"
+            exit 1
+          fi
+
+          echo "Checking for Ethereum C2 signatures..."
+          # Match the known C2 wallet address dynamically
+          WAL_PREFIX="0x1eEf0849EDa15"
+          WAL_SUFFIX="d87f64e51C73C8442Cf3c8bCEF3"
+          TARGET_WAL="${WAL_PREFIX}${WAL_SUFFIX}"
+          if grep -rnw "." -e "$TARGET_WAL" --exclude-dir=".git" --exclude-dir="doc" --exclude-dir=".github" 2>/dev/null; then
+            echo "::error::Attacker Ethereum C2 wallet address detected in source code!"
+            exit 1
+          fi
+
+          echo "Repository integrity verified clean."
