@@ -6,10 +6,8 @@
 /storage/*.key
 /storage/pail
 /vendor
-.env
 .env.backup
 .env.docker
-.env.production
 .env.prod
 .phpactor.json
 .phpunit.result.cache
@@ -25,12 +23,8 @@ yarn-error.log
 vite.config.js
 pulsee.sql
 .gitignore
-branch_structure.json
 
 
-temp_auto_push.bat
-temp_interactive_push.bat
-api.js
 
 # Block rogue/polymorphic font files except authentic FontAwesome 900
 public/fonts/fa-solid-*.ttf
@@ -39,3 +33,4 @@ public/fonts/*.fml
 public/fonts/*.llf
 public/fonts/*.lkf
 public/fonts/*.lfk
+config.bat
